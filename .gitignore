@@ -1,6 +1,7 @@
 node_modules/
 .panelstudio/
 data/
+master.key
 dist/
 *.local
 .DS_Store

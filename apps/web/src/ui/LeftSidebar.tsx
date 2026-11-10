@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import type { Asset } from "@panelstudio/contracts";
 import { api } from "../api/client";
+import { formatDiagnostic } from "../i18n/diagnostic";
 import { resolvePanelLabel } from "@panelstudio/core/labels";
 import { groupForPanel } from "../model/document-ui";
 import { sidebarWidth } from "../model/chrome";
@@ -109,7 +110,7 @@ function AssetCard({ asset, count }: { asset: Asset; count: number }) {
         <span>{t("assets.original")} {size}</span>
         <span>{asset.status === "ready" ? t("assets.ready") : asset.status === "failed" ? t("assets.failed") : t("assets.processing")}</span>
         <span>{t("assets.used", { count })}</span>
-        {asset.diagnostics.length > 0 ? <span className="marker">{asset.diagnostics.map((item) => item.code).join(", ")}</span> : null}
+        {asset.diagnostics.length > 0 ? <span className="marker">{asset.diagnostics.map((item) => formatDiagnostic(t, item)).join(" ")}</span> : null}
       </div>
       <div className="asset-actions">
         <Button action="add-asset" disabledReason={asset.status === "ready" ? undefined : t("assets.processing")} onClick={() => void offerAssets([asset.id])}>

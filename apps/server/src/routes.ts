@@ -21,6 +21,7 @@ import {
   SSE_HEARTBEAT_INTERVAL_MS,
 } from "./ai-jobs.js";
 import { listJobEvents } from "./db.js";
+import { fontBundle, fontList } from "./fonts.js";
 import { ApiException, requireIdempotencyKey, sendError } from "./http.js";
 import {
   commitHistory,
@@ -85,6 +86,10 @@ export function registerRoutes(app: FastifyInstance, ctx: AppContext): void {
   }));
 
   app.get("/api/v1/capabilities", async () => PHASE0_CAPABILITY_SAMPLE);
+
+  app.get("/api/v1/fonts", async () => fontList());
+
+  app.get("/api/v1/fonts/bundle", async (_request, reply) => sendBytes(reply, fontBundle()));
 
   app.post("/api/v1/projects", async (request, reply) => {
     const key = requireIdempotencyKey(request);

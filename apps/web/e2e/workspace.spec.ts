@@ -46,7 +46,9 @@ test("imports, lays out, accepts, and exports through the real API", async ({ pa
   await page.getByRole("button", { name: "可编辑 SVG" }).click();
   const file = await download;
   expect(file.suggestedFilename()).toMatch(/\.svg$/);
-  await expect(page.getByText("FONT_MISSING").first()).toBeVisible();
+  await expect(page.getByTestId("font-status")).toContainText("Noto Sans");
+  await expect(page.getByText("FONT_MISSING")).toHaveCount(0);
+  await expect(page.getByTestId("export-diagnostics")).not.toContainText("font.notInstalled");
   await expect(page.getByRole("button", { name: "再次下载" })).toBeEnabled();
   await shot(page, "phase4-import-layout-export");
   const buttons = page.locator("button:visible");

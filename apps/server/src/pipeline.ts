@@ -69,6 +69,7 @@ import {
   type ProjectRecord,
 } from "./db.js";
 import { buildProjectPackage, readProjectPackage, type PackagedAsset } from "./figure-package.js";
+import { isBundledFamily, missingGlyphs, packagedFontFiles } from "./fonts.js";
 import { ApiException } from "./http.js";
 import { normalizeRaster, rasterizeSvg, sniffMediaType, type RasterMediaType } from "./raster.js";
 import type Database from "better-sqlite3";
@@ -1074,14 +1075,6 @@ async function produceExport(
   const compiled = compileDocument(ctx, project.id, document, revision, false);
   let preview: Buffer | null = null;
   const diagnostics = [...compiled.diagnostics];
-  if (request.options.includeBundledFonts) {
-    diagnostics.push({
-      code: "FONT_MISSING",
-      severity: "warning",
-      messageKey: "font.filesNotVendored",
-      params: { family: "Noto Sans" },
-    });
-  }
   try {
     const previewWidth = Math.min(1200, pngPixelsFromMm(document.canvas.widthMm, 150));
     preview = rasterizeSvg(compiled.svg, previewWidth);
@@ -1101,6 +1094,7 @@ async function produceExport(
     assets,
     preview,
     fontDependencies: { families },
+    bundledFonts: request.options.includeBundledFonts ? packagedFontFiles() : [],
   });
   return {
     bytes: packed,
@@ -1183,15 +1177,26 @@ function compileDocument(
     includeMetadata,
     panels,
   });
-  return {
-    svg: compiled.svg,
-    diagnostics: compiled.fontFamilies.map((family) => ({
+  const diagnostics: Diagnostic[] = compiled.fontFamilies
+    .filter((family) => !isBundledFamily(family))
+    .map((family) => ({
       code: "FONT_MISSING",
       severity: "warning" as const,
       messageKey: "font.notInstalled",
       params: { family },
-    })),
-  };
+    }));
+  for (const panel of panels) {
+    if (!panel.label) continue;
+    const glyphs = missingGlyphs(panel.label.fontFamily, panel.label.fontWeight, panel.label.text);
+    if (glyphs.length === 0) continue;
+    diagnostics.push({
+      code: "FONT_MISSING",
+      severity: "warning",
+      messageKey: "font.missingGlyph",
+      params: { family: panel.label.fontFamily, glyphs: glyphs.join(" ") },
+    });
+  }
+  return { svg: compiled.svg, diagnostics };
 }
 
 function packageAssets(ctx: AppContext, projectId: string): PackagedAsset[] {

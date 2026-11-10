@@ -1,30 +1,59 @@
 # PanelStudio
 
-科研多面板排版编辑器。导入已有子图，排版并添加面板编号，导出可在 Adobe Illustrator 中继续编辑的 SVG。
+[中文](README.zh-CN.md)
 
-PanelStudio is an MIT-licensed local or self-hosted web editor for multi-panel scientific figures. The normative handbook is [`docs/PanelStudio-spec-v0.1.md`](docs/PanelStudio-spec-v0.1.md).
+PanelStudio is a local or self-hosted editor for multi-panel scientific figures. You import drawings you already made, the app proposes a layout and adds panel labels, and you export an SVG you can keep editing in Adobe Illustrator.
 
-## Phase 0
+The normative handbook is [`docs/PanelStudio-spec-v0.1.md`](docs/PanelStudio-spec-v0.1.md). This repository is v0.1.0. AI is optional: import, layout, editing, and export work with no model configured.
 
-This repository currently contains the phase 0 contract:
+## Flow
 
-- TypeBox schemas for the document, domain commands, and HTTP API
-- OpenAPI 3.1 document at [`docs/openapi.json`](docs/openapi.json)
-- Defaults, error codes, the SVG support catalog, and theme tokens
-- A pnpm workspace with exact dependency versions and a lockfile
+Import images → auto layout → adjust with one sentence, or with the mouse → export SVG → keep editing in Illustrator.
 
-Import, editing, layout, AI calls, and export are not implemented. `apps/web` is a shell that loads the theme tokens. It is not the editor and it has no controls.
+![Empty editor](docs/screenshots/01-empty.png)
 
-Handbook gaps that the schemas had to encode are recorded in [`docs/phase-0-decisions.md`](docs/phase-0-decisions.md). That note does not replace the handbook.
+![Six imported drawings](docs/screenshots/02-imported.png)
 
-## Develop
+![Layout candidates](docs/screenshots/03-layout.png)
 
-Node.js 22 LTS and pnpm 10.33.4.
+![One sentence makes C the primary panel](docs/screenshots/05-ai-primary.png)
+
+![Export dialog, with bundled font names](docs/screenshots/06-export.png)
+
+Those stills are from the running app. A Playwright capture of the same in-app states is [`docs/demo/in-app-walkthrough.webm`](docs/demo/in-app-walkthrough.webm). It does not include Illustrator. The sentence in that capture is answered by a local stand-in, not a hosted model. The script is [`docs/demo.md`](docs/demo.md).
+
+## Run
+
+Node.js 22.12 or newer, pnpm 10.33.4.
 
 ```bash
-pnpm install
-pnpm typecheck
-pnpm test
+pnpm install --frozen-lockfile
+pnpm --filter @panelstudio/server exec node start.mjs
 ```
 
-`pnpm-lock.yaml` is the reproducible install. Workspace manifests pin exact versions.
+In a second terminal:
+
+```bash
+pnpm --filter @panelstudio/web dev
+```
+
+Open `http://127.0.0.1:5173`. Full notes, including the data directory and `master.key`, are in [`docs/install.md`](docs/install.md).
+
+The default data directory is `$HOME/.panelstudio`. `master.key` is created there when you save a model secret. It must never be committed.
+
+## Formats and limits
+
+PNG, JPEG, WebP, and a documented subset of SVG. At most 8 panels in a project. Editable SVG keeps vectors and label text; it does not turn type into outlines. PDF, EPS, native `.ai`, and outline export are out of scope for v0.1.
+
+Details: [`docs/format-support.md`](docs/format-support.md).
+
+## Example
+
+[`examples/synthetic-six/`](examples/synthetic-six/) is an original six-panel figure (MIT), with source drawings and a `.figurezip`.
+
+## More
+
+- [Test record](docs/test-record.md)
+- [Illustrator checklist](docs/illustrator-compatibility.md) — every row needs a manual check
+- [Licenses, including the Noto OFL](docs/licenses.md)
+- [Phase 6 notes](docs/phase-6-decisions.md)

@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { DEFAULT_PNG_DPI, PNG_DPI_OPTIONS, SVG_SUPPORT, type AIProviderConfig, type ExportRequest } from "@panelstudio/contracts";
 import { api, newKey, waitForJob } from "../api/client";
+import { formatDiagnostic } from "../i18n/diagnostic";
 import { queryClient } from "../state/query";
 import { BUNDLED_FONTS } from "@panelstudio/contracts";
 import {
@@ -249,6 +250,13 @@ function ShortcutsDialog({ open }: { open: boolean }) {
   );
 }
 
+function downloadFontBundle(): void {
+  const link = document.createElement("a");
+  link.href = "/api/v1/fonts/bundle";
+  link.download = "panelstudio-fonts.zip";
+  link.click();
+}
+
 function ExportDialog({ open }: { open: boolean }) {
   const { t } = useTranslation();
   const state = useWorkspace();
@@ -259,7 +267,9 @@ function ExportDialog({ open }: { open: boolean }) {
   const running = state.exportState?.status === "running" ? state.exportState : null;
   return (
     <Shell open={open} title={t("export.title")}>
-      <p>{t("status.fontMissing", { families: BUNDLED_FONTS.map((font) => font.family).join(", ") })}</p>
+      <p>{t("export.fontList", { families: BUNDLED_FONTS.map((font) => font.family).join(", ") })}</p>
+      <p>{t("status.fontsReady", { families: BUNDLED_FONTS.map((font) => font.family).join(", ") })}</p>
+      <Button action="download-fonts" onClick={downloadFontBundle}>{t("export.downloadFonts")}</Button>
       {running ? <p data-testid="export-phase">{t("export.running", { revision: running.revision, phase: running.phase })}</p> : null}
       <Button action="export-svg" disabledReason={state.confirmed ? undefined : t("app.noProject")} onClick={() => void exportFigure({ revision, format: "svg", options: { includeMetadata: metadata } } satisfies ExportRequest)}>
         {t("export.svg")}
@@ -288,9 +298,9 @@ function ExportDialog({ open }: { open: boolean }) {
         <>
           <p>{t("export.blockedHint")}</p>
           <Button action="download-again" onClick={() => void downloadAgain()}>{t("export.downloadAgain")}</Button>
-          <ul>
+          <ul data-testid="export-diagnostics">
             {state.exportState.diagnostics.map((item, index) => (
-              <li key={`${item.code}-${index}`}>{item.code} {item.messageKey} {Object.values(item.params).join(" ")}</li>
+              <li key={`${item.code}-${index}`}>{formatDiagnostic(t, item)}</li>
             ))}
           </ul>
         </>
@@ -329,7 +339,7 @@ function AssetDialog({ open }: { open: boolean }) {
           <div><dt>{t("assets.original")}</dt><dd>{asset.originalMediaType}</dd></div>
           <div><dt>SHA-256</dt><dd>{asset.originalSha256}</dd></div>
           <div><dt>{asset.originalByteLength}</dt><dd>{asset.status}</dd></div>
-          {asset.diagnostics.map((item) => <div key={item.code}><dt>{item.code}</dt><dd>{item.messageKey}</dd></div>)}
+          {asset.diagnostics.map((item, index) => <div key={`${item.code}-${index}`}><dt>{formatDiagnostic(t, item)}</dt><dd>{item.severity}</dd></div>)}
           {asset.status === "ready" ? asset.normalized.normalizationNotes.map((note) => <p key={note}>{note}</p>) : null}
         </dl>
       ) : <p>{t("errors.NOT_FOUND")}</p>}

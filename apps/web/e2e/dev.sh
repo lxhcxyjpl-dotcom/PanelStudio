@@ -2,6 +2,10 @@
 set -euo pipefail
 cd "$(dirname "$0")/../../.."
 export PORT=3001
+if [[ -z "${DATA_DIR:-}" ]]; then
+  DATA_DIR="$(mktemp -d "${TMPDIR:-/tmp}/panelstudio-e2e.XXXXXX")"
+  export DATA_DIR
+fi
 pnpm --filter @panelstudio/server exec node start.mjs &
 server_pid=$!
 cleanup() { kill "$server_pid" 2>/dev/null || true; }

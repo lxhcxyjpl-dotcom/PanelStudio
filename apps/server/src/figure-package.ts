@@ -39,6 +39,7 @@ export function buildProjectPackage(input: {
   assets: PackagedAsset[];
   preview: Buffer | null;
   fontDependencies: unknown;
+  bundledFonts?: Array<{ path: string; bytes: Buffer; mediaType: string }>;
 }): Buffer {
   const files = new Map<string, { bytes: Buffer; mediaType: string }>();
   files.set("document.json", {
@@ -51,6 +52,9 @@ export function buildProjectPackage(input: {
   });
   if (input.preview) {
     files.set("preview.png", { bytes: input.preview, mediaType: "image/png" });
+  }
+  for (const font of input.bundledFonts ?? []) {
+    files.set(font.path, { bytes: font.bytes, mediaType: font.mediaType });
   }
   for (const asset of input.assets) {
     const base = `assets/${asset.id}`;

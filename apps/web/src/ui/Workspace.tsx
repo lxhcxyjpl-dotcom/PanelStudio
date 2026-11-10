@@ -1,7 +1,9 @@
 import { useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { NUDGE_MM } from "@panelstudio/contracts";
-import { BUNDLED_FONTS } from "@panelstudio/contracts";
+import { BUNDLED_FONTS, NUDGE_MM } from "@panelstudio/contracts";
+import { api } from "../api/client";
+import { formatDiagnostic } from "../i18n/diagnostic";
 import { workspaceMode, sidebarWidth, localizedSummary } from "../model/chrome";
 import { geometryLocked, panelIdsOf } from "../model/document-ui";
 import { fitCamera } from "../model/view";
@@ -198,8 +200,8 @@ export function Workspace() {
       <footer className="bottombar">
         <span>{t("status.zoom", { zoom: Math.round(state.camera.zoom * 100) })}</span>
         <span>{t("status.panels", { count: state.confirmed?.document.panelOrder.length ?? 0 })}</span>
-        <span className="font-warning" title={t("status.fontMissing", { families: BUNDLED_FONTS.map((font) => font.family).join(", ") })}>
-          FONT_MISSING
+        <span className="font-status" data-testid="font-status" title={t("status.fontsReady", { families: BUNDLED_FONTS.map((font) => font.family).join(", ") })}>
+          {t("status.fontsReady", { families: BUNDLED_FONTS.map((font) => font.family).join(", ") })}
         </span>
         {stale ? <span>{state.cards.some((card) => card.candidate.origin === "ai") ? t("ai.stale") : t("layout.stale")}</span> : null}
       </footer>
@@ -212,7 +214,12 @@ export function Workspace() {
 function Banners() {
   const { t } = useTranslation();
   const state = useWorkspace();
-  const families = BUNDLED_FONTS.map((font) => font.family).join(", ");
+  const assets = useQuery({
+    queryKey: ["assets", state.projectId],
+    enabled: Boolean(state.projectId),
+    queryFn: () => api.assets(state.projectId ?? ""),
+  });
+  const missing = (assets.data?.items ?? []).flatMap((asset) => asset.diagnostics.filter((item) => item.code === "FONT_MISSING"));
   return (
     <div className="banners">
       {state.backend === "down" || state.saveState === "offline" ? <p className="banner">{t("save.offline")}</p> : null}
@@ -233,7 +240,12 @@ function Banners() {
           )}
         </p>
       ) : null}
-      <p className="banner quiet">{t("status.fontMissing", { families })}</p>
+      {missing.length > 0 ? (
+        <p className="banner quiet">
+          {t("status.fontMissing")}
+          {missing.map((item, index) => <span key={`${item.messageKey}-${index}`}> {formatDiagnostic(t, item)}</span>)}
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -269,7 +281,7 @@ function CandidateDock() {
               {card.previewUrl ? <img alt="" src={card.previewUrl} /> : <span>{card.previewError ?? t("layout.loading")}</span>}
               <strong>{localizedSummary(card.candidate.summary, i18n.language)}</strong>
               <span>{t("layout.canvasSize", { width: round(canvas.widthMm), height: round(canvas.heightMm) })}</span>
-              {card.candidate.diagnostics.map((item, index) => <em key={`${item.code}-${index}`}>{item.code}</em>)}
+              {card.candidate.diagnostics.map((item, index) => <em key={`${item.code}-${index}`}>{formatDiagnostic(t, item)}</em>)}
             </button>
           );
         })}
