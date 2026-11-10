@@ -16,7 +16,8 @@ export type ServerOptions = {
 
 /**
  * Phase 3 server: phase 1 import and export, the phase 2 edit kernel,
- * and automatic layout candidates. AI and the workspace UI stay later phases.
+ * and automatic layout candidates. Phase 4 also serves project rename and
+ * unused-asset removal so those workspace controls are real. AI stays later.
  * Domain commands, undo, redo, candidates, and project files survive a restart.
  */
 export function createServer(options: ServerOptions = {}) {

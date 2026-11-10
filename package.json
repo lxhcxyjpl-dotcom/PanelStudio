@@ -11,9 +11,11 @@
   "scripts": {
     "typecheck": "pnpm --filter \"./packages/*\" --filter \"./apps/*\" typecheck",
     "test": "pnpm --filter \"./packages/*\" --filter \"./apps/*\" --if-present test",
-    "build:web": "pnpm --filter @panelstudio/web build"
+    "build:web": "pnpm --filter @panelstudio/web build",
+    "test:e2e": "playwright test -c apps/web/playwright.config.ts"
   },
   "devDependencies": {
+    "@playwright/test": "1.65.0",
     "playwright": "1.65.0",
     "typescript": "7.0.2"
   },

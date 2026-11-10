@@ -6,5 +6,11 @@ export default defineConfig({
   server: {
     host: "127.0.0.1",
     port: 5173,
+    proxy: {
+      "/api": {
+        target: process.env.PANELSTUDIO_API ?? "http://127.0.0.1:3001",
+        changeOrigin: true,
+      },
+    },
   },
 });

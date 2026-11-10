@@ -26,6 +26,8 @@ import {
   readDocument,
   readJob,
   readProject,
+  removeUnusedAsset,
+  renameProjectTitle,
   type AppContext,
 } from "./pipeline.js";
 
@@ -79,6 +81,15 @@ export function registerRoutes(app: FastifyInstance, ctx: AppContext): void {
 
   app.get("/api/v1/projects/:projectId", async (request) => {
     return readProject(ctx, projectIdOf(request.params));
+  });
+
+  app.patch("/api/v1/projects/:projectId", async (request) => {
+    return renameProjectTitle(ctx, projectIdOf(request.params), titleOf(request.body));
+  });
+
+  app.delete("/api/v1/projects/:projectId/assets/:assetId", async (request) => {
+    const params = assetParams(request.params);
+    return removeUnusedAsset(ctx, params.projectId, params.assetId);
   });
 
   app.get("/api/v1/projects/:projectId/document", async (request) => {

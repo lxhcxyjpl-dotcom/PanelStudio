@@ -313,6 +313,16 @@ export function touchProject(db: Database.Database, id: string, updatedAt: strin
   db.prepare(`UPDATE projects SET updatedAt = ? WHERE id = ?`).run(updatedAt, id);
 }
 
+/** Title only. Renames are not canvas history and do not change the revision. */
+export function renameProject(db: Database.Database, id: string, title: string, updatedAt: string): void {
+  db.prepare(`UPDATE projects SET title = ?, updatedAt = ? WHERE id = ?`).run(title, updatedAt, id);
+}
+
+/** Keeps the bytes. Historical revisions can still read a removed library asset. */
+export function markAssetRemoved(db: Database.Database, id: string, removedAt: string): void {
+  db.prepare(`UPDATE assets SET removedFromLibraryAt = ? WHERE id = ?`).run(removedAt, id);
+}
+
 export function insertRevision(db: Database.Database, revision: RevisionRecord): void {
   db.prepare(
     `INSERT INTO project_revisions

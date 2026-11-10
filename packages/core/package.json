@@ -5,7 +5,12 @@
   "license": "MIT",
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./apply": "./src/apply.ts",
+    "./arrange": "./src/arrange.ts",
+    "./geometry": "./src/geometry.ts",
+    "./labels": "./src/labels.ts",
+    "./stack": "./src/stack.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json",
