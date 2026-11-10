@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { i18n } from "../i18n";
 import {
@@ -11,16 +12,23 @@ import {
 } from "@panelstudio/contracts";
 import { scalePanel, translateSelection } from "@panelstudio/core/arrange";
 import { resolvePanelLabel } from "@panelstudio/core/labels";
+import { api } from "../api/client";
+import { proposalChanges } from "../model/changes";
 import { sidebarWidth } from "../model/chrome";
 import { geometryLocked, mergedOverrides } from "../model/document-ui";
 import {
+  acceptCandidate,
   align,
+  cancelAiPrompt,
+  continueEditing,
   createGroup,
+  dismissCandidates,
   dissolveGroup,
   distribute,
   enterCrop,
   equalSize,
   restoreFullCrop,
+  sendAiPrompt,
   transact,
   updateCrop,
 } from "../state/session";
@@ -35,7 +43,32 @@ const EXAMPLES = [
   "把 C 放左边作为主图",
   "Keep A on the left and arrange the others on the right",
   "面板间距改成 3 mm",
+  "横向间距 2 mm，纵向间距 4 mm",
+  "把 A 向右移动 2 mm",
+  "B 的宽度设为 50 mm",
+  "A 稍微大一点",
+  "B 和 C 顶部对齐",
+  "Make B and C the same height",
+  "将选中的三张图水平等距分布",
+  "A 保持不动",
+  "解锁 B",
+  "编号改成小写 a、b、c",
+  "编号加括号",
+  "编号统一 9 pt，加粗",
+  "把 C 的编号改成 C1",
+  "编号放在左上角外侧",
+  "A 的编号向左移动 1 mm",
+  "Labels should be black",
+  "换成白底黑字",
+  "整张图宽度设为 180 mm，再重新排一下",
+  "撤销",
 ];
+
+const BUILTIN_PRESETS = [
+  { key: "preset.compact", prompt: "宽 180 mm，间距 3 mm，编号 9 pt。" },
+  { key: "preset.hero", prompt: "把选中的图放在左边作为主图，其他图放在右边。" },
+  { key: "preset.labels", prompt: "编号改成大写字母，加粗，黑色，放在左上角外侧。" },
+] as const;
 
 export function Inspector() {
   const { t } = useTranslation();
@@ -323,28 +356,93 @@ function AiPanel() {
   const { t } = useTranslation();
   const state = useWorkspace();
   const document = baseDocument(state);
+  const settings = useQuery({ queryKey: ["ai-provider"], queryFn: () => api.providerSettings() });
+  const configured = Boolean(settings.data?.config && settings.data.hasSecret);
+  const imageInput = Boolean(settings.data?.config?.capabilities.imageInput);
   const [prompt, setPrompt] = useState("");
+  const [includePreview, setIncludePreview] = useState(false);
+  const [visualReview, setVisualReview] = useState(false);
   const [presets, setPresets] = useState<PromptPreset[]>(() => readPresets());
   const scope = scopeText(document, state.selection);
+  const card = state.cards.find((item) => item.candidate.origin === "ai" && item.candidate.id === (state.activeCandidateId ?? item.candidate.id));
+  const aiCard = state.cards.find((item) => item.candidate.origin === "ai");
+  const proposal = card ?? aiCard;
+  const stale = Boolean(proposal) && candidatesStale(state);
+  const running = state.aiStatus.phase === "running";
+  const sendReason = !configured ? t("ai.notConfigured") : running ? t("ai.running") : prompt.trim() ? undefined : t("ai.prompt");
+  function send() {
+    if (sendReason) {
+      patch({ liveMessage: sendReason });
+      return;
+    }
+    void sendAiPrompt(prompt, { includePreviewImage: includePreview, visualReview });
+  }
+  const lines = proposal && document ? proposalChanges(document, proposal.candidate.previewDocument) : [];
   return (
-    <section className="section">
+    <section className="section" data-testid="ai-panel">
       <h2>{t("ai.tab")}</h2>
       <p>{scope}</p>
-      <p>{t("ai.notConfigured")}</p>
+      {!configured ? <p data-testid="ai-status">{t("ai.notConfigured")}</p> : null}
+      {configured && !imageInput ? <p>{t("ai.textOnly")}</p> : null}
+      {state.aiStatus.phase === "running" ? <p data-testid="ai-status">{state.aiStatus.label}</p> : null}
+      {state.aiStatus.phase === "failed" ? <p data-testid="ai-status">{state.aiStatus.message}</p> : null}
+      {state.aiStatus.phase === "cancelled" ? <p data-testid="ai-status">{t("ai.cancelled")}</p> : null}
+      {state.aiStatus.phase === "unsupported" ? <p data-testid="ai-status">{state.aiStatus.reason}</p> : null}
+      {state.aiStatus.phase === "clarification" ? (
+        <div data-testid="ai-status">
+          <p>{state.aiStatus.question}</p>
+          {state.aiStatus.options.map((option) => (
+            <Button key={option} action="ai-option" onClick={() => setPrompt(option)}>{option}</Button>
+          ))}
+        </div>
+      ) : null}
+      {stale ? <p data-testid="ai-status">{t("ai.stale")}</p> : null}
       <label className="field">
         <span>{t("ai.prompt")}</span>
-        <textarea rows={3} maxLength={4000} value={prompt} onChange={(event) => setPrompt(event.target.value)} onKeyDown={(event) => {
-          if (event.key === "Enter" && (event.metaKey || event.ctrlKey) && !event.nativeEvent.isComposing) {
-            event.preventDefault();
-            patch({ liveMessage: t("ai.notConfigured") });
-          }
-        }} />
+        <textarea
+          data-testid="ai-prompt"
+          rows={Math.min(8, Math.max(3, prompt.split("\n").length))}
+          maxLength={4000}
+          value={prompt}
+          onChange={(event) => setPrompt(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" && (event.metaKey || event.ctrlKey) && !event.nativeEvent.isComposing) {
+              event.preventDefault();
+              send();
+            }
+          }}
+        />
       </label>
-      <Button action="ai-send" onClick={() => patch({ liveMessage: t("ai.notConfigured") })}>{t("ai.send")}</Button>
-      <Button action="ai-apply" disabledReason={t("ai.notConfigured")}>{t("ai.apply")}</Button>
+      <label className="check">
+        <input type="checkbox" checked={includePreview} disabled={!imageInput} onChange={(event) => setIncludePreview(event.target.checked)} />
+        {t("ai.previewImage")}
+      </label>
+      <label className="check">
+        <input type="checkbox" checked={visualReview} disabled={!imageInput} onChange={(event) => setVisualReview(event.target.checked)} />
+        {t("ai.review")}
+      </label>
+      <Button action="ai-send" disabledReason={sendReason} onClick={send}>{t("ai.send")}</Button>
+      {running ? <Button action="ai-cancel" onClick={() => void cancelAiPrompt()}>{t("ai.cancel")}</Button> : null}
+      {proposal ? (
+        <div className="ai-preview" data-testid="ai-proposal">
+          <p data-testid="ai-summary">{proposal.candidate.summary}</p>
+          {lines.map((line, index) => (
+            <p key={`${line.kind}-${index}`} data-testid="ai-change">{changeLine(t, line)}</p>
+          ))}
+          {proposal.previewUrl ? <img alt="" src={proposal.previewUrl} /> : null}
+          <Button action="ai-apply" disabledReason={stale ? t("ai.stale") : undefined} onClick={() => void acceptCandidate()}>{t("ai.apply")}</Button>
+          <Button action="ai-discard" onClick={dismissCandidates}>{t("ai.discard")}</Button>
+          <Button action="ai-manual" onClick={continueEditing}>{t("layout.manual")}</Button>
+        </div>
+      ) : null}
       <h2>{t("ai.examples")}</h2>
       {EXAMPLES.map((example) => (
         <Button key={example} action="fill-example" onClick={() => setPrompt(example)}>{example}</Button>
+      ))}
+      {BUILTIN_PRESETS.map((preset) => (
+        <Button key={preset.key} action="use-builtin" onClick={() => { setPrompt(preset.prompt); patch({ liveMessage: t("ai.saved") }); }}>
+          {t(preset.key)}
+        </Button>
       ))}
       <Button
         action="save-preset"
@@ -362,9 +460,18 @@ function AiPanel() {
           {preset.title}
         </Button>
       ))}
-      {candidatesStale(state) ? <p>{t("layout.stale")}</p> : null}
     </section>
   );
+}
+
+function changeLine(t: ReturnType<typeof useTranslation>["t"], line: ReturnType<typeof proposalChanges>[number]): string {
+  if (line.kind === "canvas") return t("ai.changeCanvas", line);
+  if (line.kind === "gutter") return t("ai.changeGutter", line);
+  if (line.kind === "labels") return t("ai.changeLabels");
+  if (line.kind === "move") return t("ai.changeMove", line);
+  if (line.kind === "size") return t("ai.changeSize", line);
+  if (line.kind === "text") return t("ai.changeText", line);
+  return t(line.locked ? "ai.changeLock" : "ai.changeUnlock", { label: line.label });
 }
 
 function scopeText(document: FigureDocumentV1 | null, selection: ReturnType<typeof useWorkspace.getState>["selection"]): string {

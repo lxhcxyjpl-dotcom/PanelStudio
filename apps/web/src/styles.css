@@ -248,6 +248,12 @@ html[data-reduce-motion="true"] .button:active:not(:disabled) {
   resize: vertical;
 }
 
+.ai-preview img {
+  width: 100%;
+  height: auto;
+  background: var(--ui-surfaceInset);
+}
+
 .numeric input {
   font-variant-numeric: tabular-nums;
 }

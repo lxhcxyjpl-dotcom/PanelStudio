@@ -1,4 +1,7 @@
 import type {
+  AILayoutRequest,
+  AIProviderConfig,
+  AIProviderSettings,
   ApiError,
   Asset,
   Candidate,
@@ -112,6 +115,27 @@ export const api = {
   job(jobId: string): Promise<Job> {
     return request(`/jobs/${jobId}`);
   },
+  cancelJob(jobId: string, key: string): Promise<Job> {
+    return request(`/jobs/${jobId}/cancel`, jsonInit("POST", {}, key));
+  },
+  providerSettings(): Promise<AIProviderSettings> {
+    return request("/settings/ai-provider");
+  },
+  saveProvider(config: AIProviderConfig, key: string): Promise<AIProviderSettings> {
+    return request("/settings/ai-provider", jsonInit("PUT", config, key));
+  },
+  saveSecret(secret: string, key: string): Promise<{ configRevision: number; hasSecret: true }> {
+    return request("/settings/ai-provider/secret", jsonInit("PUT", { secret }, key));
+  },
+  deleteSecret(key: string): Promise<{ configRevision: number; hasSecret: false }> {
+    return request("/settings/ai-provider/secret", jsonInit("DELETE", {}, key));
+  },
+  testProvider(key: string): Promise<{ jobId: string }> {
+    return request("/settings/ai-provider/test", jsonInit("POST", {}, key));
+  },
+  aiLayout(projectId: string, body: AILayoutRequest, key: string): Promise<{ jobId: string }> {
+    return request(`/projects/${projectId}/ai-layouts`, jsonInit("POST", body, key));
+  },
   transaction(
     projectId: string,
     body: { baseRevision: number; commands: DomainCommand[] } | { baseRevision: number; candidateId: string },
@@ -189,10 +213,10 @@ export function thumbnailUrl(projectId: string, assetId: string): string {
 }
 
 export async function waitForJob(jobId: string): Promise<Job> {
-  for (let attempt = 0; attempt < 30; attempt += 1) {
+  for (let attempt = 0; attempt < 120; attempt += 1) {
     const job = await api.job(jobId);
     if (job.status === "succeeded" || job.status === "failed" || job.status === "cancelled") return job;
-    await new Promise((resolve) => setTimeout(resolve, 150));
+    await new Promise((resolve) => setTimeout(resolve, 500));
   }
   throw new ApiClientError("The job did not finish.", 0, "NETWORK");
 }

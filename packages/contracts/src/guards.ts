@@ -1,5 +1,14 @@
 import { Check } from "typebox/value";
 import {
+  AIIntentSchema,
+  AILayoutRequestSchema,
+  AIProviderConfigSchema,
+  SecretWriteRequestSchema,
+  type AIIntent,
+  type AILayoutRequest,
+  type AIProviderConfig,
+} from "./ai.js";
+import {
   ExportRequestSchema,
   HistoryRequestSchema,
   LayoutCandidatesRequestSchema,
@@ -41,4 +50,20 @@ export function isLayoutCandidatesRequest(value: unknown): value is LayoutCandid
 
 export function isPreviewRequest(value: unknown): value is PreviewRequest {
   return Check(PreviewRequestSchema, value);
+}
+
+export function isAIProviderConfig(value: unknown): value is AIProviderConfig {
+  return Check(AIProviderConfigSchema, value);
+}
+
+export function isAILayoutRequest(value: unknown): value is AILayoutRequest {
+  return Check(AILayoutRequestSchema, value);
+}
+
+export function isAIIntent(value: unknown): value is AIIntent {
+  return Check(AIIntentSchema, value);
+}
+
+export function isSecretWriteRequest(value: unknown): value is Static<typeof SecretWriteRequestSchema> {
+  return Check(SecretWriteRequestSchema, value);
 }

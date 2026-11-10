@@ -2,6 +2,7 @@ import { mkdirSync } from "node:fs";
 import path from "node:path";
 import Database from "better-sqlite3";
 import type {
+  AIProviderConfig,
   Asset,
   Diagnostic,
   DomainCommand,
@@ -115,6 +116,13 @@ CREATE TABLE IF NOT EXISTS idempotency_records (
   responseJson TEXT NOT NULL,
   createdAt TEXT NOT NULL,
   PRIMARY KEY (scope, key)
+);
+CREATE TABLE IF NOT EXISTS provider_settings (
+  singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
+  configRevision INTEGER NOT NULL,
+  configJson TEXT NOT NULL,
+  encryptedSecret TEXT,
+  updatedAt TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS assets_project ON assets(projectId);
 CREATE INDEX IF NOT EXISTS jobs_project ON jobs(projectId);
@@ -668,6 +676,173 @@ export function publicAsset(asset: AssetRecord): Asset {
     diagnostics: asset.diagnostics,
     removedFromLibraryAt: asset.removedFromLibraryAt,
   };
+}
+
+export type JobDetail = JobRecord & {
+  input: unknown;
+  cancelRequested: boolean;
+};
+
+export type ProviderRecord = {
+  configRevision: number;
+  config: AIProviderConfig;
+  encryptedSecret: string | null;
+  updatedAt: string;
+};
+
+type JobRow = {
+  id: string;
+  projectId: string | null;
+  kind: Job["kind"];
+  status: Job["status"];
+  phase: string;
+  inputJson: string;
+  resultJson: string | null;
+  errorJson: string | null;
+  cancelRequested: number;
+  createdAt: string;
+  startedAt: string | null;
+  finishedAt: string | null;
+};
+
+function mapJob(row: JobRow): JobDetail {
+  return {
+    id: row.id,
+    projectId: row.projectId,
+    kind: row.kind,
+    status: row.status,
+    phase: row.phase,
+    createdAt: row.createdAt,
+    startedAt: row.startedAt,
+    finishedAt: row.finishedAt,
+    result: row.resultJson ? (JSON.parse(row.resultJson) as Job["result"]) : null,
+    error: row.errorJson ? (JSON.parse(row.errorJson) as Job["error"]) : null,
+    input: JSON.parse(row.inputJson) as unknown,
+    cancelRequested: row.cancelRequested === 1,
+  };
+}
+
+export function getJobDetail(db: Database.Database, id: string): JobDetail | null {
+  const row = db.prepare(`SELECT * FROM jobs WHERE id = ?`).get(id) as JobRow | undefined;
+  return row ? mapJob(row) : null;
+}
+
+export function listActiveAiJobs(db: Database.Database): JobDetail[] {
+  const rows = db
+    .prepare(
+      `SELECT * FROM jobs WHERE kind IN ('ai_layout', 'provider_test') AND status IN ('queued', 'running') ORDER BY createdAt`,
+    )
+    .all() as JobRow[];
+  return rows.map(mapJob);
+}
+
+export function listQueuedAiJobs(db: Database.Database): JobDetail[] {
+  const rows = db
+    .prepare(`SELECT * FROM jobs WHERE kind IN ('ai_layout', 'provider_test') AND status = 'queued' ORDER BY createdAt`)
+    .all() as JobRow[];
+  return rows.map(mapJob);
+}
+
+export function updateJobState(
+  db: Database.Database,
+  id: string,
+  patch: {
+    status: Job["status"];
+    phase: string;
+    result: Job["result"];
+    error: Job["error"];
+    startedAt: string | null;
+    finishedAt: string | null;
+    cancelRequested?: boolean;
+  },
+): void {
+  db.prepare(
+    `UPDATE jobs SET status = @status, phase = @phase, resultJson = @resultJson, errorJson = @errorJson,
+      startedAt = @startedAt, finishedAt = @finishedAt, cancelRequested = COALESCE(@cancelRequested, cancelRequested)
+     WHERE id = @id`,
+  ).run({
+    id,
+    status: patch.status,
+    phase: patch.phase,
+    resultJson: patch.result ? JSON.stringify(patch.result) : null,
+    errorJson: patch.error ? JSON.stringify(patch.error) : null,
+    startedAt: patch.startedAt,
+    finishedAt: patch.finishedAt,
+    cancelRequested: patch.cancelRequested === undefined ? null : patch.cancelRequested ? 1 : 0,
+  });
+}
+
+export function markCancelRequested(db: Database.Database, id: string): void {
+  db.prepare(`UPDATE jobs SET cancelRequested = 1 WHERE id = ?`).run(id);
+}
+
+export function appendJobEvent(
+  db: Database.Database,
+  event: { jobId: string; event: string; payloadJson: unknown; createdAt: string },
+): number {
+  const row = db.prepare(`SELECT COALESCE(MAX(seq), -1) + 1 AS seq FROM job_events WHERE jobId = ?`).get(event.jobId) as {
+    seq: number;
+  };
+  db.prepare(`INSERT INTO job_events (jobId, seq, event, payloadJson, createdAt) VALUES (?, ?, ?, ?, ?)`).run(
+    event.jobId,
+    row.seq,
+    event.event,
+    JSON.stringify(event.payloadJson),
+    event.createdAt,
+  );
+  return row.seq;
+}
+
+export function listJobEvents(
+  db: Database.Database,
+  jobId: string,
+  afterSeq: number,
+): Array<{ seq: number; event: string; payloadJson: unknown; createdAt: string }> {
+  const rows = db
+    .prepare(`SELECT seq, event, payloadJson, createdAt FROM job_events WHERE jobId = ? AND seq > ? ORDER BY seq`)
+    .all(jobId, afterSeq) as Array<{ seq: number; event: string; payloadJson: string; createdAt: string }>;
+  return rows.map((row) => ({ ...row, payloadJson: JSON.parse(row.payloadJson) as unknown }));
+}
+
+export function readProvider(db: Database.Database): ProviderRecord | null {
+  const row = db
+    .prepare(`SELECT configRevision, configJson, encryptedSecret, updatedAt FROM provider_settings WHERE singleton = 1`)
+    .get() as
+    | { configRevision: number; configJson: string; encryptedSecret: string | null; updatedAt: string }
+    | undefined;
+  if (!row) return null;
+  return {
+    configRevision: row.configRevision,
+    config: JSON.parse(row.configJson) as AIProviderConfig,
+    encryptedSecret: row.encryptedSecret,
+    updatedAt: row.updatedAt,
+  };
+}
+
+export function writeProviderConfig(
+  db: Database.Database,
+  config: AIProviderConfig,
+  encryptedSecret: string | null,
+  now: string,
+): ProviderRecord {
+  const current = readProvider(db);
+  const configRevision = (current?.configRevision ?? 0) + 1;
+  const secret = encryptedSecret === undefined ? current?.encryptedSecret ?? null : encryptedSecret;
+  db.prepare(
+    `INSERT INTO provider_settings (singleton, configRevision, configJson, encryptedSecret, updatedAt)
+     VALUES (1, @configRevision, @configJson, @encryptedSecret, @updatedAt)
+     ON CONFLICT(singleton) DO UPDATE SET
+       configRevision = excluded.configRevision,
+       configJson = excluded.configJson,
+       encryptedSecret = excluded.encryptedSecret,
+       updatedAt = excluded.updatedAt`,
+  ).run({
+    configRevision,
+    configJson: JSON.stringify(config),
+    encryptedSecret: secret,
+    updatedAt: now,
+  });
+  return { configRevision, config, encryptedSecret: secret, updatedAt: now };
 }
 
 export function publicJob(job: JobRecord): Job {

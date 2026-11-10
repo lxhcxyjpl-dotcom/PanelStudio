@@ -77,6 +77,9 @@ export type AppContext = {
   db: Database.Database;
   blobs: BlobStore;
   now: () => string;
+  dataDir: string;
+  deferAiJobs?: boolean;
+  aiFetch?: typeof fetch;
 };
 
 type Response = { status: number; body: unknown };
@@ -1106,6 +1109,17 @@ async function produceExport(
     rendererVersion: ENGINE_VERSIONS.svg,
     diagnostics,
   };
+}
+
+export function renderDocumentPng(
+  ctx: AppContext,
+  projectId: string,
+  document: FigureDocumentV1,
+  revision: number,
+  pixelWidth: number,
+): Buffer {
+  const compiled = compileDocument(ctx, projectId, document, revision, false);
+  return rasterizeSvg(compiled.svg, pixelWidth);
 }
 
 function compileDocument(

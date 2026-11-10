@@ -1,9 +1,10 @@
 import * as Dialog from "@radix-ui/react-dialog";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { DEFAULT_PNG_DPI, PNG_DPI_OPTIONS, SVG_SUPPORT, type ExportRequest } from "@panelstudio/contracts";
-import { api } from "../api/client";
+import { DEFAULT_PNG_DPI, PNG_DPI_OPTIONS, SVG_SUPPORT, type AIProviderConfig, type ExportRequest } from "@panelstudio/contracts";
+import { api, newKey, waitForJob } from "../api/client";
+import { queryClient } from "../state/query";
 import { BUNDLED_FONTS } from "@panelstudio/contracts";
 import {
   discardDraft,
@@ -87,8 +88,128 @@ function SettingsDialog({ open }: { open: boolean }) {
         <input type="checkbox" checked={state.reduceTransparency} onChange={(event) => patch({ reduceTransparency: event.target.checked })} />
         {t("settings.reduceTransparency")}
       </label>
-      <p>{t("settings.aiNote")}</p>
+      <ProviderSettings />
     </Shell>
+  );
+}
+
+function ProviderSettings() {
+  const { t } = useTranslation();
+  const settings = useQuery({ queryKey: ["ai-provider"], queryFn: () => api.providerSettings() });
+  const [baseUrl, setBaseUrl] = useState("");
+  const [model, setModel] = useState("");
+  const [structured, setStructured] = useState<AIProviderConfig["capabilities"]["structuredOutput"]>("json_object");
+  const [imageInput, setImageInput] = useState(false);
+  const [allowLocal, setAllowLocal] = useState(false);
+  const [secret, setSecret] = useState("");
+  const [message, setMessage] = useState("");
+  useEffect(() => {
+    const config = settings.data?.config;
+    if (!config) return;
+    setBaseUrl(config.baseUrl);
+    setModel(config.model);
+    setStructured(config.capabilities.structuredOutput);
+    setImageInput(config.capabilities.imageInput);
+    setAllowLocal(config.allowLocalEndpoint);
+  }, [settings.data?.config]);
+  async function saveConfig() {
+    try {
+      await api.saveProvider(
+        {
+          adapter: "openai-compatible",
+          baseUrl: baseUrl.trim(),
+          model: model.trim(),
+          capabilities: { imageInput, structuredOutput: structured },
+          allowLocalEndpoint: allowLocal,
+        },
+        newKey(),
+      );
+      await queryClient.invalidateQueries({ queryKey: ["ai-provider"] });
+      setMessage(t("settings.saveProvider"));
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : t("ai.jobFailed"));
+    }
+  }
+  async function saveSecret() {
+    try {
+      await api.saveSecret(secret, newKey());
+      setSecret("");
+      await queryClient.invalidateQueries({ queryKey: ["ai-provider"] });
+      setMessage(t("settings.hasSecret"));
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : t("ai.jobFailed"));
+    }
+  }
+  async function removeSecret() {
+    try {
+      await api.deleteSecret(newKey());
+      setSecret("");
+      await queryClient.invalidateQueries({ queryKey: ["ai-provider"] });
+      setMessage(t("settings.noSecret"));
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : t("ai.jobFailed"));
+    }
+  }
+  async function testProvider() {
+    try {
+      const accepted = await api.testProvider(newKey());
+      const job = await waitForJob(accepted.jobId);
+      if (job.status === "succeeded" && job.result && "latencyMs" in job.result) {
+        setMessage(t("ai.testOk", { latency: job.result.latencyMs }));
+        return;
+      }
+      setMessage(job.status === "failed" ? job.error?.message ?? t("ai.jobFailed") : t("ai.jobFailed"));
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : t("ai.jobFailed"));
+    }
+  }
+  return (
+    <div className="section" data-testid="ai-settings">
+      <h2>{t("settings.provider")}</h2>
+      <p>{t("settings.aiNote")}</p>
+      <p data-testid="ai-secret-state">{settings.data?.hasSecret ? t("settings.hasSecret") : t("settings.noSecret")}</p>
+      <label className="field">
+        <span>{t("settings.baseUrl")}</span>
+        <input data-testid="ai-base-url" value={baseUrl} onChange={(event) => setBaseUrl(event.target.value)} />
+      </label>
+      <label className="field">
+        <span>{t("settings.model")}</span>
+        <input data-testid="ai-model" value={model} onChange={(event) => setModel(event.target.value)} />
+      </label>
+      <label className="field">
+        <span>{t("settings.structured")}</span>
+        <select data-testid="ai-structured" value={structured} onChange={(event) => setStructured(event.target.value as AIProviderConfig["capabilities"]["structuredOutput"])}>
+          <option value="json_schema">json_schema</option>
+          <option value="json_object">json_object</option>
+          <option value="text_json">text_json</option>
+        </select>
+      </label>
+      <label className="check">
+        <input data-testid="ai-image" type="checkbox" checked={imageInput} onChange={(event) => setImageInput(event.target.checked)} />
+        {t("settings.imageInput")}
+      </label>
+      <label className="check">
+        <input data-testid="ai-local" type="checkbox" checked={allowLocal} onChange={(event) => setAllowLocal(event.target.checked)} />
+        {t("settings.allowLocal")}
+      </label>
+      <Button action="save-provider" disabledReason={baseUrl.trim() && model.trim() ? undefined : t("settings.baseUrl")} onClick={() => void saveConfig()}>
+        {t("settings.saveProvider")}
+      </Button>
+      <label className="field">
+        <span>{t("settings.secret")}</span>
+        <input data-testid="ai-secret" type="password" autoComplete="off" value={secret} onChange={(event) => setSecret(event.target.value)} />
+      </label>
+      <Button action="save-secret" disabledReason={secret.trim() ? undefined : t("settings.secret")} onClick={() => void saveSecret()}>
+        {t("settings.saveSecret")}
+      </Button>
+      <Button action="delete-secret" disabledReason={settings.data?.hasSecret ? undefined : t("settings.noSecret")} onClick={() => void removeSecret()}>
+        {t("settings.deleteSecret")}
+      </Button>
+      <Button action="test-provider" disabledReason={settings.data?.config && settings.data.hasSecret ? undefined : t("ai.notConfigured")} onClick={() => void testProvider()}>
+        {t("ai.test")}
+      </Button>
+      {message ? <p data-testid="ai-provider-status">{message}</p> : null}
+    </div>
   );
 }
 

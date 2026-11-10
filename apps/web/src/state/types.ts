@@ -61,6 +61,14 @@ export type HistoryRetry = {
   idempotencyKey: string;
 };
 
+export type AiStatus =
+  | { phase: "idle" }
+  | { phase: "running"; jobId: string; label: string }
+  | { phase: "clarification"; question: string; options: string[] }
+  | { phase: "unsupported"; reason: string }
+  | { phase: "failed"; code: string; message: string }
+  | { phase: "cancelled" };
+
 export type WorkspaceState = {
   theme: ThemeName;
   locale: LocaleName;
@@ -102,6 +110,7 @@ export type WorkspaceState = {
   dragging: boolean;
   historyRetry: HistoryRetry | null;
   serverSnapshot: Confirmed | null;
+  aiStatus: AiStatus;
 };
 
 export function baseDocument(state: WorkspaceState): FigureDocumentV1 | null {

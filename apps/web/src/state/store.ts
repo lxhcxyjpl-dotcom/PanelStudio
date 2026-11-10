@@ -42,6 +42,7 @@ export const useWorkspace = create<WorkspaceState>(() => ({
   dragging: false,
   historyRetry: null,
   serverSnapshot: null,
+  aiStatus: { phase: "idle" },
 }));
 
 export function patch(partial: Partial<WorkspaceState>): void {

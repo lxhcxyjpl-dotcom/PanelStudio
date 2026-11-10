@@ -131,7 +131,7 @@ export {
   StructuredOutputSchema,
   TargetRefSchema,
 } from "./ai.js";
-export type { AIAction, AIIntent, AILayoutRequest, AIProviderConfig, AlignEdge, TargetRef } from "./ai.js";
+export type { AIAction, AIIntent, AILayoutRequest, AIProviderConfig, AIProviderSettings, AlignEdge, TargetRef } from "./ai.js";
 export {
   AssetAcceptedSchema,
   AssetSchema,
@@ -229,12 +229,16 @@ export {
 } from "./storage.js";
 export { buildOpenApiDocument, renderOpenApiDocument, toJsonSchema } from "./openapi.js";
 export {
+  isAIIntent,
+  isAILayoutRequest,
+  isAIProviderConfig,
   isExportRequest,
   isFigureDocument,
   isHistoryRequest,
   isLayoutCandidatesRequest,
   isPreviewRequest,
   isProjectManifest,
+  isSecretWriteRequest,
   isTransactionRequest,
 } from "./guards.js";
 export type { LayoutCandidatesRequest } from "./guards.js";
