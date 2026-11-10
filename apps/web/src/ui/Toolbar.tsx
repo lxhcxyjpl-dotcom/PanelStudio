@@ -1,19 +1,23 @@
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { RESOURCE_LIMITS } from "@panelstudio/contracts";
+import { RESOURCE_LIMITS, type Project } from "@panelstudio/contracts";
+import { api, ApiClientError } from "../api/client";
 import { fitCamera } from "../model/view";
 import { writeProjectId } from "../prefs";
 import {
   cancelCrop,
   commitCrop,
+  deleteCurrentProject,
   ensureProject,
   importFiles,
   importPackage,
+  openListedProject,
   redo,
   reloadFromServer,
   renameTitle,
   requestLayout,
+  restoreListedProject,
   undo,
 } from "../state/session";
 import { patch, useWorkspace } from "../state/store";
@@ -36,9 +40,20 @@ export function Toolbar() {
   const undoReason = !state.confirmed ? t("app.noProject") : state.confirmed.history.canUndo ? undefined : t("history.undoEmpty");
   const redoReason = !state.confirmed ? t("app.noProject") : state.confirmed.history.canRedo ? undefined : t("history.redoEmpty");
   const cropInvalidNow = state.crop ? cropInvalid(state.crop.crop) : false;
+  const [listed, setListed] = useState<Project[]>([]);
+  const openable = listed.filter((project) => !project.deletedAt);
+  const deleted = listed.filter((project) => project.deletedAt);
   return (
     <header className="toolbar" data-testid="toolbar">
-      <DropdownMenu.Root>
+      <DropdownMenu.Root
+        onOpenChange={(open) => {
+          if (!open) return;
+          void api.projects({ includeDeleted: true }).then(
+            (page) => setListed(page.items),
+            (error: unknown) => patch({ liveMessage: error instanceof ApiClientError ? error.message : t("errors.generic") }),
+          );
+        }}
+      >
         <DropdownMenu.Trigger asChild>
           <Button action="project-menu" aria-label={t("toolbar.projectMenu")}>
             <Icon name="more" />
@@ -49,10 +64,33 @@ export function Toolbar() {
             <DropdownMenu.Item className="menu-item" onSelect={() => void newProject()}>
               {t("toolbar.newProject")}
             </DropdownMenu.Item>
+            <ProjectSubmenu
+              label={t("toolbar.openProject")}
+              testId="open-project"
+              projects={openable}
+              empty={t("app.noProject")}
+              onSelect={(projectId) => void openListedProject(projectId).catch((error: unknown) => patch({ liveMessage: error instanceof ApiClientError ? error.message : t("errors.generic") }))}
+            />
+            <DropdownMenu.Item
+              className="menu-item"
+              data-testid="delete-project"
+              disabled={!state.projectId}
+              title={state.projectId ? undefined : t("app.noProject")}
+              onSelect={() => void deleteCurrentProject().catch((error: unknown) => patch({ liveMessage: error instanceof ApiClientError ? error.message : t("errors.generic") }))}
+            >
+              {t("toolbar.deleteProject")}
+            </DropdownMenu.Item>
+            <ProjectSubmenu
+              label={t("toolbar.restoreProject")}
+              testId="restore-project"
+              projects={deleted}
+              empty={t("toolbar.noDeletedProjects")}
+              onSelect={(projectId) => void restoreListedProject(projectId).catch((error: unknown) => patch({ liveMessage: error instanceof ApiClientError ? error.message : t("errors.generic") }))}
+            />
             <DropdownMenu.Item className="menu-item" onSelect={() => document.getElementById("package-input")?.click()}>
               {t("toolbar.importPackage")}
             </DropdownMenu.Item>
-            <DropdownMenu.Item className="menu-item" disabled={!state.projectId} onSelect={() => void reloadFromServer()}>
+            <DropdownMenu.Item className="menu-item" disabled={!state.projectId} title={state.projectId ? undefined : t("app.noProject")} onSelect={() => void reloadFromServer()}>
               {t("toolbar.reload")}
             </DropdownMenu.Item>
             <DropdownMenu.Item className="menu-item" onSelect={() => patch({ dialog: "shortcuts" })}>
@@ -167,6 +205,42 @@ export function Toolbar() {
         <span className="sr-only">{t("layout.preview")}</span>
       ) : null}
     </header>
+  );
+}
+
+function ProjectSubmenu(props: {
+  label: string;
+  testId: string;
+  projects: Project[];
+  empty: string;
+  onSelect: (projectId: string) => void;
+}) {
+  return (
+    <DropdownMenu.Sub>
+      <DropdownMenu.SubTrigger className="menu-item" data-testid={props.testId}>
+        {props.label}
+      </DropdownMenu.SubTrigger>
+      <DropdownMenu.Portal>
+        <DropdownMenu.SubContent className="menu menu-scroll" sideOffset={4} alignOffset={-4}>
+          {props.projects.length === 0 ? (
+            <DropdownMenu.Item className="menu-item" disabled title={props.empty}>
+              {props.empty}
+            </DropdownMenu.Item>
+          ) : (
+            props.projects.map((project) => (
+              <DropdownMenu.Item
+                key={project.id}
+                className="menu-item menu-project"
+                title={project.title}
+                onSelect={() => props.onSelect(project.id)}
+              >
+                {project.title}
+              </DropdownMenu.Item>
+            ))
+          )}
+        </DropdownMenu.SubContent>
+      </DropdownMenu.Portal>
+    </DropdownMenu.Sub>
   );
 }
 

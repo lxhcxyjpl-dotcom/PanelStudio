@@ -41,6 +41,8 @@ Open `http://127.0.0.1:5173`. Full notes, including the data directory and `mast
 
 The default data directory is `$HOME/.panelstudio`. `master.key` is created there when you save a model secret. It must never be committed.
 
+The project menu opens another project on this server, soft-deletes the current one, or restores a deleted one. A deleted project keeps its files and history, rejects new edits, and cancels work that had not finished. The route audit is [`docs/v0.1-gap-close.md`](docs/v0.1-gap-close.md).
+
 ## Formats and limits
 
 PNG, JPEG, WebP, and a documented subset of SVG. At most 8 panels in a project. Editable SVG keeps vectors and label text; it does not turn type into outlines. PDF, EPS, native `.ai`, and outline export are out of scope for v0.1.
@@ -57,3 +59,4 @@ Details: [`docs/format-support.md`](docs/format-support.md).
 - [Illustrator checklist](docs/illustrator-compatibility.md) — every row needs a manual check
 - [Licenses, including the Noto OFL](docs/licenses.md)
 - [Phase 6 notes](docs/phase-6-decisions.md)
+- [v0.1 route audit](docs/v0.1-gap-close.md)

@@ -41,6 +41,8 @@ pnpm --filter @panelstudio/web dev
 
 数据目录默认是 `$HOME/.panelstudio`。保存模型密钥时会在那里生成 `master.key`，权限 `0600`。不要把这个文件提交到仓库。
 
+项目菜单可以打开这台服务上的其他项目，软删除当前项目，或恢复已删除的项目。删除后素材和历史还在，新的修改会被拒绝，未完成的任务会被取消。路由对照见 [`docs/v0.1-gap-close.md`](docs/v0.1-gap-close.md)。
+
 ## 格式与限制
 
 支持 PNG、JPEG、WebP，以及文档列出的 SVG 子集。一个项目最多 8 个面板。可编辑 SVG 保留矢量和编号文字，不把文字转成轮廓。v0.1 不导入 PDF、EPS 或原生 `.ai`，也不提供转曲导出。
@@ -57,3 +59,4 @@ pnpm --filter @panelstudio/web dev
 - [Illustrator 对照表](docs/illustrator-compatibility.md)：每一行都是 needs manual check
 - [依赖与字体许可](docs/licenses.md)
 - [阶段 6 记录](docs/phase-6-decisions.md)
+- [v0.1 路由对照](docs/v0.1-gap-close.md)

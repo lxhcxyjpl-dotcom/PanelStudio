@@ -285,9 +285,7 @@ export function insertProject(
   });
 }
 
-export function getProject(db: Database.Database, id: string): ProjectRecord | null {
-  const row = db.prepare(`SELECT * FROM projects WHERE id = ?`).get(id) as ProjectRow | undefined;
-  if (!row) return null;
+function mapProject(row: ProjectRow): ProjectRecord {
   return {
     id: row.id,
     title: row.title,
@@ -298,6 +296,54 @@ export function getProject(db: Database.Database, id: string): ProjectRecord | n
     undoStack: JSON.parse(row.undoStackJson) as number[],
     redoStack: JSON.parse(row.redoStackJson) as number[],
   };
+}
+
+export function getProject(db: Database.Database, id: string): ProjectRecord | null {
+  const row = db.prepare(`SELECT * FROM projects WHERE id = ?`).get(id) as ProjectRow | undefined;
+  return row ? mapProject(row) : null;
+}
+
+export type KeyCursor = { createdAt: string; id: string };
+
+export type PageRows<T> = { items: T[]; hasMore: boolean };
+
+/**
+ * Projects ordered by createdAt, then id. `limit` null means the whole list.
+ * Deleted rows are omitted unless includeDeleted is set.
+ */
+export function queryProjects(
+  db: Database.Database,
+  options: { includeDeleted: boolean; after: KeyCursor | null; limit: number | null },
+): PageRows<ProjectRecord> {
+  const rows = db
+    .prepare(
+      `SELECT * FROM projects
+       WHERE (@includeDeleted = 1 OR deletedAt IS NULL)
+         AND (
+           @useAfter = 0
+           OR createdAt > @createdAt
+           OR (createdAt = @createdAt AND id > @id)
+         )
+       ORDER BY createdAt ASC, id ASC
+       LIMIT @take`,
+    )
+    .all({
+      includeDeleted: options.includeDeleted ? 1 : 0,
+      useAfter: options.after ? 1 : 0,
+      createdAt: options.after?.createdAt ?? "",
+      id: options.after?.id ?? "",
+      take: options.limit === null ? -1 : options.limit + 1,
+    }) as ProjectRow[];
+  return pageOf(rows.map(mapProject), options.limit);
+}
+
+export function setProjectDeleted(
+  db: Database.Database,
+  id: string,
+  deletedAt: string | null,
+  updatedAt: string,
+): void {
+  db.prepare(`UPDATE projects SET deletedAt = ?, updatedAt = ? WHERE id = ?`).run(deletedAt, updatedAt, id);
 }
 
 export function updateProjectHead(
@@ -430,6 +476,75 @@ export function listAssets(db: Database.Database, projectId: string): AssetRecor
     .prepare(`SELECT * FROM assets WHERE projectId = ? ORDER BY createdAt ASC, id ASC`)
     .all(projectId) as AssetRow[];
   return rows.map(mapAsset);
+}
+
+/** Same order as listAssets. `limit` null returns every asset record for the project. */
+export function queryAssets(
+  db: Database.Database,
+  projectId: string,
+  after: KeyCursor | null,
+  limit: number | null,
+): PageRows<AssetRecord> {
+  const rows = db
+    .prepare(
+      `SELECT * FROM assets
+       WHERE projectId = @projectId
+         AND (
+           @useAfter = 0
+           OR createdAt > @createdAt
+           OR (createdAt = @createdAt AND id > @id)
+         )
+       ORDER BY createdAt ASC, id ASC
+       LIMIT @take`,
+    )
+    .all({
+      projectId,
+      useAfter: after ? 1 : 0,
+      createdAt: after?.createdAt ?? "",
+      id: after?.id ?? "",
+      take: limit === null ? -1 : limit + 1,
+    }) as AssetRow[];
+  return pageOf(rows.map(mapAsset), limit);
+}
+
+export type RevisionSummaryRow = {
+  projectId: string;
+  revision: number;
+  baseRevision: number | null;
+  kind: string;
+  documentHash: string;
+  createdAt: string;
+};
+
+/** Revision summaries in ascending revision order. The document JSON stays on the snapshot route. */
+export function queryRevisions(
+  db: Database.Database,
+  projectId: string,
+  afterRevision: number | null,
+  limit: number | null,
+): PageRows<RevisionSummaryRow> {
+  const rows = db
+    .prepare(
+      `SELECT projectId, revision, baseRevision, kind, documentHash, createdAt
+       FROM project_revisions
+       WHERE projectId = @projectId
+         AND (@useAfter = 0 OR revision > @revision)
+       ORDER BY revision ASC
+       LIMIT @take`,
+    )
+    .all({
+      projectId,
+      useAfter: afterRevision === null ? 0 : 1,
+      revision: afterRevision ?? -1,
+      take: limit === null ? -1 : limit + 1,
+    }) as RevisionSummaryRow[];
+  return pageOf(rows, limit);
+}
+
+function pageOf<T>(rows: T[], limit: number | null): PageRows<T> {
+  if (limit === null) return { items: rows, hasMore: false };
+  const hasMore = rows.length > limit;
+  return { items: hasMore ? rows.slice(0, limit) : rows, hasMore };
 }
 
 export function countAssets(db: Database.Database, projectId: string): number {
@@ -774,6 +889,31 @@ export function updateJobState(
 
 export function markCancelRequested(db: Database.Database, id: string): void {
   db.prepare(`UPDATE jobs SET cancelRequested = 1 WHERE id = ?`).run(id);
+}
+
+/**
+ * Handbook soft-delete: cancel unfinished jobs for the project.
+ * Queued jobs become cancelled here. Running jobs are marked so the runner stops.
+ */
+export function cancelOpenJobsForProject(db: Database.Database, projectId: string, now: string): void {
+  const rows = db
+    .prepare(`SELECT id, status FROM jobs WHERE projectId = ? AND status IN ('queued', 'running')`)
+    .all(projectId) as Array<{ id: string; status: string }>;
+  for (const row of rows) {
+    markCancelRequested(db, row.id);
+    if (row.status !== "queued") continue;
+    db.prepare(
+      `UPDATE jobs
+       SET status = 'cancelled', phase = 'cancelled', finishedAt = ?, resultJson = NULL, errorJson = NULL
+       WHERE id = ?`,
+    ).run(now, row.id);
+    appendJobEvent(db, {
+      jobId: row.id,
+      event: "job.cancelled",
+      payloadJson: { status: "cancelled", phase: "cancelled", progress: null },
+      createdAt: now,
+    });
+  }
 }
 
 export function appendJobEvent(

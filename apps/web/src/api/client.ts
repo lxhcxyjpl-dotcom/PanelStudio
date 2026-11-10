@@ -88,11 +88,25 @@ export const api = {
   createProject(title: string, key: string): Promise<{ project: Project; revision: 0 }> {
     return request("/projects", jsonInit("POST", { title }, key));
   },
+  projects(query: { cursor?: string; limit?: number; includeDeleted?: boolean } = {}): Promise<{ items: Project[]; nextCursor: string | null }> {
+    const params = new URLSearchParams();
+    if (query.cursor) params.set("cursor", query.cursor);
+    if (query.limit !== undefined) params.set("limit", String(query.limit));
+    if (query.includeDeleted !== undefined) params.set("includeDeleted", String(query.includeDeleted));
+    const suffix = params.size > 0 ? `?${params.toString()}` : "";
+    return request(`/projects${suffix}`);
+  },
   project(projectId: string): Promise<Project> {
     return request(`/projects/${projectId}`);
   },
   renameProject(projectId: string, title: string): Promise<Project> {
     return request(`/projects/${projectId}`, jsonInit("PATCH", { title }));
+  },
+  deleteProject(projectId: string): Promise<Project> {
+    return request(`/projects/${projectId}`, { method: "DELETE" });
+  },
+  restoreProject(projectId: string, key: string): Promise<Project> {
+    return request(`/projects/${projectId}/restore`, jsonInit("POST", {}, key));
   },
   document(projectId: string): Promise<DocumentState> {
     return request(`/projects/${projectId}/document`);
