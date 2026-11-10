@@ -1,5 +1,4 @@
-import type { Diagnostic, NormalizedAsset } from "@panelstudio/contracts";
-import { NORMALIZATION_VERSION } from "@panelstudio/contracts";
+import { BUNDLED_FONTS, NORMALIZATION_VERSION, type Diagnostic, type NormalizedAsset } from "@panelstudio/contracts";
 import { inlineStyles } from "./css.js";
 import { expandUses } from "./expand-use.js";
 import { SvgImportError } from "./errors.js";
@@ -98,12 +97,18 @@ export function normalizeSvg(source: string): NormalizedSvg {
   assertResolvedReferences(root);
   const fonts = collectFonts(root);
   const viewport = bakeViewport(document, root, notes);
-  const diagnostics: Diagnostic[] = fonts.map((font) => ({
-    code: "FONT_MISSING",
-    severity: "warning" as const,
-    messageKey: "font.notInstalled",
-    params: { family: font.family },
-  }));
+  const diagnostics: Diagnostic[] = fonts.flatMap((font) =>
+    font.availableForPreview
+      ? []
+      : [
+          {
+            code: "FONT_MISSING" as const,
+            severity: "warning" as const,
+            messageKey: "font.notInstalled",
+            params: { family: font.family },
+          },
+        ],
+  );
   const svg = `<?xml version="1.0" encoding="UTF-8"?>\n${serializeElement(root, true)}`;
   return {
     svg,
@@ -162,6 +167,8 @@ function assertResolvedReferences(root: Element): void {
   }
 }
 
+const BUNDLED_FAMILIES = new Set<string>(BUNDLED_FONTS.map((font) => font.family));
+
 function collectFonts(root: Element): NormalizedAsset["fonts"] {
   const families = new Set<string>();
   for (const element of [root, ...descendants(root)]) {
@@ -172,11 +179,14 @@ function collectFonts(root: Element): NormalizedAsset["fonts"] {
       if (name) families.add(name);
     }
   }
-  return [...families].map((family) => ({
-    family,
-    availableForPreview: false,
-    fallbackFamily: null,
-  }));
+  return [...families].map((family) => {
+    const bundled = BUNDLED_FAMILIES.has(family);
+    return {
+      family,
+      availableForPreview: bundled,
+      fallbackFamily: bundled ? null : "Noto Sans",
+    };
+  });
 }
 
 function bakeViewport(document: Document, root: Element, notes: string[]): { width: number; height: number } {

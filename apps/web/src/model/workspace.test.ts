@@ -1,6 +1,8 @@
 import { createDefaultFigureDocument, REPRESENTATIVE_MESSAGES } from "@panelstudio/contracts";
 import { applyCommands } from "@panelstudio/core/apply";
 import { describe, expect, it } from "vitest";
+import { formatDiagnostic } from "../i18n/diagnostic";
+import { i18n } from "../i18n";
 import { enUS, messageKeys, zhCN, type MessageKey } from "../i18n/catalog";
 import { sidebarWidth, workspaceMode } from "./chrome";
 import { placePanelCommands } from "./place";
@@ -34,6 +36,35 @@ describe("phase 4 workspace rules", () => {
     }
     expect(messageKeys.every((key) => zhCN[key] && enUS[key])).toBe(true);
     expect(JSON.stringify({ zhCN, enUS })).not.toMatch(/<|\{%/);
+  });
+
+  it("translates layout and font diagnostics instead of showing raw codes", async () => {
+    await i18n.changeLanguage("zh-CN");
+    const ppi = formatDiagnostic(i18n.t.bind(i18n), {
+      code: "LAYOUT_PPI_BELOW_TARGET",
+      severity: "warning",
+      messageKey: "layout.ppiBelowTarget",
+      params: { ppi: 120, target: 300 },
+    });
+    expect(ppi).toContain("120");
+    expect(ppi).toContain("300");
+    expect(ppi).not.toContain("LAYOUT_PPI_BELOW_TARGET");
+    expect(ppi).not.toContain("layout.ppiBelowTarget");
+    const missing = formatDiagnostic(i18n.t.bind(i18n), {
+      code: "FONT_MISSING",
+      severity: "warning",
+      messageKey: "font.notInstalled",
+      params: { family: "Helvetica" },
+    });
+    expect(missing).toContain("Helvetica");
+    expect(missing).not.toContain("font.notInstalled");
+    await i18n.changeLanguage("en-US");
+    expect(formatDiagnostic(i18n.t.bind(i18n), {
+      code: "FONT_MISSING",
+      severity: "warning",
+      messageKey: "font.missingGlyph",
+      params: { family: "Noto Sans", glyphs: "中" },
+    })).toContain("Noto Sans");
   });
 
   it("places imported panels with the shared command applicator", () => {

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="480" height="280" viewBox="0 0 480 280">
+  <rect width="480" height="280" fill="#F7F7F7"/>
+  <path d="M48 240 H440 M48 40 V240" fill="none" stroke="#222222" stroke-width="2"/>
+  <path id="series" d="M48 200 C 120 190, 160 80, 230 110 S 360 60, 440 70" fill="none" stroke="#111111" stroke-width="3"/>
+  <text id="note" x="56" y="36" font-family="Noto Sans" font-size="16" fill="#222222">n=24</text>
+</svg>

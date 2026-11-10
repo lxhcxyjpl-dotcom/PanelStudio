@@ -5,15 +5,15 @@ export const SCHEMA_VERSION = 1 as const;
 
 /**
  * Application version reported by health.
- * Phase 5 wires provider settings and AI layout jobs. Layout and SVG engines
- * stay at their phase 3 and phase 1 versions.
+ * v0.1.0 is the public release candidate. Layout and SVG engines stay at the
+ * versions shipped in phases 3 and 1.
  */
-export const APP_VERSION = "0.1.0-phase5" as const;
+export const APP_VERSION = "0.1.0" as const;
 
 /**
  * Layout scoring is recorded with this engine version.
  * The SVG compiler shipped in phase 1. The font registry version identifies the
- * bundled family list. Font files are still not vendored.
+ * bundled family list, which is still Noto Sans and Noto Sans SC.
  */
 export const ENGINE_VERSIONS = {
   layout: "0.1.0",

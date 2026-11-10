@@ -11,6 +11,7 @@
   "scripts": {
     "typecheck": "pnpm --filter \"./packages/*\" --filter \"./apps/*\" typecheck",
     "test": "pnpm --filter \"./packages/*\" --filter \"./apps/*\" --if-present test",
+    "test:e2e": "playwright test -c apps/web/playwright.config.ts",
     "build:web": "pnpm --filter @panelstudio/web build",
     "test:e2e": "playwright test -c apps/web/playwright.config.ts"
   },

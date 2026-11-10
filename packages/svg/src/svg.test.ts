@@ -39,8 +39,17 @@ describe("SVG normalize", () => {
     expect(normalized.svg).toContain("<text");
     expect(normalized.svg).toContain("linearGradient");
     expect(normalized.svg).not.toContain("<image");
-    expect(normalized.fonts.map((font) => font.family)).toEqual(["Noto Sans"]);
-    expect(normalized.diagnostics[0]?.code).toBe("FONT_MISSING");
+    expect(normalized.fonts).toEqual([{ family: "Noto Sans", availableForPreview: true, fallbackFamily: null }]);
+    expect(normalized.diagnostics).toEqual([]);
+  });
+
+  it("warns when imported text uses a family that is not bundled", () => {
+    const normalized = normalizeSvg(
+      `<svg xmlns="http://www.w3.org/2000/svg" width="40" height="20"><text font-family="Helvetica" font-size="10">Hi</text></svg>`,
+    );
+    expect(normalized.fonts[0]).toEqual({ family: "Helvetica", availableForPreview: false, fallbackFamily: "Noto Sans" });
+    expect(normalized.diagnostics.map((item) => item.messageKey)).toEqual(["font.notInstalled"]);
+    expect(normalized.svg).toContain('font-family="Helvetica"');
   });
 
   it("rejects script, filters, and external images", () => {

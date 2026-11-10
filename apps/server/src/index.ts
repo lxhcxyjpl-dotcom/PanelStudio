@@ -22,8 +22,8 @@ export type ServerOptions = {
 const drains = new WeakMap<FastifyInstance, () => Promise<void>>();
 
 /**
- * Phase 5 server: import, export, the edit kernel, layout candidates, and
- * OpenAI-compatible AI layout jobs. A restart fails an in-flight provider
+ * v0.1 server: import, export, the edit kernel, layout candidates,
+ * OpenAI-compatible AI layout jobs, and the bundled Noto fonts. A restart fails an in-flight provider
  * call instead of sending it again. Domain commands, undo, redo, candidates,
  * and project files survive a restart.
  */

@@ -1,6 +1,7 @@
 import { RESOURCE_LIMITS, type NormalizedAsset } from "@panelstudio/contracts";
 import { Resvg } from "@resvg/resvg-js";
 import sharp, { type Metadata } from "sharp";
+import { resvgFontOptions } from "./fonts.js";
 import { ApiException } from "./http.js";
 
 const THUMBNAIL_EDGE = 256;
@@ -117,7 +118,7 @@ export async function normalizeRaster(
 export function rasterizeSvg(svg: string, pixelWidth: number): Buffer {
   const resvg = new Resvg(svg, {
     fitTo: { mode: "width", value: Math.max(1, Math.round(pixelWidth)) },
-    font: { loadSystemFonts: false },
+    font: resvgFontOptions(),
   });
   return Buffer.from(resvg.render().asPng());
 }
