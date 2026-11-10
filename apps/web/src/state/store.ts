@@ -38,6 +38,7 @@ export const useWorkspace = create<WorkspaceState>(() => ({
   cards: [],
   activeCandidateId: null,
   layoutState: "idle",
+  cardLayoutRequest: null,
   layoutMessage: null,
   imports: [],
   draggingFiles: false,

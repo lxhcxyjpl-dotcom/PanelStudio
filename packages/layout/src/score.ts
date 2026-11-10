@@ -8,6 +8,7 @@ import {
 import { rasterPpi, type LayoutAssetFacts } from "./measure.js";
 
 export type ConcreteFamily = "rows" | "hero-top" | "hero-left";
+type ScoringFamily = ConcreteFamily | "guided";
 
 const PENALTY_KEYS = [
   "readability",
@@ -40,7 +41,7 @@ export function scoreLayout(
   original: FigureDocumentV1,
   preview: FigureDocumentV1,
   assets: Readonly<Record<string, LayoutAssetFacts>>,
-  family: ConcreteFamily,
+  family: ScoringFamily,
   primaryId: string | null,
 ): { score: LayoutScore; diagnostics: Diagnostic[] } {
   const order = preview.panelOrder;
@@ -120,7 +121,7 @@ function whitespace(preview: FigureDocumentV1, order: string[]): Penalty {
 function emphasis(
   preview: FigureDocumentV1,
   order: string[],
-  family: ConcreteFamily,
+  family: ScoringFamily,
   primaryId: string | null,
 ): Penalty {
   if (!primaryId) return "unknown";

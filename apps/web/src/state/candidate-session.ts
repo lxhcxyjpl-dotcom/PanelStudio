@@ -47,6 +47,7 @@ export function resetCandidateSession(projectId: string | null) {
   active = null;
   releaseCards();
   patch({
+    cardLayoutRequest: null,
     cards: [], activeCandidateId: null, candidateRoot: null, compareMode: "editing", aiScope: "document",
     frozenScope: null, scopeChanged: false, awaitingAnswer: null, aiHistory: [], historyCursor: null,
     aiStatus: { phase: "idle" }, layoutState: "idle", layoutMessage: null,
@@ -135,6 +136,8 @@ export async function generateLayout(request: LayoutRequest) {
     const { candidates } = await api.layoutCandidates(projectId, { baseRevision: confirmed.revision, request, maxCandidates: request.family === "selection-row" ? 1 : 3 }, newKey());
     if (!current(origin)) return;
     putCards(candidates, confirmed, null, get().confirmed?.revision === confirmed.revision);
+    patch({ cardLayoutRequest: request });
+    return candidates.length > 0 && get().confirmed?.revision === confirmed.revision;
   } catch (error) {
     if (current(origin)) patch({ layoutState: error instanceof ApiClientError && error.code === "LAYOUT_CONFLICT" ? "conflict" : "error", layoutMessage: errorText(error), liveMessage: errorText(error) });
   }

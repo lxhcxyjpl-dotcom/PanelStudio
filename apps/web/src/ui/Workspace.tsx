@@ -34,6 +34,7 @@ import { proposalChanges, labelName } from "../model/changes";
 import { cancelGesture } from "./gesture";
 import { labelDiagnostics } from "@panelstudio/core/labels";
 import { Dialogs } from "./Dialogs";
+import { GuidedDialog } from "./GuidedDialog";
 import { Inspector } from "./Inspector";
 import { LeftSidebar } from "./LeftSidebar";
 import { Toolbar } from "./Toolbar";
@@ -47,6 +48,7 @@ export function Workspace() {
     const onResize = () => patch({ mode: workspaceMode(window.innerWidth) });
     window.addEventListener("resize", onResize);
     const onDragEnter = (event: DragEvent) => {
+      if (useWorkspace.getState().dialog === "guided") return;
       if ([...(event.dataTransfer?.types ?? [])].includes("Files")) patch({ draggingFiles: true });
     };
     const onDragLeave = (event: DragEvent) => {
@@ -56,6 +58,7 @@ export function Workspace() {
       if (![...(event.dataTransfer?.types ?? [])].includes("Files")) return;
       event.preventDefault();
       patch({ draggingFiles: false });
+      if (useWorkspace.getState().dialog === "guided") return;
       const files = [...(event.dataTransfer?.files ?? [])];
       if (files.length > 0) void importFiles(files);
     };
@@ -79,12 +82,12 @@ export function Workspace() {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.isComposing || event.key === "Process") return;
       const current = useWorkspace.getState();
+      if (current.dialog || event.defaultPrevented) return;
       if (event.key === " " && !isTyping(event.target) && !event.repeat) {
         patch({ spacePan: true });
         event.preventDefault();
         return;
       }
-      if (current.dialog || event.defaultPrevented) return;
       if (isTyping(event.target)) return;
       const key = event.key.toLowerCase();
       const command = event.metaKey || event.ctrlKey;
@@ -216,6 +219,7 @@ export function Workspace() {
       </footer>
       <div className="sr-only" aria-live="polite" data-testid="live">{state.liveMessage}</div>
       <Dialogs />
+      {state.confirmed && <GuidedDialog key={state.projectId} document={state.confirmed.document} open={state.dialog === "guided"} />}
     </div>
   );
 }
@@ -247,7 +251,7 @@ function Banners() {
         <p className="banner">
           {state.cards.some((card) => card.candidate.origin === "ai") ? t("ai.stale") : t("layout.stale")}
           {state.cards.some((card) => card.candidate.origin === "ai") ? null : (
-            <Button action="regenerate-layout" onClick={() => void requestLayout()}>{t("layout.regenerate")}</Button>
+            <Button action="regenerate-layout" onClick={() => void requestLayout(state.cardLayoutRequest ?? { family: "auto" })}>{t("layout.regenerate")}</Button>
           )}
         </p>
       ) : null}

@@ -17,6 +17,8 @@ PanelStudio is a local or self-hosted editor for multi-panel scientific figures.
 
 [Reproducible project](examples/refinement-six/) · [Recorded walkthrough](docs/demo/v0.2-refinement.webm) · [Illustrator acceptance](docs/illustrator-compatibility.md)
 
+Use **Reference & preferences** to upload a reference figure, describe your preferred composition, or combine both. Review the detected regions and adjust the emphasis, pairings, canvas shape and panel gap before previewing candidates. Image analysis runs in the browser. See the [six-panel comparison and editable files](examples/reference-preferences/).
+
 On the tested Illustrator 30.7 installation, direct SVG import substituted a Medium face for three labels in the bold CJK sample. The font download includes a label-only restoration script. All five sets passed the native checks with the intended fonts after restoration.
 
 ## Run

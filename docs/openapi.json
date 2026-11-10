@@ -2218,6 +2218,18 @@
                       {
                         "type": "string",
                         "const": "scope-conflict"
+                      },
+                      {
+                        "type": "string",
+                        "const": "reference-slots"
+                      },
+                      {
+                        "type": "string",
+                        "const": "reference-structure"
+                      },
+                      {
+                        "type": "string",
+                        "const": "guided-preferences"
                       }
                     ]
                   },
@@ -7718,6 +7730,166 @@
                   }
                 },
                 "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "required": [
+                  "family",
+                  "preferences"
+                ],
+                "properties": {
+                  "family": {
+                    "type": "string",
+                    "const": "guided"
+                  },
+                  "preferences": {
+                    "type": "object",
+                    "properties": {
+                      "gapMm": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 30
+                      },
+                      "shape": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "const": "wide"
+                          },
+                          {
+                            "type": "string",
+                            "const": "tall"
+                          },
+                          {
+                            "type": "string",
+                            "const": "square"
+                          }
+                        ]
+                      },
+                      "focus": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "pattern": "^panel:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+                          },
+                          {
+                            "type": "string",
+                            "pattern": "^group:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+                          }
+                        ]
+                      },
+                      "pair": {
+                        "type": "object",
+                        "required": [
+                          "first",
+                          "second",
+                          "axis"
+                        ],
+                        "properties": {
+                          "first": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "pattern": "^panel:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+                              },
+                              {
+                                "type": "string",
+                                "pattern": "^group:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+                              }
+                            ]
+                          },
+                          "second": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "pattern": "^panel:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+                              },
+                              {
+                                "type": "string",
+                                "pattern": "^group:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+                              }
+                            ]
+                          },
+                          "axis": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "const": "horizontal"
+                              },
+                              {
+                                "type": "string",
+                                "const": "vertical"
+                              },
+                              {
+                                "type": "string",
+                                "const": "any"
+                              }
+                            ]
+                          }
+                        },
+                        "additionalProperties": false
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "referenceAspect": {
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "maximum": 1000
+                  },
+                  "referenceSlots": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "unitId",
+                        "x",
+                        "y",
+                        "width",
+                        "height"
+                      ],
+                      "properties": {
+                        "unitId": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "pattern": "^panel:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+                            },
+                            {
+                              "type": "string",
+                              "pattern": "^group:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+                            }
+                          ]
+                        },
+                        "x": {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 1
+                        },
+                        "y": {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 1
+                        },
+                        "width": {
+                          "type": "number",
+                          "exclusiveMinimum": 0,
+                          "maximum": 1
+                        },
+                        "height": {
+                          "type": "number",
+                          "exclusiveMinimum": 0,
+                          "maximum": 1
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "minItems": 2,
+                    "maxItems": 8
+                  }
+                },
+                "description": "Reviewed reference regions in normalized image coordinates and explicit composition preferences.",
+                "additionalProperties": false
               }
             ],
             "description": "At most one of orderedUnitIds and rows. primaryPanelId is omitted when the request does not set one; the stored setting uses null instead."
@@ -11933,6 +12105,18 @@
                                 {
                                   "type": "string",
                                   "const": "scope-conflict"
+                                },
+                                {
+                                  "type": "string",
+                                  "const": "reference-slots"
+                                },
+                                {
+                                  "type": "string",
+                                  "const": "reference-structure"
+                                },
+                                {
+                                  "type": "string",
+                                  "const": "guided-preferences"
                                 }
                               ]
                             },
@@ -13034,6 +13218,18 @@
                               {
                                 "type": "string",
                                 "const": "scope-conflict"
+                              },
+                              {
+                                "type": "string",
+                                "const": "reference-slots"
+                              },
+                              {
+                                "type": "string",
+                                "const": "reference-structure"
+                              },
+                              {
+                                "type": "string",
+                                "const": "guided-preferences"
                               }
                             ]
                           },
@@ -15646,6 +15842,18 @@
                               {
                                 "type": "string",
                                 "const": "scope-conflict"
+                              },
+                              {
+                                "type": "string",
+                                "const": "reference-slots"
+                              },
+                              {
+                                "type": "string",
+                                "const": "reference-structure"
+                              },
+                              {
+                                "type": "string",
+                                "const": "guided-preferences"
                               }
                             ]
                           },
@@ -16399,6 +16607,18 @@
                               {
                                 "type": "string",
                                 "const": "scope-conflict"
+                              },
+                              {
+                                "type": "string",
+                                "const": "reference-slots"
+                              },
+                              {
+                                "type": "string",
+                                "const": "reference-structure"
+                              },
+                              {
+                                "type": "string",
+                                "const": "guided-preferences"
                               }
                             ]
                           },
@@ -17260,6 +17480,18 @@
                               {
                                 "type": "string",
                                 "const": "scope-conflict"
+                              },
+                              {
+                                "type": "string",
+                                "const": "reference-slots"
+                              },
+                              {
+                                "type": "string",
+                                "const": "reference-structure"
+                              },
+                              {
+                                "type": "string",
+                                "const": "guided-preferences"
                               }
                             ]
                           },
@@ -18018,6 +18250,18 @@
                               {
                                 "type": "string",
                                 "const": "scope-conflict"
+                              },
+                              {
+                                "type": "string",
+                                "const": "reference-slots"
+                              },
+                              {
+                                "type": "string",
+                                "const": "reference-structure"
+                              },
+                              {
+                                "type": "string",
+                                "const": "guided-preferences"
                               }
                             ]
                           },
@@ -18800,6 +19044,18 @@
                               {
                                 "type": "string",
                                 "const": "scope-conflict"
+                              },
+                              {
+                                "type": "string",
+                                "const": "reference-slots"
+                              },
+                              {
+                                "type": "string",
+                                "const": "reference-structure"
+                              },
+                              {
+                                "type": "string",
+                                "const": "guided-preferences"
                               }
                             ]
                           },
@@ -21043,6 +21299,166 @@
                 "description": "Finite length in millimeters, zero allowed."
               }
             },
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "required": [
+              "family",
+              "preferences"
+            ],
+            "properties": {
+              "family": {
+                "type": "string",
+                "const": "guided"
+              },
+              "preferences": {
+                "type": "object",
+                "properties": {
+                  "gapMm": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 30
+                  },
+                  "shape": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "const": "wide"
+                      },
+                      {
+                        "type": "string",
+                        "const": "tall"
+                      },
+                      {
+                        "type": "string",
+                        "const": "square"
+                      }
+                    ]
+                  },
+                  "focus": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "pattern": "^panel:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+                      },
+                      {
+                        "type": "string",
+                        "pattern": "^group:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+                      }
+                    ]
+                  },
+                  "pair": {
+                    "type": "object",
+                    "required": [
+                      "first",
+                      "second",
+                      "axis"
+                    ],
+                    "properties": {
+                      "first": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "pattern": "^panel:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+                          },
+                          {
+                            "type": "string",
+                            "pattern": "^group:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+                          }
+                        ]
+                      },
+                      "second": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "pattern": "^panel:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+                          },
+                          {
+                            "type": "string",
+                            "pattern": "^group:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+                          }
+                        ]
+                      },
+                      "axis": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "const": "horizontal"
+                          },
+                          {
+                            "type": "string",
+                            "const": "vertical"
+                          },
+                          {
+                            "type": "string",
+                            "const": "any"
+                          }
+                        ]
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                },
+                "additionalProperties": false
+              },
+              "referenceAspect": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "maximum": 1000
+              },
+              "referenceSlots": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "unitId",
+                    "x",
+                    "y",
+                    "width",
+                    "height"
+                  ],
+                  "properties": {
+                    "unitId": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "pattern": "^panel:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+                        },
+                        {
+                          "type": "string",
+                          "pattern": "^group:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+                        }
+                      ]
+                    },
+                    "x": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    "y": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    "width": {
+                      "type": "number",
+                      "exclusiveMinimum": 0,
+                      "maximum": 1
+                    },
+                    "height": {
+                      "type": "number",
+                      "exclusiveMinimum": 0,
+                      "maximum": 1
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                "minItems": 2,
+                "maxItems": 8
+              }
+            },
+            "description": "Reviewed reference regions in normalized image coordinates and explicit composition preferences.",
             "additionalProperties": false
           }
         ],

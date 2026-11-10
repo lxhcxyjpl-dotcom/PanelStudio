@@ -131,7 +131,7 @@ export const RENDER_MEDIA_TYPES = ["image/png", "image/svg+xml"] as const;
 
 export const EXPORT_FORMATS = ["svg", "png", "project"] as const;
 
-export const LAYOUT_FAMILIES = ["auto", "rows", "hero-top", "hero-left", "selection-row"] as const;
+export const LAYOUT_FAMILIES = ["auto", "rows", "hero-top", "hero-left", "selection-row", "guided"] as const;
 
 export const NON_DOCUMENT_CLIENT_STATE = [
   "theme",

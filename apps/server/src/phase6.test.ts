@@ -229,6 +229,28 @@ describe("phase 6 fonts and example", () => {
     await app.close();
   });
 
+  it("reopens the guided example with its chosen focus, frames and original artwork", async () => {
+    const app = server();
+    try {
+      const bundle = readFileSync(new URL("../../../examples/reference-preferences/guided.figurezip", import.meta.url));
+      const source = unzipSync(readFileSync(new URL("../../../examples/refinement-six/start.figurezip", import.meta.url)));
+      const unpacked = unzipSync(bundle);
+      const assets = Object.keys(source).filter((name) => name.startsWith("assets/")).sort();
+      expect(Object.keys(unpacked).filter((name) => name.startsWith("assets/")).sort()).toEqual(assets);
+      for (const name of assets) expect(Buffer.compare(Buffer.from(source[name]!), Buffer.from(unpacked[name]!))).toBe(0);
+      const accepted = await app.inject({method:"POST",url:"/api/v1/project-imports",
+        headers:{"idempotency-key":"guided-reopen", ...multipartHeaders(bundle,"guided.figurezip")},payload:multipartBody(bundle,"guided.figurezip")});
+      expect(accepted.statusCode).toBe(202);
+      const job = await jobOf(app,accepted.json().jobId);
+      expect(job.status).toBe("succeeded");
+      const id = job.result && "projectId" in job.result ? job.result.projectId : "";
+      const { document } = (await app.inject({method:"GET", url:"/api/v1/projects/"+id+"/document"})).json<{document:FigureDocumentV1}>();
+      expect(document).toEqual(JSON.parse(Buffer.from(unpacked["document.json"]!).toString("utf8")));
+      expect(document.layoutSettings.primaryPanelId).toBe(document.panelOrder[1]);
+      expect(document.layoutSettings.gutterMm).toEqual({horizontal:6,vertical:6});
+    } finally { await app.close(); }
+  });
+
   function server(dataDir = mkdtempSync(path.join(tmpdir(), "panelstudio-phase6-"))) {
     directories.push(dataDir);
     return createServer({ dataDir });

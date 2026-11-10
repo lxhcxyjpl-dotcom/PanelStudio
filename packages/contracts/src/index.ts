@@ -63,6 +63,8 @@ export {
   LAYOUT_SCORE_WEIGHT_SUM,
   CanvasOverrideSchema,
   GutterOverrideSchema,
+  GuidedLayoutRequestSchema,
+  layoutUnitIds,
   LayoutFamilySchema,
   LayoutRequestByOrderSchema,
   LayoutRequestByRowsSchema,
@@ -72,7 +74,7 @@ export {
   LayoutScoreSchema,
   UnitIdSchema,
 } from "./layout.js";
-export type { LayoutRequest, LayoutScore, UnitId, SelectionRowLayoutRequest } from "./layout.js";
+export type { LayoutRequest, LayoutScore, UnitId, SelectionRowLayoutRequest, GuidedLayoutRequest, GuidedPreferences, ReferenceSlot } from "./layout.js";
 export {
   CanvasSetCommandSchema,
   DomainCommandSchema,

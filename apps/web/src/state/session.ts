@@ -651,7 +651,7 @@ export async function requestLayout(request: LayoutRequest = { family: "auto" })
   const epoch = projectEpoch();
   if (nudge) await flushNudge();
   await chain;
-  if (projectEpoch() === epoch) await generateLayout(request);
+  if (projectEpoch() === epoch) return generateLayout(request);
 }
 
 export function acceptCandidate(): Promise<void> {

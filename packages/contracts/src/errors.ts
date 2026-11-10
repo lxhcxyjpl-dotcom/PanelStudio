@@ -97,6 +97,7 @@ export const ApiErrorDetailsSchema = object(
       Type.Literal("unsupported-text-layout"), Type.Literal("turn-limit"),
       Type.Literal("command-limit"), Type.Literal("empty-selection"),
       Type.Literal("scope-conflict"),
+      Type.Literal("reference-slots"), Type.Literal("reference-structure"), Type.Literal("guided-preferences"),
     ])),
     expectedRevision: Type.Optional(RevisionSchema),
     actualRevision: Type.Optional(RevisionSchema),

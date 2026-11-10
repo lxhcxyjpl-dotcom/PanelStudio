@@ -117,6 +117,9 @@ export function Toolbar() {
         <Icon name="layout" />
         {t("toolbar.autoLayout")}
       </Button>
+      <Button action="guided-layout" disabledReason={layoutReason} onClick={() => patch({ dialog: "guided" })}>
+        {t("layout.guide")}
+      </Button>
       <span className="toolbar-spacer" />
       {state.crop ? (
         <>

@@ -20,6 +20,9 @@ export function sidebarWidth(side: "left" | "right", mode: WorkspaceMode, prefer
 
 export function localizedSummary(summary: string, locale: string): string {
   if (locale.startsWith("zh")) return summary;
+  if (summary === "参考行列结构") return "Reference rows and columns";
+  if (summary === "参考区域比例") return "Reference proportions";
+  if (summary === "按排版偏好") return "Your layout preferences";
   if (summary === "局部单行整理") return "Selection arranged in a row";
   if (summary.startsWith("均衡分行")) return `Balanced rows${summary.slice("均衡分行".length)}`;
   if (summary.startsWith("主图在左")) return `Primary on the left${summary.slice("主图在左".length)}`;

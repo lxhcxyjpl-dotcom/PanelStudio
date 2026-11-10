@@ -6,4 +6,6 @@ fonts/*.ttf binary
 # Generated text is compared byte-for-byte with its source.
 packages/ui/src/tokens.css text eol=lf
 docs/openapi.json text eol=lf
+fixtures/database/v0.1.sql text eol=lf
+examples/reference-preferences/guided.svg text eol=lf
 *.sh text eol=lf

@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1056" height="961" viewBox="0 0 1056 961">
+  <title>Six-panel layout reference</title>
+  <rect width="1056" height="961" fill="white"/>
+  <rect x="2.0" y="91.5" width="412.5" height="443.5" rx="6" fill="none" stroke="#334852" stroke-width="3"/>
+  <text x="17.0" y="122.5" fill="#263238" font-family="sans-serif" font-size="23">A</text>
+  <rect x="433.2" y="91.5" width="620.8" height="621.0" rx="6" fill="none" stroke="#334852" stroke-width="3"/>
+  <text x="448.2" y="122.5" fill="#263238" font-family="sans-serif" font-size="23">B</text>
+  <rect x="2.0" y="549.3" width="414.0" height="163.3" rx="6" fill="none" stroke="#334852" stroke-width="3"/>
+  <text x="17.0" y="580.3" fill="#263238" font-family="sans-serif" font-size="23">C</text>
+  <rect x="2.0" y="728.3" width="414.0" height="230.7" rx="6" fill="none" stroke="#334852" stroke-width="3"/>
+  <text x="17.0" y="759.3" fill="#263238" font-family="sans-serif" font-size="23">D</text>
+  <rect x="433.2" y="725.3" width="318.7" height="233.7" rx="6" fill="none" stroke="#334852" stroke-width="3"/>
+  <text x="448.2" y="756.3" fill="#263238" font-family="sans-serif" font-size="23">E</text>
+  <rect x="767.6" y="726.8" width="286.4" height="232.2" rx="6" fill="none" stroke="#334852" stroke-width="3"/>
+  <text x="782.6" y="757.8" fill="#263238" font-family="sans-serif" font-size="23">F</text>
+</svg>

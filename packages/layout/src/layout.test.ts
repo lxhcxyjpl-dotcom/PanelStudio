@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import {
   TOLERANCES,
   createDefaultFigureDocument,
+  layoutUnitIds,
   type FigureDocumentV1,
   type LayoutRequest,
 } from "@panelstudio/contracts";
@@ -30,7 +31,7 @@ type FixturePanel = {
 type Fixture = {
   id: string;
   expect: "candidates" | "conflict";
-  family?: Exclude<LayoutRequest["family"], "selection-row">;
+  family?: Exclude<LayoutRequest["family"], "selection-row" | "guided">;
   primary?: number | null;
   locked?: number[];
   groups?: Array<{ id: string; panels: number[] }>;
@@ -115,6 +116,63 @@ function geometryKey(document: FigureDocumentV1): string {
     })
     .join("|");
 }
+
+describe("guided layout", () => {
+  const scene = () => loadFixture("six-panels.json");
+  const [a, b, c] = [1, 2, 3].map((n) => "panel:" + panelId(n)) as [string, string, string];
+  const slots = [[0,.10,.39,.46],[.41,.10,.59,.64],[0,.57,.39,.17],[0,.76,.39,.24],[.41,.76,.30,.24],[.73,.76,.27,.24]]
+    .map(([x,y,width,height], i) => ({ unitId: "panel:" + panelId(i+1), x: x!, y: y!, width: width!, height: height! }));
+  it("keeps a two-row spanning panel, labels, crop and original asset references; combines focus and adjacency", () => {
+    const input = scene();
+    const right = solved(solveLayout({ ...input, request: {family:"guided", referenceAspect: 1.10, referenceSlots:slots,
+      preferences:{focus:b, pair:{first:a,second:c,axis:"vertical"},gapMm:4}} }));
+    for (const { previewDocument: d, commands } of right) {
+      expect(d.panelOrder).toEqual(input.document.panelOrder);
+      expect(d.stackOrder).toEqual(input.document.stackOrder);
+      const [fa,fb,fc] = [1,2,3].map((i) => d.panels[panelId(i)]!.frameMm) as [Frame,Frame,Frame];
+      expect(fb.x).toBeGreaterThanOrEqual(fa.x+fa.width);
+      expect(fc.y).toBeGreaterThan(fa.y+fa.height);
+      expect(fb.height).toBeGreaterThan(fa.height);
+      expect(d.layoutSettings.gutterMm).toEqual({horizontal:4,vertical:4});
+      for (const id of d.panelOrder) {
+        expect(d.panels[id]!.labelOverrides).toEqual(input.document.panels[id]!.labelOverrides);
+        expect(d.panels[id]!.assetId).toBe(input.document.panels[id]!.assetId);
+        expect(d.panels[id]!.cropNormalized).toEqual(input.document.panels[id]!.cropNormalized);
+      }
+      const replay = validateCandidateResult(input.document,commands,(id) => ({id,originalFilename:"image",...input.assets[id]!}),"layout");
+      expect(replay).toEqual(d);
+    }
+  });
+  type Frame = FigureDocumentV1["panels"][string]["frameMm"];
+  it("returns an explicit conflict for overlapping, incomplete or contradictory references", () => {
+    const input = scene();
+    const check = (referenceSlots: typeof slots, focus?: string) => solveLayout({...input,
+      request:{family:"guided", referenceSlots, preferences:{focus}}});
+    expect(check(slots.slice(1))).toMatchObject({ok:false,details:{reason:"reference-slots"}});
+    expect(check(slots.map((s) => ({...s,x:0,y:0})))).toMatchObject({ok:false,details:{reason:"reference-structure"}});
+    expect(check(slots.map((s) => ({...s,unitId:a})))).toMatchObject({ok:false,details:{reason:"reference-slots"}});
+    expect(check(slots.map((s,i) => i === 0 ? {...s,x:0.9} : s))).toMatchObject({ok:false,details:{reason:"reference-slots"}});
+    expect(check(slots,c)).toMatchObject({ok:false,details:{reason:"guided-preferences"}});
+    expect(check(slots,"panel:"+panelId(8))).toMatchObject({ok:false,code:"REQUEST_INVALID"});
+  });
+  it("can emphasize one of two equal-aspect assets, honors fixed canvases and keeps groups rigid", () => {
+    const input = loadFixture("two-panels.json");
+    const second = input.document.panels[panelId(2)]!;
+    input.assets[second.assetId] = {...input.assets[input.document.panels[panelId(1)]!.assetId]!};
+    second.frameMm.height = input.document.panels[panelId(1)]!.frameMm.height * second.frameMm.width / input.document.panels[panelId(1)]!.frameMm.width;
+    const candidates = solved(solveLayout({...input,request:{family:"guided",preferences:{focus:b,shape:"square"}}}));
+    expect(candidates.every(({previewDocument:d}) => Math.abs(d.canvas.heightMm-d.canvas.widthMm) < 1)).toBe(true);
+    input.document.canvas = {...input.document.canvas,heightMode:"fixed",heightMm:100};
+    expect(solveLayout({...input,request:{family:"guided",preferences:{shape:"tall"}}})).toMatchObject({ok:false});
+    const grouped = loadFixture("rigid-group.json"), ids = layoutUnitIds(grouped.document);
+    expect(ids).toHaveLength(2);
+    const rigid = solved(solveLayout({...grouped,request:{family:"guided",preferences:{gapMm:4}}}))[0]!.previewDocument;
+    for (const i of [1,2]) expect(rigid.panels[panelId(i)]!.frameMm.width).toBe(grouped.document.panels[panelId(i)]!.frameMm.width);
+    expect(rigid.panels[panelId(1)]!.frameMm.x - rigid.panels[panelId(2)]!.frameMm.x).toBeCloseTo(-48);
+    grouped.document.panels[panelId(1)]!.locked = true;
+    expect(solveLayout({...grouped,request:{family:"guided",preferences:{gapMm:4}}})).toMatchObject({ok:false,code:"LOCKED_ELEMENT"});
+  });
+});
 
 function assertCandidateLaw(document: FigureDocumentV1, assets: Record<string, LayoutAssetFacts>, candidate: SolvedCandidate): void {
   expect(candidate.commands.length).toBeGreaterThan(0);

@@ -1,0 +1,137 @@
+{
+  "sourceFigure": "https://www.nature.com/articles/s41592-024-02212-x/figures/1",
+  "preferences": "突出 B，A 和 C 上下排列，留白多一点",
+  "gapMm": 6,
+  "referenceSlots": 6,
+  "originalAssetFilesByteIdentical": 24,
+  "originalDocumentHash": "b2503aa7ce6b379cd20a20502febf575fbe3514ea118139af6e782455f99980c",
+  "appliedDocumentHash": "a7bf65b90143008b9967964431b700ff327f1152849045640738221f60314035",
+  "undoRestoredHash": true,
+  "redoRestoredHash": true,
+  "svgSha256": "773b0728fbd3a789fce2069083003c6977e592f54986d3ede764d8863e97bd09",
+  "illustrator": {
+    "initial": {
+      "version": "30.7.0",
+      "build": "114R",
+      "passed": 55,
+      "total": 67,
+      "labelFonts": [
+        "NotoSansJP-Bold"
+      ],
+      "maxClipErrorMm": 1.493464249e-05
+    },
+    "afterFontRefresh": {
+      "version": "30.7.0",
+      "build": "114R",
+      "passed": 67,
+      "total": 67,
+      "labelFonts": [
+        "NotoSans-Bold"
+      ],
+      "maxClipErrorMm": 1.493464249e-05
+    }
+  },
+  "detection": {
+    "context": "Eight design references. The independent layout unit count was set to the annotated panel count before upload. Default suggestions were compared one-to-one to the existing manual panel envelopes at IoU >= 0.5.",
+    "matched": 25,
+    "annotated": 41,
+    "figures": [
+      {
+        "figure": "kidney3",
+        "method": "gutters",
+        "detected": 6,
+        "annotated": 6,
+        "matched": 2,
+        "iou": [
+          0.8332229460767819,
+          0.7096408031021088
+        ]
+      },
+      {
+        "figure": "kidney4",
+        "method": "gutters",
+        "detected": 5,
+        "annotated": 5,
+        "matched": 4,
+        "iou": [
+          0.9983062680805243,
+          0.9950709072614774,
+          0.6486776801332405,
+          0.5329709453640086
+        ]
+      },
+      {
+        "figure": "squid1",
+        "method": "gutters",
+        "detected": 3,
+        "annotated": 3,
+        "matched": 3,
+        "iou": [
+          0.9993587717339107,
+          0.967191181427148,
+          0.9328078490606624
+        ]
+      },
+      {
+        "figure": "squid3",
+        "method": "gutters",
+        "detected": 6,
+        "annotated": 6,
+        "matched": 1,
+        "iou": [
+          0.6671045404870611
+        ]
+      },
+      {
+        "figure": "spatial1",
+        "method": "outlines",
+        "detected": 6,
+        "annotated": 6,
+        "matched": 6,
+        "iou": [
+          0.9971033268942393,
+          0.9970286631804748,
+          0.9965424399402978,
+          0.9954134008681217,
+          0.9930154618916347,
+          0.9919778408492539
+        ]
+      },
+      {
+        "figure": "spatial2",
+        "method": "gutters",
+        "detected": 5,
+        "annotated": 5,
+        "matched": 4,
+        "iou": [
+          0.9875606730494888,
+          0.984472144722019,
+          0.6407812300094325,
+          0.5110878156538364
+        ]
+      },
+      {
+        "figure": "arches2",
+        "method": "gutters",
+        "detected": 5,
+        "annotated": 5,
+        "matched": 0,
+        "iou": []
+      },
+      {
+        "figure": "arches3",
+        "method": "gutters",
+        "detected": 5,
+        "annotated": 5,
+        "matched": 5,
+        "iou": [
+          0.9997782273780411,
+          0.997617282817017,
+          0.9933134483278612,
+          0.9881787296277152,
+          0.550698720521096
+        ]
+      }
+    ]
+  }
+}

@@ -6,7 +6,7 @@ import {
   LabelSequenceSchema,
   LabelTypographyOverrideSchema,
 } from "./document.js";
-import { LayoutRequestSchema } from "./layout.js";
+import { StandardLayoutRequestSchema } from "./layout.js";
 import {
   FontIdSchema,
   FontWeightSchema,
@@ -137,7 +137,7 @@ const targetList = Type.Array(TargetRefSchema, { minItems: 1 });
 
 export const AILayoutActionSchema = object({
   type: Type.Literal("layout"),
-  request: LayoutRequestSchema,
+  request: StandardLayoutRequestSchema,
 });
 
 export const AISetCanvasActionSchema = object({

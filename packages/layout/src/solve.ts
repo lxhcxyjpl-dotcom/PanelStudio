@@ -28,6 +28,7 @@ import {
 import { parseUnitList } from "./units.js";
 import { assertLayoutConstraints, validateCandidateResult } from "./validate.js";
 import { solveLocalRow } from "./local-row.js";
+import { solveGuided } from "./guided.js";
 import { placeHeroLeft, placeStack, type Placement } from "./place.js";
 import { scoreLayout, type ConcreteFamily } from "./score.js";
 
@@ -40,10 +41,10 @@ export type SolveLayoutInput = {
   maxCandidates?: 1 | 2 | 3;
 };
 
-type GlobalRequest = Exclude<LayoutRequest, { family: "selection-row" }>;
+type GlobalRequest = Exclude<LayoutRequest, { family: "selection-row" | "guided" }>;
 
 export type SolvedCandidate = {
-  family: ConcreteFamily | "selection-row";
+  family: ConcreteFamily | "selection-row" | "guided";
   summary: string;
   commands: DomainCommand[];
   previewDocument: FigureDocumentV1;
@@ -99,6 +100,7 @@ export function solveLayout(input: SolveLayoutInput): SolveLayoutResult {
     }
   }
   if (input.request.family === "selection-row") return solveLocalRow({ ...input, request: input.request });
+  if (input.request.family === "guided") return solveGuided({ ...input, request: input.request });
   const prepared = prepare({ ...input, request: input.request });
   if (!prepared.ok) return prepared;
   const failures = new Map<FailureKind, Failure>();

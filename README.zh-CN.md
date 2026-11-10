@@ -17,6 +17,8 @@ PanelStudio 是一个本地或自部署的科研多面板排版编辑器。导�
 
 [可复现的六图工程](examples/refinement-six/) · [实机界面录像](docs/demo/v0.2-refinement.webm) · [本机 Illustrator 验收记录](docs/illustrator-compatibility.md)
 
+工具栏的 **参考图与偏好** 支持上传期刊组图、写下构图要求，或同时使用两者。可以指定主图、相邻对比、画布方向与面板间距，再预览候选。参考图在浏览器内识别，识别框可手动调整。参见[六图排版对照、工程包与 Illustrator 样稿](examples/reference-preferences/)。
+
 在本机 Illustrator 30.7 中，中文混排样稿直接打开时出现字重替换。若遇到同一情况，可运行导出字体包中的编号字体还原脚本，再保存为 .ai。五组样稿的复测结果见上方实机验收记录。
 
 ## 运行

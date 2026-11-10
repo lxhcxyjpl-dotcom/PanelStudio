@@ -1,4 +1,4 @@
-import { ENGINE_VERSIONS, type AIHistoryTurn, type AIEditScope, type Candidate, type Diagnostic, type DomainCommand, type FigureDocumentV1 } from "@panelstudio/contracts";
+import { ENGINE_VERSIONS, type AIHistoryTurn, type AIEditScope, type Candidate, type Diagnostic, type DomainCommand, type FigureDocumentV1, type LayoutRequest } from "@panelstudio/contracts";
 import type { Guide } from "../model/snap";
 import type { Camera } from "../model/view";
 import type { LocaleName, MotionPreference, ThemeName } from "../prefs";
@@ -51,7 +51,7 @@ export type ExportState =
     }
   | { status: "failed"; message: string };
 
-export type DialogName = null | "settings" | "shortcuts" | "export" | "svg" | "asset" | "recovery" | "quota";
+export type DialogName = null | "settings" | "shortcuts" | "export" | "svg" | "asset" | "recovery" | "quota" | "guided";
 
 export type QuotaChoice = { assetIds: string[]; remaining: number };
 
@@ -107,6 +107,7 @@ export type WorkspaceState = {
   viewport: { width: number; height: number };
   fittedProjectId: string | null;
   cards: LayoutCard[];
+  cardLayoutRequest: LayoutRequest | null;
   activeCandidateId: string | null;
   layoutState: "idle" | "loading" | "conflict" | "error";
   layoutMessage: string | null;

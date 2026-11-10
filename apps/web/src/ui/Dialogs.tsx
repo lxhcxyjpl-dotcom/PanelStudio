@@ -33,13 +33,13 @@ export function Dialogs() {
   );
 }
 
-function Shell(props: { open: boolean; title: string; children: ReactNode; onClose?: () => void }) {
+export function Shell(props: { open: boolean; title: string; children: ReactNode; onClose?: () => void; className?: string }) {
   const { t } = useTranslation();
   return (
     <Dialog.Root open={props.open} onOpenChange={(open) => { if (!open) props.onClose ? props.onClose() : patch({ dialog: null }); }}>
       <Dialog.Portal>
         <Dialog.Overlay className="scrim" />
-        <Dialog.Content className="dialog" aria-describedby={undefined}>
+        <Dialog.Content className={"dialog " + (props.className ?? "")} aria-describedby={undefined}>
           <Dialog.Title>{props.title}</Dialog.Title>
           {props.children}
           <Dialog.Close asChild>
