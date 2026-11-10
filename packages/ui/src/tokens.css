@@ -1,0 +1,50 @@
+:root,
+:root[data-theme="light"] {
+  color-scheme: light;
+  --ui-background: #F5F5F7;
+  --ui-workspace: #E8E8EB;
+  --ui-surface: #FFFFFF;
+  --ui-surfaceElevated: #FFFFFF;
+  --ui-surfaceInset: #F0F0F2;
+  --ui-surfaceHover: #EEEEF0;
+  --ui-surfacePressed: #E2E2E6;
+  --ui-borderSubtle: #E3E3E7;
+  --ui-borderStrong: #87878F;
+  --ui-textPrimary: #19191D;
+  --ui-textSecondary: #5E5E68;
+  --ui-textMuted: #6D6D77;
+  --ui-textDisabled: #9898A1;
+  --ui-primaryFill: #202024;
+  --ui-primaryText: #FFFFFF;
+  --ui-selectedFill: #E6E6EB;
+  --ui-focusRing: #16161A;
+  --ui-scrim: #00000047;
+  --ui-shadow: #00000014;
+  --document-paper: #FFFFFF;
+  --document-labelDefault: #000000;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --ui-background: #18181A;
+  --ui-workspace: #242427;
+  --ui-surface: #222225;
+  --ui-surfaceElevated: #2C2C30;
+  --ui-surfaceInset: #19191C;
+  --ui-surfaceHover: #353539;
+  --ui-surfacePressed: #414146;
+  --ui-borderSubtle: #39393F;
+  --ui-borderStrong: #8C8C96;
+  --ui-textPrimary: #F5F5F7;
+  --ui-textSecondary: #B9B9C2;
+  --ui-textMuted: #A0A0AB;
+  --ui-textDisabled: #74747E;
+  --ui-primaryFill: #F1F1F4;
+  --ui-primaryText: #1B1B1F;
+  --ui-selectedFill: #3D3D45;
+  --ui-focusRing: #FFFFFF;
+  --ui-scrim: #00000070;
+  --ui-shadow: #00000040;
+  --document-paper: #FFFFFF;
+  --document-labelDefault: #000000;
+}
