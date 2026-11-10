@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="100" height="50" viewBox="0 0 100 50">
+  <defs>
+    <linearGradient id="fade" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#000000"/>
+      <stop offset="1" stop-color="#ffffff"/>
+    </linearGradient>
+    <clipPath id="round">
+      <rect id="clip-rect" x="0" y="0" width="80" height="40" rx="4"/>
+    </clipPath>
+  </defs>
+  <g id="mark" clip-path="url(#round)">
+    <rect id="bar" x="5" y="5" width="70" height="30" fill="url(#fade)" stroke="#000000" stroke-width="1"/>
+    <path id="curve" d="M10 30 C 20 10, 40 10, 60 30" fill="none" stroke="#333333" stroke-width="1.5"/>
+    <text id="note" x="12" y="22" font-family="Noto Sans" font-size="8">n=12</text>
+  </g>
+</svg>

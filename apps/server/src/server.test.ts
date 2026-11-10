@@ -1,29 +1,24 @@
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import { Resvg } from "@resvg/resvg-js";
 import Database from "better-sqlite3";
 import sharp from "sharp";
-import { describe, expect, it } from "vitest";
-import { APP_VERSION, HealthResponseSchema, SCHEMA_VERSION } from "@panelstudio/contracts";
+import { afterEach, describe, expect, it } from "vitest";
+import { APP_VERSION, SCHEMA_VERSION } from "@panelstudio/contracts";
 import { createServer } from "./index.js";
 
 describe("server wiring", () => {
-  it("does not register product routes", async () => {
-    const app = createServer();
-    const response = await app.inject({ method: "GET", url: "/api/v1/health" });
-    expect(response.statusCode).toBe(404);
-    await app.close();
+  const directories: string[] = [];
+
+  afterEach(() => {
+    for (const directory of directories.splice(0)) rmSync(directory, { recursive: true, force: true });
   });
 
-  it("can validate the health schema", async () => {
-    const app = createServer();
-    app.get(
-      "/api/v1/health",
-      { schema: { response: { 200: HealthResponseSchema } } },
-      async () => ({
-        status: "ok" as const,
-        appVersion: APP_VERSION,
-        schemaVersion: SCHEMA_VERSION,
-      }),
-    );
+  it("serves health for the phase 1 build", async () => {
+    const dataDir = mkdtempSync(path.join(tmpdir(), "panelstudio-"));
+    directories.push(dataDir);
+    const app = createServer({ dataDir });
     const response = await app.inject({ method: "GET", url: "/api/v1/health" });
     expect(response.statusCode).toBe(200);
     expect(response.json()).toEqual({

@@ -3,16 +3,20 @@ const MiB = 1024 * 1024;
 /** Document schema version. The only figure document model is version 1. */
 export const SCHEMA_VERSION = 1 as const;
 
-/** Application version reported by health. This tree is the phase 0 contract. */
-export const APP_VERSION = "0.1.0-phase0" as const;
+/**
+ * Application version reported by health.
+ * Phase 1 is the import, label, save, and editable-SVG path on the phase 0 contract.
+ */
+export const APP_VERSION = "0.1.0-phase1" as const;
 
 /**
- * Layout and SVG compilers are not implemented in phase 0, so those versions
- * stay at 0.0.0. The font registry version identifies the bundled family list.
+ * The layout compiler is still phase 3, so it stays at 0.0.0.
+ * The SVG compiler shipped in phase 1. The font registry version identifies the
+ * bundled family list. Font files are still not vendored.
  */
 export const ENGINE_VERSIONS = {
   layout: "0.0.0",
-  svg: "0.0.0",
+  svg: "0.1.0",
   fontRegistry: "1",
 } as const;
 

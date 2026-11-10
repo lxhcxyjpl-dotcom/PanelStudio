@@ -1,4 +1,4 @@
-import Type from "typebox";
+import Type, { type Static } from "typebox";
 import { NonEmptyStringSchema, UuidSchema } from "./primitives.js";
 import { object } from "./schema.js";
 
@@ -29,3 +29,5 @@ export const DiagnosticSchema = object(
       "Localized diagnostic. Known codes include the error catalog; FONT_MISSING is usually a warning.",
   },
 );
+
+export type Diagnostic = Static<typeof DiagnosticSchema>;
