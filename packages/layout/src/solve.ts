@@ -9,18 +9,15 @@ import {
 } from "@panelstudio/contracts";
 import {
   DocumentCommandError,
-  applyCommands,
+  resolvePanelLabel,
   framesNearlyEqual,
-  type ReadyAssetFacts,
 } from "@panelstudio/core";
 import {
   hasExplicitOrder,
   hasExplicitRows,
-  insideMargins,
-  intersects,
-  labelBounds,
+  assetFacts,
+  occupiedRects,
   nearly,
-  parseUnitId,
   patternKey,
   compositions,
   splitUnits,
@@ -28,6 +25,9 @@ import {
   type Rect,
   type Unit,
 } from "./measure.js";
+import { parseUnitList } from "./units.js";
+import { assertLayoutConstraints, validateCandidateResult } from "./validate.js";
+import { solveLocalRow } from "./local-row.js";
 import { placeHeroLeft, placeStack, type Placement } from "./place.js";
 import { scoreLayout, type ConcreteFamily } from "./score.js";
 
@@ -40,8 +40,10 @@ export type SolveLayoutInput = {
   maxCandidates?: 1 | 2 | 3;
 };
 
+type GlobalRequest = Exclude<LayoutRequest, { family: "selection-row" }>;
+
 export type SolvedCandidate = {
-  family: ConcreteFamily;
+  family: ConcreteFamily | "selection-row";
   summary: string;
   commands: DomainCommand[];
   previewDocument: FigureDocumentV1;
@@ -51,13 +53,9 @@ export type SolvedCandidate = {
 
 export type SolveLayoutFailure = {
   ok: false;
-  code: "LAYOUT_CONFLICT" | "REQUEST_INVALID" | "DOCUMENT_INVALID";
+  code: DocumentCommandError["code"] | "REQUEST_INVALID";
   message: string;
-  details: {
-    panelIds?: string[];
-    assetIds?: string[];
-    constraintIds?: string[];
-  };
+  details: DocumentCommandError["details"];
 };
 
 export type SolveLayoutResult = { ok: true; candidates: SolvedCandidate[] } | SolveLayoutFailure;
@@ -93,7 +91,15 @@ type Attempt = {
  * produced by applying that candidate's commands.
  */
 export function solveLayout(input: SolveLayoutInput): SolveLayoutResult {
-  const prepared = prepare(input);
+  for (const id of input.document.panelOrder) {
+    const measured = resolvePanelLabel(input.document, id)?.measurement;
+    if (measured?.status === "unavailable") {
+      return { ok: false, code: "TEXT_METRICS_UNAVAILABLE", message: "A label cannot be measured with its selected font.",
+        details: { reason: measured.reason, panelIds: [id] } };
+    }
+  }
+  if (input.request.family === "selection-row") return solveLocalRow({ ...input, request: input.request });
+  const prepared = prepare({ ...input, request: input.request });
   if (!prepared.ok) return prepared;
   const failures = new Map<FailureKind, Failure>();
   const found: SolvedCandidate[] = [];
@@ -129,7 +135,7 @@ type Prepared = {
   gutterV: number;
 };
 
-function prepare(input: SolveLayoutInput): Prepared | SolveLayoutFailure {
+function prepare(input: Omit<SolveLayoutInput, "request"> & { request: GlobalRequest }): Prepared | SolveLayoutFailure {
   const { document, request } = input;
   const panelIds = document.panelOrder;
   if (
@@ -200,7 +206,7 @@ function prepare(input: SolveLayoutInput): Prepared | SolveLayoutFailure {
 }
 
 function buildAttempts(
-  family: LayoutRequest["family"],
+  family: GlobalRequest["family"],
   units: Unit[],
   explicitRows: Unit[][] | null,
   rowMode: "full" | "secondary" | "search",
@@ -237,7 +243,7 @@ type ParsedUnits = {
 function parseUnits(
   document: FigureDocumentV1,
   membership: Map<string, string>,
-  request: LayoutRequest,
+  request: GlobalRequest,
   primaryId: string | null,
 ): ParsedUnits | { ok: false; failure: SolveLayoutFailure } {
   if (hasExplicitRows(request) && hasExplicitOrder(request)) {
@@ -291,49 +297,6 @@ function parseUnits(
     return { ok: true, units: parsed.units, explicitRows: null, rowMode: "search" };
   }
   return { ok: true, units: defaultUnits(document, membership), explicitRows: null, rowMode: "search" };
-}
-
-function parseUnitList(
-  document: FigureDocumentV1,
-  membership: Map<string, string>,
-  ids: string[],
-  seen: Set<string>,
-): { ok: true; units: Unit[] } | { ok: false; failure: SolveLayoutFailure } {
-  const units: Unit[] = [];
-  const seenGroups = new Set<string>();
-  for (const value of ids) {
-    const parsed = parseUnitId(value);
-    if (!parsed) return { ok: false, failure: invalid("REQUEST_INVALID", "A layout unit id is invalid.") };
-    if (parsed.kind === "panel") {
-      if (!document.panels[parsed.id]) {
-        return { ok: false, failure: invalid("REQUEST_INVALID", "The layout names a missing panel.", { panelIds: [parsed.id] }) };
-      }
-      if (membership.has(parsed.id)) {
-        return {
-          ok: false,
-          failure: invalid("REQUEST_INVALID", "A grouped panel can only participate as its group.", { panelIds: [parsed.id] }),
-        };
-      }
-      if (seen.has(parsed.id)) {
-        return { ok: false, failure: invalid("REQUEST_INVALID", "A panel is listed more than once.", { panelIds: [parsed.id] }) };
-      }
-      seen.add(parsed.id);
-      units.push({ kind: "panel", panelId: parsed.id });
-      continue;
-    }
-    const group = document.groups[parsed.id];
-    if (!group) return { ok: false, failure: invalid("REQUEST_INVALID", "The layout names a missing group.") };
-    if (seenGroups.has(parsed.id)) return { ok: false, failure: invalid("REQUEST_INVALID", "A group is listed more than once.") };
-    seenGroups.add(parsed.id);
-    for (const panelId of group.panelIds) {
-      if (seen.has(panelId)) {
-        return { ok: false, failure: invalid("REQUEST_INVALID", "A panel is listed more than once.", { panelIds: [panelId] }) };
-      }
-      seen.add(panelId);
-    }
-    units.push({ kind: "group", groupId: parsed.id, panelIds: [...group.panelIds] });
-  }
-  return { ok: true, units };
 }
 
 function defaultUnits(document: FigureDocumentV1, membership: Map<string, string>): Unit[] {
@@ -409,86 +372,16 @@ function evaluate(
       failure: { kind: "lock", message: "Locked panels cannot move or scale.", panelIds: locked, constraintIds: [] },
     };
   }
-  for (const constraint of document.layoutSettings.constraints) {
-    const frames: Rect[] = [];
-    for (const panelId of constraint.panelIds) {
-      const frame = placed.frames.get(panelId);
-      if (!frame) {
-        return {
-          ok: false,
-          failure: {
-            kind: "constraint",
-            message: "No layout satisfies the row, equal-width, or equal-height constraints.",
-            panelIds: [...constraint.panelIds],
-            constraintIds: [constraint.id],
-          },
-        };
-      }
-      frames.push(frame);
-    }
-    const anchor = frames[0];
-    const satisfied =
-      anchor !== undefined &&
-      frames.every((frame) => {
-        if (constraint.kind === "row") return nearly(frame.y, anchor.y);
-        if (constraint.kind === "equalHeight") return nearly(frame.height, anchor.height);
-        return nearly(frame.width, anchor.width);
-      });
-    if (!satisfied) {
-      return {
-        ok: false,
-        failure: {
-          kind: "constraint",
-          message: "No layout satisfies the row, equal-width, or equal-height constraints.",
-          panelIds: [...constraint.panelIds],
-          constraintIds: [constraint.id],
-        },
-      };
-    }
+  try {
+    assertLayoutConstraints(document, (id) => placed.frames.get(id)!);
+  } catch (error) {
+    if (!(error instanceof DocumentCommandError)) throw error;
+    return { ok: false, failure: { kind: "constraint", message: error.message,
+      panelIds: error.details.panelIds ?? [], constraintIds: error.details.constraintIds ?? [] } };
   }
-  const minSize = document.layoutSettings.minPanelSizeMm;
-  const tiny = everyone.filter((panelId) => {
-    const frame = placed.frames.get(panelId);
-    if (!frame) return true;
-    return (
-      frame.width < minSize.width - TOLERANCES.geometryComparisonMm ||
-      frame.height < minSize.height - TOLERANCES.geometryComparisonMm
-    );
-  });
-  if (tiny.length > 0) {
-    return {
-      ok: false,
-      failure: { kind: "min-size", message: "A panel would be smaller than the minimum size.", panelIds: tiny, constraintIds: [] },
-    };
-  }
-  const boxes: Array<{ panelId: string; rect: Rect }> = [];
-  for (const panelId of everyone) {
-    const frame = placed.frames.get(panelId);
-    if (!frame) continue;
-    boxes.push({ panelId, rect: frame });
-    const bounds = labelBounds(document, panelId, frame);
-    if (bounds) boxes.push({ panelId, rect: bounds });
-  }
-  for (let left = 0; left < boxes.length; left += 1) {
-    for (let right = left + 1; right < boxes.length; right += 1) {
-      const a = boxes[left];
-      const b = boxes[right];
-      if (!a || !b || a.panelId === b.panelId) continue;
-      if (intersects(a.rect, b.rect)) {
-        return {
-          ok: false,
-          failure: {
-            kind: "overlap",
-            message: "Panels or their labels would overlap.",
-            panelIds: [a.panelId, b.panelId],
-            constraintIds: [],
-          },
-        };
-      }
-    }
-  }
+  const boxes = everyone.flatMap((id) => occupiedRects(document, id, placed.frames.get(id)!));
   let bottom = margins.top;
-  for (const box of boxes) bottom = Math.max(bottom, box.rect.y + box.rect.height);
+  for (const box of boxes) bottom = Math.max(bottom, box.y + box.height);
   const needed = bottom + margins.bottom;
   if (prepared.heightMode === "auto") {
     if (needed > document.layoutSettings.maxAutoHeightMm + TOLERANCES.geometryComparisonMm) {
@@ -514,21 +407,6 @@ function evaluate(
     heightMm: prepared.heightMode === "auto" ? needed : prepared.fixedHeightMm,
     heightMode: prepared.heightMode,
   };
-  const outside = new Set<string>();
-  for (const box of boxes) {
-    if (!insideMargins(box.rect, nextCanvas)) outside.add(box.panelId);
-  }
-  if (outside.size > 0) {
-    return {
-      ok: false,
-      failure: {
-        kind: "margin",
-        message: "A panel or its label would leave the safety margin.",
-        panelIds: [...outside],
-        constraintIds: [],
-      },
-    };
-  }
   const items = everyone.map((panelId) => {
     const current = document.panels[panelId]?.frameMm;
     const next = placed.frames.get(panelId);
@@ -555,7 +433,7 @@ function evaluate(
     nearly(nextCanvas.heightMm, document.canvas.heightMm);
   if (!canvasUnchanged) commands.push({ type: "canvas.set", canvas: nextCanvas });
   try {
-    const previewDocument = applyCommands(document, commands, (assetId) => assetFacts(assets, assetId));
+    const previewDocument = validateCandidateResult(document, commands, (assetId) => assetFacts(assets, assetId), "layout");
     const scored = scoreLayout(document, previewDocument, assets, attempt.family, attempt.primaryId);
     return {
       ok: true,
@@ -570,8 +448,12 @@ function evaluate(
     };
   } catch (error) {
     if (error instanceof DocumentCommandError) {
-      const kind: FailureKind =
-        error.code === "LOCKED_ELEMENT" ? "lock" : error.code === "OUTSIDE_CANVAS" ? "margin" : "fit";
+      const reasons: Partial<Record<NonNullable<SolveLayoutFailure["details"]["reason"]>, FailureKind>> = {
+        "layout-constraint": "constraint", "layout-min-size": "min-size", "layout-overlap": "overlap",
+        "layout-margin": "margin", "layout-max-height": "height",
+      };
+      const kind = error.code === "LOCKED_ELEMENT" ? "lock" : error.code === "OUTSIDE_CANVAS" ? "margin" :
+        error.details.reason && reasons[error.details.reason] || "fit";
       return {
         ok: false,
         failure: {
@@ -656,17 +538,6 @@ function unitContains(unit: Unit, panelId: string): boolean {
   return unit.kind === "panel" ? unit.panelId === panelId : unit.panelIds.includes(panelId);
 }
 
-function assetFacts(assets: Readonly<Record<string, LayoutAssetFacts>>, assetId: string): ReadyAssetFacts | null {
-  const facts = assets[assetId];
-  if (!facts) return null;
-  return {
-    id: assetId,
-    originalFilename: "asset",
-    viewport: facts.viewport,
-    rasterPixelSize: facts.rasterPixelSize,
-  };
-}
-
 function dedupe(candidates: SolvedCandidate[]): SolvedCandidate[] {
   const kept = new Map<string, SolvedCandidate>();
   for (const candidate of candidates) {
@@ -714,7 +585,7 @@ function prefer(left: SolvedCandidate, right: SolvedCandidate): boolean {
   return left.summary < right.summary;
 }
 
-function familyRank(family: ConcreteFamily): number {
+function familyRank(family: SolvedCandidate["family"]): number {
   if (family === "rows") return 0;
   if (family === "hero-top") return 1;
   return 2;
@@ -744,7 +615,9 @@ function bestFailure(failures: Map<FailureKind, Failure>): Failure | null {
 
 function detailsOf(failure: Failure | null): SolveLayoutFailure["details"] {
   if (!failure) return {};
+  const reasons = { constraint: "layout-constraint", "min-size": "layout-min-size", overlap: "layout-overlap", margin: "layout-margin", height: "layout-max-height" } as const;
   return {
+    ...(failure.kind in reasons ? { reason: reasons[failure.kind as keyof typeof reasons] } : {}),
     ...(failure.panelIds.length > 0 ? { panelIds: failure.panelIds } : {}),
     ...(failure.constraintIds.length > 0 ? { constraintIds: failure.constraintIds } : {}),
   };

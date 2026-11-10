@@ -1,5 +1,5 @@
 import { createServer, type Server } from "node:http";
-import { mkdirSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { once } from "node:events";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -16,8 +16,8 @@ const assets = path.join(root, "examples/synthetic-six/assets");
 const shots = path.join(root, "docs/screenshots");
 const SECRET = "ephemeral-test-secret";
 
-if (process.env.PANELSTUDIO_VIDEO === "1") {
-  test.use({ video: "on" });
+if (process.env.PANELSTUDIO_VIDEO === "1" || process.env.PANELSTUDIO_CAPTURE_V02 === "1") {
+  test.use({ video: { mode: "on", size: { width: 1440, height: 900 } } });
 }
 const figures = ["line.svg", "bars.svg", "scatter.svg", "schematic.svg", "histogram.svg", "heatmap.svg"].map((name) =>
   path.join(assets, name),
@@ -60,7 +60,7 @@ test("imports six drawings, lays them out, applies one sentence, and exports SVG
     await expect(page.getByTestId("ai-proposal")).toBeVisible();
     await beat(page);
     await shot(page, "05-ai-primary");
-    await page.getByRole("button", { name: "应用修改" }).click();
+    await page.locator("[data-action=ai-apply]").click();
     await expect(page.getByTestId("save-status")).toHaveText("已保存");
     const download = page.waitForEvent("download");
     await page.getByTestId("export-button").click();
@@ -77,6 +77,93 @@ test("imports six drawings, lays them out, applies one sentence, and exports SVG
   } finally {
     provider.close();
   }
+});
+
+test("v0.2 six-panel continuous refinement, local row and editable export", async ({ page }) => {
+  const provider = await fixtureProvider();
+  const capture = process.env.PANELSTUDIO_CAPTURE_V02 === "1";
+  const examples = path.join(root, "examples/refinement-six");
+  const images = path.join(root, "docs/acceptance-v0.2/workspace");
+  const button = (action: string) => page.locator('[data-action="' + action + '"]');
+  const shotStage = async (name: string) => {
+    if (!capture) return;
+    mkdirSync(images, { recursive: true });
+    await page.waitForTimeout(750);
+    await page.screenshot({ path: path.join(images, name + ".png") });
+  };
+  try {
+    await page.goto("/");
+    await configure(page, provider.port);
+    await page.getByTestId("import-input").setInputFiles([...figures.slice(0, 5), path.join(assets, "heatmap.png")]);
+    await button("tab-panels").click();
+    await expect(page.getByTestId("panel-row")).toHaveCount(6);
+    await shotStage("01-six-panels");
+    await page.getByTestId("layout-button").click();
+    await expect(page.getByTestId("candidate-card").first().locator("img")).toBeVisible();
+    const commit = async (action: () => Promise<unknown>) => {
+      const done = page.waitForResponse(r => r.url().endsWith("/transactions") && r.request().method() === "POST");
+      await action();
+      const response = await done;
+      expect(response.ok(), await response.text()).toBe(true);
+      return response.json();
+    };
+    await page.getByTestId("candidate-card").nth(1).click();
+    const original = await commit(() => button("apply-layout").click());
+    const project = original.projectId;
+    if (capture) {
+      mkdirSync(examples, { recursive: true });
+      const receipt = await page.request.post("/api/v1/projects/" + project + "/exports", {
+        headers: { "idempotency-key": "demo-start" }, data: { revision: original.revision, format: "project", options: { includeBundledFonts: false } } });
+      const id = (await receipt.json()).jobId;
+      await expect.poll(async () => (await (await page.request.get("/api/v1/jobs/" + id)).json()).status).toBe("succeeded");
+      const artifact = (await (await page.request.get("/api/v1/jobs/" + id)).json()).result.artifactId;
+      writeFileSync(path.join(examples, "start.figurezip"), await (await page.request.get("/api/v1/artifacts/" + artifact + "/download")).body());
+    }
+    await button("tab-ai").click();
+    for (const [round, prompt] of ["把六张图排成两行三列", "在这个草案上，把 A 的编号向右移动 1 mm。"].entries()) {
+      await page.getByTestId("ai-prompt").fill(prompt);
+      await button("ai-send").click();
+      await expect(page.getByTestId("ai-turn").filter({ hasText: prompt })).toHaveAttribute("data-current", "true");
+      await expect(button("ai-apply")).toBeEnabled();
+      await shotStage(round ? "03-refined" : "02-first-draft");
+    }
+    await button("compare-original").click();
+    await expect(button("compare-original")).toHaveAttribute("aria-pressed","true");
+    await shotStage("04-root");
+    await button("compare-draft").click();
+    const accepted = await commit(() => button("ai-apply").click());
+    expect(accepted.revision).toBe(original.revision + 1);
+    expect(accepted.document.panels[accepted.document.panelOrder[2]].frameMm).not.toEqual(original.document.panels[original.document.panelOrder[2]].frameMm);
+    expect(accepted.document.panels[accepted.document.panelOrder[0]].labelOverrides.offsetMm.x).toBeCloseTo(1, 5);
+    await button("tab-properties").click();
+    const [, b, c] = accepted.document.panelOrder;
+    const hit = page.locator('[data-label-id="' + b + '"]');
+    const bounds = await hit.boundingBox();
+    if (!bounds) throw new Error("Label B is not visible");
+    await commit(async () => {
+      const x = bounds.x + bounds.width / 2, y = bounds.y + bounds.height / 2;
+      await page.mouse.move(x, y); await page.mouse.down(); await page.mouse.move(x + 6, y + 2, { steps: 6 }); await page.mouse.up();
+    });
+    await shotStage("05-label");
+    await page.locator('[data-panel-id="' + b + '"]').click();
+    await page.locator('[data-panel-id="' + c + '"]').click({ modifiers: ["Shift"] });
+    await page.getByTestId("row-sizing").selectOption("equal-width");
+    await button("selection-row").click();
+    await expect(button("apply-layout")).toBeEnabled();
+    await shotStage("06-local-row");
+    const aligned = await commit(() => button("apply-layout").click());
+    expect(aligned.document.panels[b].frameMm.width).toBeCloseTo(aligned.document.panels[c].frameMm.width, 4);
+    const downloaded = page.waitForEvent("download");
+    await page.getByTestId("export-button").click();
+    await button("export-svg").click();
+    const file = await downloaded;
+    const svg = await readAll(await file.createReadStream());
+    expect(svg).toContain("<image");
+    expect(svg).toContain("<path");
+    expect(svg.match(/id="panel-[^"]+-label"/g)).toHaveLength(6);
+    if (capture) writeFileSync(path.join(examples, "refined.svg"), svg);
+    await shotStage("07-export");
+  } finally { provider.close(); }
 });
 
 async function beat(page: Page): Promise<void> {

@@ -1,0 +1,37 @@
+// Illustrator ExtendScript. Read only the four font faces of editor-created
+// labels. Imported artwork can have its own typography inside its content group.
+function restorePanelStudioLabelFaces(doc, sourceFile) {
+  var file = new File(sourceFile.fsName);
+  file.encoding = "UTF-8";
+  if (!file.open("r")) throw new Error("Cannot read the source SVG.");
+  var source;
+  try { source = file.read(); } finally { file.close(); }
+  var styles = {}, count = 0, tag, pattern = /<text\b[^>]*>/g;
+  var labelId = /^panel-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})-label$/i;
+  var panelId = /^panel-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i;
+  while ((tag = pattern.exec(source)) !== null) {
+    var id = /\sid="([^"]+)"/.exec(tag[0]);
+    var family = /\sfont-family="(Noto Sans(?: SC)?)"/.exec(tag[0]);
+    var weight = /\sfont-weight="(400|700)"/.exec(tag[0]);
+    var match = id && labelId.exec(id[1]);
+    if (!match || !family || !weight) continue;
+    styles[match[1]] = family[1].replace(/ /g, "") + (weight[1] === "700" ? "-Bold" : "-Regular");
+    count++;
+  }
+  if (!count) throw new Error("This SVG has no identifiable PanelStudio panel labels.");
+  var matched = {}, plans = [];
+  for (var i = 0; i < doc.textFrames.length; i++) {
+    var frame = doc.textFrames[i];
+    var key = labelId.exec(frame.name) || (frame.parent.typename === "GroupItem" && panelId.exec(frame.parent.name));
+    if (!key || !styles[key[1]]) continue;
+    if (matched[key[1]]) throw new Error("The panel has multiple label frames: " + key[1]);
+    matched[key[1]] = true;
+    var needed = styles[key[1]], face;
+    try { face = app.textFonts.getByName(needed); }
+    catch (e) { throw new Error("Install the bundled font " + needed + " and reopen Illustrator."); }
+    if (frame.textRange.characterAttributes.textFont.name !== needed) plans.push({ frame: frame, face: face, id: key[1] });
+  }
+  for (var keyId in styles) if (styles.hasOwnProperty(keyId) && !matched[keyId]) throw new Error("Cannot locate native label " + keyId);
+  for (var j = 0; j < plans.length; j++) plans[j].frame.textRange.characterAttributes.textFont = plans[j].face;
+  return { labels: count, changed: plans.length };
+}

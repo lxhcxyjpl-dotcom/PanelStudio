@@ -1,11 +1,14 @@
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { waitForTerminalJob } from "./test-jobs.js";
+import { mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { unzipSync } from "fflate";
 import { describe, expect, it, afterEach } from "vitest";
-import type { Asset, Diagnostic, ExportRequest, Job } from "@panelstudio/contracts";
+import type { Asset, Diagnostic, ExportRequest, FigureDocumentV1, Job } from "@panelstudio/contracts";
+import { hashFigureDocument } from "@panelstudio/core";
+import { readProjectPackage } from "./figure-package.js";
 import { createServer } from "./index.js";
 import { rasterizeSvg } from "./raster.js";
 
@@ -49,16 +52,12 @@ describe("phase 6 fonts and example", () => {
     expect(figure).toContain('font-family="Helvetica"');
     expect(figure).toContain(">A</text>");
     expect(figure).not.toContain("@font-face");
-    await transact(app, projectId, 1, "han", [
-      {
-        type: "label.setOverrides",
-        items: [{ panelId: PANEL, value: { visible: null, text: "中", placement: null, offsetMm: null, typography: null } }],
-      },
-    ]);
-    const han = await exportJob(app, projectId, { revision: 2, format: "svg", options: { includeMetadata: false } }, "svg-han");
-    expect(han.diagnostics.some((item) => item.messageKey === "font.missingGlyph" && item.params.glyphs === "中")).toBe(true);
-    expect((await download(app, `/api/v1/artifacts/${han.artifactId}/download`)).toString("utf8")).toContain(">中</text>");
-    await transact(app, projectId, 2, "sc", [
+    const override = { type: "label.setOverrides", items: [{ panelId: PANEL,
+      value: { visible: null, text: "中", placement: null, offsetMm: null, typography: null } }] };
+    const unavailable = await app.inject({ method: "POST", url: "/api/v1/projects/" + projectId + "/transactions",
+      headers: { "idempotency-key": "missing-glyph" }, payload: { baseRevision: 1, commands: [override] } });
+    expect(unavailable.json().error.code).toBe("TEXT_METRICS_UNAVAILABLE");
+    await transact(app, projectId, 1, "sc", [
       {
         type: "label.setStyle",
         labelStyle: {
@@ -74,6 +73,7 @@ describe("phase 6 fonts and example", () => {
         },
       },
     ]);
+    await transact(app, projectId, 2, "han", [override]);
     const sc = await exportJob(app, projectId, { revision: 3, format: "svg", options: { includeMetadata: false } }, "svg-sc");
     expect(sc.diagnostics.some((item) => item.messageKey === "font.missingGlyph")).toBe(false);
     const scSvg = (await download(app, `/api/v1/artifacts/${sc.artifactId}/download`)).toString("utf8");
@@ -107,6 +107,62 @@ describe("phase 6 fonts and example", () => {
     const job = await jobOf(app, imported.json().jobId as string);
     expect(job.status).toBe("succeeded");
     await app.close();
+  });
+
+  it("keeps the v0.1 six-panel document hash and project-local UUIDs across repeated imports and export", async () => {
+    const dataDir = mkdtempSync(path.join(tmpdir(), "ps-package-id-"));
+    const app = server(dataDir);
+    try {
+      const source = readFileSync(path.join(exampleDir, "synthetic-six.figurezip"));
+      const original = readProjectPackage(source);
+      expect(original.manifest.appVersion).toBe("0.1.0");
+      const hash = hashFigureDocument(original.document);
+      const ids = original.assets.map((a) => a.id).sort();
+      expect(ids).toHaveLength(6);
+      const importCopy = async (key: string) => {
+        const accepted = await app.inject({ method: "POST", url: "/api/v1/project-imports",
+          headers: { "idempotency-key": key, ...multipartHeaders(source, "original.figurezip") },
+          payload: multipartBody(source, "original.figurezip") });
+        expect(accepted.statusCode).toBe(202);
+        const job = await jobOf(app, accepted.json().jobId);
+        if (job.kind !== "project_import" || job.status !== "succeeded") throw new Error(JSON.stringify(job.error));
+        return job.result.projectId;
+      };
+      const first = await importCopy("first-copy");
+      const listedBlobs = () => readdirSync(path.join(dataDir, "blobs"), { recursive: true }).sort();
+      const firstBlobs = listedBlobs();
+      expect(firstBlobs.length).toBeGreaterThan(6);
+      const second = await importCopy("second-copy");
+      expect(first).not.toBe(second);
+      expect(listedBlobs()).toEqual(firstBlobs);
+      expect(await importCopy("second-copy")).toBe(second);
+      const read = async (project: string) => (await app.inject({ method: "GET", url: `/api/v1/projects/${project}/document` })).json() as { document: FigureDocumentV1; documentHash: string; revision: number };
+      for (const project of [first, second]) {
+        const state = await read(project);
+        expect(state).toMatchObject({ document: original.document, revision: 0, documentHash: hash });
+        expect(state.document).toEqual(original.document);
+        const library = (await app.inject({ method: "GET", url: `/api/v1/projects/${project}/assets` })).json().items as Asset[];
+        expect(library.map((asset) => asset.id).sort()).toEqual(ids);
+        expect(library.every((asset) => asset.projectId === project)).toBe(true);
+      }
+      const restored = readProjectPackage(await packaged(app, first, 0, false, "re-export-v01"));
+      expect(restored.document).toEqual(original.document);
+      expect(hashFigureDocument(restored.document)).toBe(hash);
+      const assetFiles = (files: typeof original.manifest.files) => files.filter((file) => file.path.startsWith("assets/"));
+      expect(assetFiles(restored.manifest.files)).toEqual(assetFiles(original.manifest.files));
+      const panel = original.document.panelOrder[0]!, assetId = original.document.panels[panel]!.assetId;
+      const assetRoute = (project: string) => `/api/v1/projects/${project}/assets/${assetId}`;
+      await transact(app, second, 0, "remove-second-only", [{ type: "panel.remove", panelIds: [panel] }]);
+      const removed = await app.inject({ method: "DELETE", url: assetRoute(second) });
+      expect(removed.statusCode, removed.body).toBe(200);
+      expect(removed.json().removedFromLibraryAt).toBeTruthy();
+      expect((await app.inject({ method: "GET", url: assetRoute(first) })).json().removedFromLibraryAt).toBeNull();
+      expect((await read(first)).documentHash).toBe(hash);
+      expect((await read(second)).document.panels[panel]).toBeUndefined();
+      expect(await download(app, assetRoute(first) + "/original")).toEqual(original.assets.find((asset) => asset.id === assetId)!.original);
+      const unrelated = await createProject(app, "No assets");
+      expect((await app.inject({ method: "GET", url: assetRoute(unrelated) })).statusCode).toBe(404);
+    } finally { await app.close(); }
   });
 
   it("ships an original six-panel example that reopens", async () => {
@@ -173,8 +229,7 @@ describe("phase 6 fonts and example", () => {
     await app.close();
   });
 
-  function server() {
-    const dataDir = mkdtempSync(path.join(tmpdir(), "panelstudio-phase6-"));
+  function server(dataDir = mkdtempSync(path.join(tmpdir(), "panelstudio-phase6-"))) {
     directories.push(dataDir);
     return createServer({ dataDir });
   }
@@ -304,9 +359,8 @@ async function packaged(app: ReturnType<typeof createServer>, projectId: string,
 }
 
 async function jobOf(app: ReturnType<typeof createServer>, jobId: string): Promise<Job> {
-  const response = await app.inject({ method: "GET", url: `/api/v1/jobs/${jobId}` });
-  expect(response.statusCode).toBe(200);
-  return response.json() as Job;
+  const job = await waitForTerminalJob(app, jobId);
+  return job;
 }
 
 async function download(app: ReturnType<typeof createServer>, url: string): Promise<Buffer> {

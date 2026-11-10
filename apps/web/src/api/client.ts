@@ -1,5 +1,7 @@
 import type {
+  AIHistoryPage,
   AILayoutRequest,
+  LayoutRequest,
   AIProviderConfig,
   AIProviderSettings,
   ApiError,
@@ -111,6 +113,16 @@ export const api = {
   document(projectId: string): Promise<DocumentState> {
     return request(`/projects/${projectId}/document`);
   },
+  revision(projectId: string, revision: number): Promise<{ revision: number; document: FigureDocumentV1; documentHash: string }> {
+    return request(`/projects/${projectId}/revisions/${revision}`);
+  },
+  candidate(projectId: string, candidateId: string): Promise<Candidate> {
+    return request(`/projects/${projectId}/candidates/${candidateId}`);
+  },
+  aiHistory(projectId: string, cursor?: string): Promise<AIHistoryPage> {
+    const query = cursor ? `?cursor=${encodeURIComponent(cursor)}` : "";
+    return request(`/projects/${projectId}/ai-history${query}`);
+  },
   assets(projectId: string): Promise<AssetPage> {
     return request(`/projects/${projectId}/assets`);
   },
@@ -165,7 +177,7 @@ export const api = {
   },
   layoutCandidates(
     projectId: string,
-    body: { baseRevision: number; request: { family: "auto" | "rows" | "hero-top" | "hero-left" }; maxCandidates?: 1 | 2 | 3 },
+    body: { baseRevision: number; request: LayoutRequest; maxCandidates?: 1 | 2 | 3 },
     key: string,
   ): Promise<LayoutCandidatesResponse> {
     return request(`/projects/${projectId}/layout-candidates`, jsonInit("POST", body, key));

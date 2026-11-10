@@ -39,7 +39,7 @@ pnpm exec playwright install --with-deps chromium
 pnpm test:e2e
 ```
 
-`pnpm build:web` writes `apps/web/dist` and copies the four Noto files into `dist/fonts`. A self-hosted deployment serves that directory at `/` and forwards `/api` to the API. There is no single-process production binary in v0.1. Put any public hostname behind the reverse proxy you already use for authentication. Do not expose the API without that proxy. The app does not add Redis, accounts, or multi-user collaboration.
+`pnpm build:web` writes `apps/web/dist` and copies the four Noto files into `dist/fonts`. A self-hosted deployment serves that directory at `/` and forwards `/api` to the API. There is no single-process production binary in v0.2. Put any public hostname behind the reverse proxy you already use for authentication. Do not expose the API without that proxy. The app does not add Redis, accounts, or multi-user collaboration.
 
 ## Data directory
 
@@ -51,7 +51,7 @@ That directory holds:
 - `blobs/` for originals, normalized assets, thumbnails, and exports
 - `master.key`, created the first time a model-provider secret is saved
 
-`master.key` is the 32-byte AES-256-GCM key for the provider secret. The file mode is `0600`. It is not part of a `.figurezip`, and it is not returned by the API. Losing it makes a stored provider secret unreadable. Figure projects in the same directory stay readable.
+`master.key` is the 32-byte AES-256-GCM key for the provider secret. The POSIX file mode is `0600`. Windows access follows the data directory’s permissions. It is not part of a `.figurezip`, and it is not returned by the API. Losing it makes a stored provider secret unreadable. Figure projects in the same directory stay readable.
 
 Never commit `master.key`. `.gitignore` ignores that filename, `.panelstudio/`, and `data/`. Do not copy the key into docs, fixtures, or CI. The end-to-end script sets `DATA_DIR` to a temporary directory so a test run does not write the home-directory database.
 
@@ -76,4 +76,11 @@ pnpm --filter @panelstudio/web dev
 
 浏览器打开 `http://127.0.0.1:5173`。
 
-数据目录默认是 `$HOME/.panelstudio`，可用 `DATA_DIR` 改到仓库以外的位置。其中的 `master.key` 只用于加密模型密钥，权限为 `0600`。不要提交这个文件。不配置 AI 时，导入、排版、编辑和导出仍然可用。
+数据目录默认是 `$HOME/.panelstudio`，可用 `DATA_DIR` 改到仓库以外的位置。其中的 `master.key` 只用于加密模型密钥，在 POSIX 系统上使用 `0600` 权限，Windows 上的访问由数据目录权限控制。不要提交这个文件。不配置 AI 时，导入、排版、编辑和导出仍然可用。
+
+
+## Windows
+
+Use the pnpm version in the root package manifest. In an environment with multiple pnpm versions, put the Corepack shim first on PATH so that nested package scripts use the same version. The pinned SQLite package includes its Windows x64 native binary. Its optional source build is disabled for this workspace. For browser tests run `pnpm exec playwright install chromium` once. Integration tests need a temporary directory where the current user can rename files.
+
+The default data directory is shared between releases. An existing SQLite database is backed up under `backups/` before the v0.2 migration. To run an independent demonstration, set `DATA_DIR` to a new directory when starting the API.

@@ -6,6 +6,7 @@ import { BUNDLED_FONTS, ENGINE_VERSIONS, RESOURCE_LIMITS, SCHEMA_VERSION } from 
 import { HistoryFlagsSchema, TransactionRequestSchema, TransactionResponseSchema } from "./commands.js";
 import { FigureDocumentSchema } from "./document.js";
 import { LayoutRequestSchema } from "./layout.js";
+import { AIHistoryTurnSchema } from "./jobs.js";
 import {
   DateTimeSchema,
   DocumentHashSchema,
@@ -99,6 +100,8 @@ export function pageSchema<Item extends TSchema>(item: Item) {
 
 export const ProjectPageSchema = pageSchema(ProjectSchema);
 export const AssetPageSchema = pageSchema(AssetSchema);
+export const AIHistoryPageSchema = pageSchema(AIHistoryTurnSchema);
+export type AIHistoryPage = Static<typeof AIHistoryPageSchema>;
 
 export const DocumentStateSchema = object({
   projectId: UuidSchema,
@@ -198,7 +201,7 @@ export const PHASE0_CAPABILITY_SAMPLE = {
     export: ["svg", "png", "project"],
   },
   limits: RESOURCE_LIMITS,
-  fonts: BUNDLED_FONTS,
+  fonts: BUNDLED_FONTS.map(({ fontId, family, weights, bundled }) => ({ fontId, family, weights, bundled })),
   engines: ENGINE_VERSIONS,
 } as const;
 

@@ -4,23 +4,20 @@
 
 PanelStudio is a local or self-hosted editor for multi-panel scientific figures. You import drawings you already made, the app proposes a layout and adds panel labels, and you export an SVG you can keep editing in Adobe Illustrator.
 
-The normative handbook is [`docs/PanelStudio-spec-v0.1.md`](docs/PanelStudio-spec-v0.1.md). This repository is v0.1.0. AI is optional: import, layout, editing, and export work with no model configured.
+**Version 0.2.0** supports continuous refinement of an unapplied draft, comparison with its original revision, and acceptance or undo in one transaction. Existing schema-1 figures and project packages remain compatible. AI is optional.
 
-## Flow
+## Refine a figure
 
-Import images → auto layout → adjust with one sentence, or with the mouse → export SVG → keep editing in Illustrator.
+1. Import up to eight existing panels and choose a layout.
+2. Ask for changes to the full figure or a frozen selection. Keep refining the same draft, answer clarification questions, compare original and draft, then apply. You can edit while a proposal is being generated.
+3. Drag individual labels, rigid groups or selected panels. Reorder the panel list to change lettering. Arrange two or three selected units into a row, preserving their sizes or using a common width or height.
+4. Export editable SVG. The editor uses the bundled Noto faces to measure label ink and keeps text, supported vectors and raster images editable in their respective forms.
 
-![Empty editor](docs/screenshots/01-empty.png)
+![Refining a six-panel draft](docs/acceptance-v0.2/workspace/03-refined.png)
 
-![Six imported drawings](docs/screenshots/02-imported.png)
+[Reproducible project](examples/refinement-six/) · [Recorded walkthrough](docs/demo/v0.2-refinement.webm) · [Illustrator acceptance](docs/illustrator-compatibility.md)
 
-![Layout candidates](docs/screenshots/03-layout.png)
-
-![One sentence makes C the primary panel](docs/screenshots/05-ai-primary.png)
-
-![Export dialog, with bundled font names](docs/screenshots/06-export.png)
-
-Those stills are from the running app. A Playwright capture of the same in-app states is [`docs/demo/in-app-walkthrough.webm`](docs/demo/in-app-walkthrough.webm). It does not include Illustrator. The sentence in that capture is answered by a local stand-in, not a hosted model. The script is [`docs/demo.md`](docs/demo.md).
+On the tested Illustrator 30.7 installation, direct SVG import substituted a Medium face for three labels in the bold CJK sample. The font download includes a label-only restoration script. All five sets passed the native checks with the intended fonts after restoration.
 
 ## Run
 
@@ -45,7 +42,7 @@ The project menu opens another project on this server, soft-deletes the current 
 
 ## Formats and limits
 
-PNG, JPEG, WebP, and a documented subset of SVG. At most 8 panels in a project. Editable SVG keeps vectors and label text; it does not turn type into outlines. PDF, EPS, native `.ai`, and outline export are out of scope for v0.1.
+PNG, JPEG, WebP, and a documented subset of SVG. At most 8 panels in a project. Editable SVG keeps vectors and label text; it does not turn type into outlines. PDF, EPS, native `.ai`, and outline export are outside the supported formats.
 
 Details: [`docs/format-support.md`](docs/format-support.md).
 
@@ -56,7 +53,7 @@ Details: [`docs/format-support.md`](docs/format-support.md).
 ## More
 
 - [Test record](docs/test-record.md)
-- [Illustrator checklist](docs/illustrator-compatibility.md) — every row needs a manual check
+- [Illustrator checklist](docs/illustrator-compatibility.md)
 - [Licenses, including the Noto OFL](docs/licenses.md)
 - [Phase 6 notes](docs/phase-6-decisions.md)
 - [v0.1 route audit](docs/v0.1-gap-close.md)

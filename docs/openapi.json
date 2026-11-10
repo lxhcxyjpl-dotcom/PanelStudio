@@ -2,11 +2,11 @@
   "openapi": "3.1.0",
   "info": {
     "title": "PanelStudio API",
-    "version": "0.1.0",
+    "version": "0.2.0",
     "license": {
       "name": "MIT"
     },
-    "description": "HTTP contract for PanelStudio v0.1. Normative handbook: docs/PanelStudio-spec-v0.1.md. Phase 0 published this contract. Phase 1 implements asset import, panel and label commands, document revisions, SVG and project-package export, and project import. Phase 2 implements the edit kernel: frames, crops, labels, groups, locks, stack order, the remaining document commands, undo, redo, and restart restore. Phase 3 implements automatic layout candidates, candidate reads, preview renders, and accepting a candidate through the transaction path. Phase 5 implements provider settings, the provider test, AI layout jobs, job cancellation, and job event replay. Phase 6 serves the bundled font list and the font zip. Project list, soft-delete, restore, and revision reads are implemented. The response model does not contain provider secrets. All paths are under /api/v1. The service listens on loopback and is deployed same-origin. Authentication, when required, is an external reverse proxy."
+    "description": "PanelStudio v0.2 exposes schema-1 figure documents, revisioned edits, local and whole-figure layout, and asynchronous render jobs. AI drafts can be refined against a candidate or a clarification. Accepting the cumulative candidate creates one document transaction. AI history is scoped to a project. The service uses same-origin deployment under /api/v1."
   },
   "servers": [
     {
@@ -848,6 +848,7 @@
             "name": "assetId",
             "in": "path",
             "required": true,
+            "description": "Asset UUID within this project. Importing a project package preserves its asset UUIDs.",
             "schema": {
               "$ref": "#/components/schemas/Uuid"
             }
@@ -895,6 +896,7 @@
             "name": "assetId",
             "in": "path",
             "required": true,
+            "description": "Asset UUID within this project. Importing a project package preserves its asset UUIDs.",
             "schema": {
               "$ref": "#/components/schemas/Uuid"
             }
@@ -944,6 +946,7 @@
             "name": "assetId",
             "in": "path",
             "required": true,
+            "description": "Asset UUID within this project. Importing a project package preserves its asset UUIDs.",
             "schema": {
               "$ref": "#/components/schemas/Uuid"
             }
@@ -1000,6 +1003,7 @@
             "name": "assetId",
             "in": "path",
             "required": true,
+            "description": "Asset UUID within this project. Importing a project package preserves its asset UUIDs.",
             "schema": {
               "$ref": "#/components/schemas/Uuid"
             }
@@ -1068,6 +1072,7 @@
             "name": "assetId",
             "in": "path",
             "required": true,
+            "description": "Asset UUID within this project. Importing a project package preserves its asset UUIDs.",
             "schema": {
               "$ref": "#/components/schemas/Uuid"
             }
@@ -1190,6 +1195,76 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Candidate"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error envelope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{projectId}/ai-history": {
+      "get": {
+        "operationId": "listAiHistory",
+        "tags": [
+          "AI"
+        ],
+        "summary": "Read this project's AI turns in descending creation time and job ID order.",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Uuid"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            },
+            "description": "Page size, default 20."
+          },
+          {
+            "name": "baseRevision",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/Revision"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "AI history turns.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AIHistoryPage"
                 }
               }
             }
@@ -1979,6 +2054,22 @@
                   },
                   {
                     "type": "string",
+                    "const": "AI_CONTEXT_INVALID"
+                  },
+                  {
+                    "type": "string",
+                    "const": "AI_SCOPE_VIOLATION"
+                  },
+                  {
+                    "type": "string",
+                    "const": "AI_CHAIN_LIMIT"
+                  },
+                  {
+                    "type": "string",
+                    "const": "TEXT_METRICS_UNAVAILABLE"
+                  },
+                  {
+                    "type": "string",
                     "const": "IDEMPOTENCY_KEY_REUSED"
                   },
                   {
@@ -2054,6 +2145,82 @@
               "details": {
                 "type": "object",
                 "properties": {
+                  "reason": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "const": "region-occupied"
+                      },
+                      {
+                        "type": "string",
+                        "const": "region-too-small"
+                      },
+                      {
+                        "type": "string",
+                        "const": "cross-selection-constraint"
+                      },
+                      {
+                        "type": "string",
+                        "const": "group-resize"
+                      },
+                      {
+                        "type": "string",
+                        "const": "outside-layout-conflict"
+                      },
+                      {
+                        "type": "string",
+                        "const": "invalid-units"
+                      },
+                      {
+                        "type": "string",
+                        "const": "region-outside-margins"
+                      },
+                      {
+                        "type": "string",
+                        "const": "missing-glyph"
+                      },
+                      {
+                        "type": "string",
+                        "const": "layout-margin"
+                      },
+                      {
+                        "type": "string",
+                        "const": "layout-overlap"
+                      },
+                      {
+                        "type": "string",
+                        "const": "layout-min-size"
+                      },
+                      {
+                        "type": "string",
+                        "const": "layout-constraint"
+                      },
+                      {
+                        "type": "string",
+                        "const": "layout-max-height"
+                      },
+                      {
+                        "type": "string",
+                        "const": "unsupported-text-layout"
+                      },
+                      {
+                        "type": "string",
+                        "const": "turn-limit"
+                      },
+                      {
+                        "type": "string",
+                        "const": "command-limit"
+                      },
+                      {
+                        "type": "string",
+                        "const": "empty-selection"
+                      },
+                      {
+                        "type": "string",
+                        "const": "scope-conflict"
+                      }
+                    ]
+                  },
                   "expectedRevision": {
                     "type": "integer",
                     "minimum": 0,
@@ -7466,6 +7633,91 @@
                 },
                 "description": "Neither orderedUnitIds nor rows. Order comes from panelOrder.",
                 "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "required": [
+                  "family",
+                  "orderedUnitIds",
+                  "sizing"
+                ],
+                "properties": {
+                  "family": {
+                    "type": "string",
+                    "const": "selection-row"
+                  },
+                  "orderedUnitIds": {
+                    "type": "array",
+                    "items": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "pattern": "^panel:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+                        },
+                        {
+                          "type": "string",
+                          "pattern": "^group:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+                        }
+                      ]
+                    },
+                    "minItems": 2,
+                    "maxItems": 3,
+                    "uniqueItems": true
+                  },
+                  "sizing": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "const": "preserve"
+                      },
+                      {
+                        "type": "string",
+                        "const": "equal-width"
+                      },
+                      {
+                        "type": "string",
+                        "const": "equal-height"
+                      }
+                    ]
+                  },
+                  "regionMm": {
+                    "type": "object",
+                    "required": [
+                      "x",
+                      "y",
+                      "width",
+                      "height"
+                    ],
+                    "properties": {
+                      "x": {
+                        "type": "number",
+                        "description": "Millimeters."
+                      },
+                      "y": {
+                        "type": "number",
+                        "description": "Millimeters."
+                      },
+                      "width": {
+                        "type": "number",
+                        "exclusiveMinimum": 0,
+                        "description": "Finite length in millimeters."
+                      },
+                      "height": {
+                        "type": "number",
+                        "exclusiveMinimum": 0,
+                        "description": "Finite length in millimeters."
+                      }
+                    },
+                    "description": "Rectangle in document millimeters.",
+                    "additionalProperties": false
+                  },
+                  "gapMm": {
+                    "type": "number",
+                    "minimum": 0,
+                    "description": "Finite length in millimeters, zero allowed."
+                  }
+                },
+                "additionalProperties": false
               }
             ],
             "description": "At most one of orderedUnitIds and rows. primaryPanelId is omitted when the request does not set one; the stored setting uses null instead."
@@ -7505,6 +7757,8 @@
                 "id",
                 "projectId",
                 "baseRevision",
+                "parentCandidateId",
+                "sourceJobId",
                 "origin",
                 "validationMode",
                 "summary",
@@ -7531,6 +7785,30 @@
                   "minimum": 0,
                   "maximum": 9007199254740991,
                   "description": "Non-negative safe integer. Revisions start at 0 and only increase."
+                },
+                "parentCandidateId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "uuid",
+                      "description": "UUID. Letters such as A, B, and C are labels, not object ids."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "sourceJobId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "uuid",
+                      "description": "UUID. Letters such as A, B, and C are labels, not object ids."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
                 },
                 "origin": {
                   "anyOf": [
@@ -8551,7 +8829,8 @@
                         "additionalProperties": false
                       }
                     ]
-                  }
+                  },
+                  "maxItems": 64
                 },
                 "previewDocument": {
                   "type": "object",
@@ -9290,6 +9569,8 @@
           "id",
           "projectId",
           "baseRevision",
+          "parentCandidateId",
+          "sourceJobId",
           "origin",
           "validationMode",
           "summary",
@@ -9316,6 +9597,30 @@
             "minimum": 0,
             "maximum": 9007199254740991,
             "description": "Non-negative safe integer. Revisions start at 0 and only increase."
+          },
+          "parentCandidateId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid",
+                "description": "UUID. Letters such as A, B, and C are labels, not object ids."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "sourceJobId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid",
+                "description": "UUID. Letters such as A, B, and C are labels, not object ids."
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "origin": {
             "anyOf": [
@@ -10336,7 +10641,8 @@
                   "additionalProperties": false
                 }
               ]
-            }
+            },
+            "maxItems": 64
           },
           "previewDocument": {
             "type": "object",
@@ -11081,6 +11387,75 @@
             "maximum": 9007199254740991,
             "description": "Non-negative safe integer. Revisions start at 0 and only increase."
           },
+          "context": {
+            "anyOf": [
+              {
+                "type": "object",
+                "required": [
+                  "kind"
+                ],
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "const": "revision"
+                  }
+                },
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "required": [
+                  "kind",
+                  "candidateId"
+                ],
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "const": "candidate"
+                  },
+                  "candidateId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "description": "UUID. Letters such as A, B, and C are labels, not object ids."
+                  }
+                },
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "required": [
+                  "kind",
+                  "jobId"
+                ],
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "const": "clarification"
+                  },
+                  "jobId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "description": "UUID. Letters such as A, B, and C are labels, not object ids."
+                  }
+                },
+                "additionalProperties": false
+              }
+            ],
+            "description": "Defaults to revision. Candidate and clarification IDs must belong to this project and its original baseRevision."
+          },
+          "scope": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "document"
+              },
+              {
+                "type": "string",
+                "const": "selection"
+              }
+            ],
+            "description": "Defaults to document for a new draft. A continuation inherits its previous scope and expanded selection unless explicitly changed. Clarifications retain both."
+          },
           "prompt": {
             "type": "string",
             "minLength": 1,
@@ -11105,6 +11480,531 @@
           },
           "visualReview": {
             "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "AIHistoryPage": {
+        "type": "object",
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "jobId",
+                "projectId",
+                "baseRevision",
+                "context",
+                "scope",
+                "resolvedSelectedPanelIds",
+                "prompt",
+                "replyLocale",
+                "status",
+                "phase",
+                "createdAt",
+                "finishedAt",
+                "result",
+                "error",
+                "isStale"
+              ],
+              "properties": {
+                "jobId": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "UUID. Letters such as A, B, and C are labels, not object ids."
+                },
+                "projectId": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "UUID. Letters such as A, B, and C are labels, not object ids."
+                },
+                "baseRevision": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991,
+                  "description": "Non-negative safe integer. Revisions start at 0 and only increase."
+                },
+                "context": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "required": [
+                        "kind"
+                      ],
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "const": "revision"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "kind",
+                        "candidateId"
+                      ],
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "const": "candidate"
+                        },
+                        "candidateId": {
+                          "type": "string",
+                          "format": "uuid",
+                          "description": "UUID. Letters such as A, B, and C are labels, not object ids."
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "kind",
+                        "jobId"
+                      ],
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "const": "clarification"
+                        },
+                        "jobId": {
+                          "type": "string",
+                          "format": "uuid",
+                          "description": "UUID. Letters such as A, B, and C are labels, not object ids."
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  ],
+                  "description": "Defaults to revision. Candidate and clarification IDs must belong to this project and its original baseRevision."
+                },
+                "scope": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "const": "document"
+                    },
+                    {
+                      "type": "string",
+                      "const": "selection"
+                    }
+                  ],
+                  "description": "Defaults to document for a new draft. A continuation inherits its previous scope and expanded selection unless explicitly changed. Clarifications retain both."
+                },
+                "resolvedSelectedPanelIds": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "format": "uuid",
+                    "description": "UUID. Letters such as A, B, and C are labels, not object ids."
+                  },
+                  "uniqueItems": true
+                },
+                "prompt": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "replyLocale": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "status": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "const": "queued"
+                    },
+                    {
+                      "type": "string",
+                      "const": "running"
+                    },
+                    {
+                      "type": "string",
+                      "const": "succeeded"
+                    },
+                    {
+                      "type": "string",
+                      "const": "failed"
+                    },
+                    {
+                      "type": "string",
+                      "const": "cancelled"
+                    }
+                  ]
+                },
+                "phase": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "createdAt": {
+                  "type": "string",
+                  "format": "date-time",
+                  "description": "UTC ISO 8601 timestamp."
+                },
+                "finishedAt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "UTC ISO 8601 timestamp."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "result": {
+                  "anyOf": [
+                    {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "required": [
+                            "kind",
+                            "candidateIds"
+                          ],
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "const": "candidates"
+                            },
+                            "candidateIds": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "format": "uuid",
+                                "description": "UUID. Letters such as A, B, and C are labels, not object ids."
+                              }
+                            },
+                            "summary": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "required": [
+                            "kind",
+                            "question"
+                          ],
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "const": "clarification"
+                            },
+                            "question": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "options": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "minLength": 1
+                              }
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "required": [
+                            "kind",
+                            "reason"
+                          ],
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "const": "unsupported"
+                            },
+                            "reason": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          },
+                          "additionalProperties": false
+                        }
+                      ]
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "error": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "const": "REQUEST_INVALID"
+                            },
+                            {
+                              "type": "string",
+                              "const": "NOT_FOUND"
+                            },
+                            {
+                              "type": "string",
+                              "const": "PROJECT_DELETED"
+                            },
+                            {
+                              "type": "string",
+                              "const": "REVISION_CONFLICT"
+                            },
+                            {
+                              "type": "string",
+                              "const": "CANDIDATE_STALE"
+                            },
+                            {
+                              "type": "string",
+                              "const": "AI_CONTEXT_INVALID"
+                            },
+                            {
+                              "type": "string",
+                              "const": "AI_SCOPE_VIOLATION"
+                            },
+                            {
+                              "type": "string",
+                              "const": "AI_CHAIN_LIMIT"
+                            },
+                            {
+                              "type": "string",
+                              "const": "TEXT_METRICS_UNAVAILABLE"
+                            },
+                            {
+                              "type": "string",
+                              "const": "IDEMPOTENCY_KEY_REUSED"
+                            },
+                            {
+                              "type": "string",
+                              "const": "ASSET_IN_USE"
+                            },
+                            {
+                              "type": "string",
+                              "const": "FILE_TOO_LARGE"
+                            },
+                            {
+                              "type": "string",
+                              "const": "UNSUPPORTED_MEDIA_TYPE"
+                            },
+                            {
+                              "type": "string",
+                              "const": "DOCUMENT_INVALID"
+                            },
+                            {
+                              "type": "string",
+                              "const": "LOCKED_ELEMENT"
+                            },
+                            {
+                              "type": "string",
+                              "const": "GROUP_PARTIAL_EDIT"
+                            },
+                            {
+                              "type": "string",
+                              "const": "OUTSIDE_CANVAS"
+                            },
+                            {
+                              "type": "string",
+                              "const": "LAYOUT_CONFLICT"
+                            },
+                            {
+                              "type": "string",
+                              "const": "SVG_UNSUPPORTED_FEATURE"
+                            },
+                            {
+                              "type": "string",
+                              "const": "FONT_MISSING"
+                            },
+                            {
+                              "type": "string",
+                              "const": "EXPORT_TOO_LARGE"
+                            },
+                            {
+                              "type": "string",
+                              "const": "PROVIDER_NOT_CONFIGURED"
+                            },
+                            {
+                              "type": "string",
+                              "const": "PROVIDER_CONFIG_CHANGED"
+                            },
+                            {
+                              "type": "string",
+                              "const": "MODEL_OUTPUT_INVALID"
+                            },
+                            {
+                              "type": "string",
+                              "const": "SERVER_RESTARTED"
+                            }
+                          ]
+                        },
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "details": {
+                          "type": "object",
+                          "properties": {
+                            "reason": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "const": "region-occupied"
+                                },
+                                {
+                                  "type": "string",
+                                  "const": "region-too-small"
+                                },
+                                {
+                                  "type": "string",
+                                  "const": "cross-selection-constraint"
+                                },
+                                {
+                                  "type": "string",
+                                  "const": "group-resize"
+                                },
+                                {
+                                  "type": "string",
+                                  "const": "outside-layout-conflict"
+                                },
+                                {
+                                  "type": "string",
+                                  "const": "invalid-units"
+                                },
+                                {
+                                  "type": "string",
+                                  "const": "region-outside-margins"
+                                },
+                                {
+                                  "type": "string",
+                                  "const": "missing-glyph"
+                                },
+                                {
+                                  "type": "string",
+                                  "const": "layout-margin"
+                                },
+                                {
+                                  "type": "string",
+                                  "const": "layout-overlap"
+                                },
+                                {
+                                  "type": "string",
+                                  "const": "layout-min-size"
+                                },
+                                {
+                                  "type": "string",
+                                  "const": "layout-constraint"
+                                },
+                                {
+                                  "type": "string",
+                                  "const": "layout-max-height"
+                                },
+                                {
+                                  "type": "string",
+                                  "const": "unsupported-text-layout"
+                                },
+                                {
+                                  "type": "string",
+                                  "const": "turn-limit"
+                                },
+                                {
+                                  "type": "string",
+                                  "const": "command-limit"
+                                },
+                                {
+                                  "type": "string",
+                                  "const": "empty-selection"
+                                },
+                                {
+                                  "type": "string",
+                                  "const": "scope-conflict"
+                                }
+                              ]
+                            },
+                            "expectedRevision": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991,
+                              "description": "Non-negative safe integer. Revisions start at 0 and only increase."
+                            },
+                            "actualRevision": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991,
+                              "description": "Non-negative safe integer. Revisions start at 0 and only increase."
+                            },
+                            "panelIds": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "format": "uuid",
+                                "description": "UUID. Letters such as A, B, and C are labels, not object ids."
+                              },
+                              "uniqueItems": true
+                            },
+                            "assetIds": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "format": "uuid",
+                                "description": "UUID. Letters such as A, B, and C are labels, not object ids."
+                              },
+                              "uniqueItems": true
+                            },
+                            "constraintIds": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "format": "uuid",
+                                "description": "UUID. Letters such as A, B, and C are labels, not object ids."
+                              },
+                              "uniqueItems": true
+                            }
+                          },
+                          "description": "Closed details object. Revision conflicts use expectedRevision and actualRevision. Document errors may include ids so the client can point at a panel.",
+                          "additionalProperties": false
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "isStale": {
+                  "type": "boolean"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "null when there is no further page. Empty string is not a cursor."
           }
         },
         "additionalProperties": false
@@ -11974,6 +12874,22 @@
                           },
                           {
                             "type": "string",
+                            "const": "AI_CONTEXT_INVALID"
+                          },
+                          {
+                            "type": "string",
+                            "const": "AI_SCOPE_VIOLATION"
+                          },
+                          {
+                            "type": "string",
+                            "const": "AI_CHAIN_LIMIT"
+                          },
+                          {
+                            "type": "string",
+                            "const": "TEXT_METRICS_UNAVAILABLE"
+                          },
+                          {
+                            "type": "string",
                             "const": "IDEMPOTENCY_KEY_REUSED"
                           },
                           {
@@ -12041,6 +12957,128 @@
                       "message": {
                         "type": "string",
                         "minLength": 1
+                      },
+                      "details": {
+                        "type": "object",
+                        "properties": {
+                          "reason": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "const": "region-occupied"
+                              },
+                              {
+                                "type": "string",
+                                "const": "region-too-small"
+                              },
+                              {
+                                "type": "string",
+                                "const": "cross-selection-constraint"
+                              },
+                              {
+                                "type": "string",
+                                "const": "group-resize"
+                              },
+                              {
+                                "type": "string",
+                                "const": "outside-layout-conflict"
+                              },
+                              {
+                                "type": "string",
+                                "const": "invalid-units"
+                              },
+                              {
+                                "type": "string",
+                                "const": "region-outside-margins"
+                              },
+                              {
+                                "type": "string",
+                                "const": "missing-glyph"
+                              },
+                              {
+                                "type": "string",
+                                "const": "layout-margin"
+                              },
+                              {
+                                "type": "string",
+                                "const": "layout-overlap"
+                              },
+                              {
+                                "type": "string",
+                                "const": "layout-min-size"
+                              },
+                              {
+                                "type": "string",
+                                "const": "layout-constraint"
+                              },
+                              {
+                                "type": "string",
+                                "const": "layout-max-height"
+                              },
+                              {
+                                "type": "string",
+                                "const": "unsupported-text-layout"
+                              },
+                              {
+                                "type": "string",
+                                "const": "turn-limit"
+                              },
+                              {
+                                "type": "string",
+                                "const": "command-limit"
+                              },
+                              {
+                                "type": "string",
+                                "const": "empty-selection"
+                              },
+                              {
+                                "type": "string",
+                                "const": "scope-conflict"
+                              }
+                            ]
+                          },
+                          "expectedRevision": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991,
+                            "description": "Non-negative safe integer. Revisions start at 0 and only increase."
+                          },
+                          "actualRevision": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991,
+                            "description": "Non-negative safe integer. Revisions start at 0 and only increase."
+                          },
+                          "panelIds": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "format": "uuid",
+                              "description": "UUID. Letters such as A, B, and C are labels, not object ids."
+                            },
+                            "uniqueItems": true
+                          },
+                          "assetIds": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "format": "uuid",
+                              "description": "UUID. Letters such as A, B, and C are labels, not object ids."
+                            },
+                            "uniqueItems": true
+                          },
+                          "constraintIds": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "format": "uuid",
+                              "description": "UUID. Letters such as A, B, and C are labels, not object ids."
+                            },
+                            "uniqueItems": true
+                          }
+                        },
+                        "description": "Closed details object. Revision conflicts use expectedRevision and actualRevision. Document errors may include ids so the client can point at a panel.",
+                        "additionalProperties": false
                       }
                     },
                     "additionalProperties": false
@@ -12464,6 +13502,8 @@
                                 "id",
                                 "projectId",
                                 "baseRevision",
+                                "parentCandidateId",
+                                "sourceJobId",
                                 "origin",
                                 "validationMode",
                                 "summary",
@@ -12490,6 +13530,30 @@
                                   "minimum": 0,
                                   "maximum": 9007199254740991,
                                   "description": "Non-negative safe integer. Revisions start at 0 and only increase."
+                                },
+                                "parentCandidateId": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "format": "uuid",
+                                      "description": "UUID. Letters such as A, B, and C are labels, not object ids."
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "sourceJobId": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "format": "uuid",
+                                      "description": "UUID. Letters such as A, B, and C are labels, not object ids."
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
                                 },
                                 "origin": {
                                   "anyOf": [
@@ -13510,7 +14574,8 @@
                                         "additionalProperties": false
                                       }
                                     ]
-                                  }
+                                  },
+                                  "maxItems": 64
                                 },
                                 "previewDocument": {
                                   "type": "object",
@@ -14421,6 +15486,22 @@
                           },
                           {
                             "type": "string",
+                            "const": "AI_CONTEXT_INVALID"
+                          },
+                          {
+                            "type": "string",
+                            "const": "AI_SCOPE_VIOLATION"
+                          },
+                          {
+                            "type": "string",
+                            "const": "AI_CHAIN_LIMIT"
+                          },
+                          {
+                            "type": "string",
+                            "const": "TEXT_METRICS_UNAVAILABLE"
+                          },
+                          {
+                            "type": "string",
                             "const": "IDEMPOTENCY_KEY_REUSED"
                           },
                           {
@@ -14488,6 +15569,128 @@
                       "message": {
                         "type": "string",
                         "minLength": 1
+                      },
+                      "details": {
+                        "type": "object",
+                        "properties": {
+                          "reason": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "const": "region-occupied"
+                              },
+                              {
+                                "type": "string",
+                                "const": "region-too-small"
+                              },
+                              {
+                                "type": "string",
+                                "const": "cross-selection-constraint"
+                              },
+                              {
+                                "type": "string",
+                                "const": "group-resize"
+                              },
+                              {
+                                "type": "string",
+                                "const": "outside-layout-conflict"
+                              },
+                              {
+                                "type": "string",
+                                "const": "invalid-units"
+                              },
+                              {
+                                "type": "string",
+                                "const": "region-outside-margins"
+                              },
+                              {
+                                "type": "string",
+                                "const": "missing-glyph"
+                              },
+                              {
+                                "type": "string",
+                                "const": "layout-margin"
+                              },
+                              {
+                                "type": "string",
+                                "const": "layout-overlap"
+                              },
+                              {
+                                "type": "string",
+                                "const": "layout-min-size"
+                              },
+                              {
+                                "type": "string",
+                                "const": "layout-constraint"
+                              },
+                              {
+                                "type": "string",
+                                "const": "layout-max-height"
+                              },
+                              {
+                                "type": "string",
+                                "const": "unsupported-text-layout"
+                              },
+                              {
+                                "type": "string",
+                                "const": "turn-limit"
+                              },
+                              {
+                                "type": "string",
+                                "const": "command-limit"
+                              },
+                              {
+                                "type": "string",
+                                "const": "empty-selection"
+                              },
+                              {
+                                "type": "string",
+                                "const": "scope-conflict"
+                              }
+                            ]
+                          },
+                          "expectedRevision": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991,
+                            "description": "Non-negative safe integer. Revisions start at 0 and only increase."
+                          },
+                          "actualRevision": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991,
+                            "description": "Non-negative safe integer. Revisions start at 0 and only increase."
+                          },
+                          "panelIds": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "format": "uuid",
+                              "description": "UUID. Letters such as A, B, and C are labels, not object ids."
+                            },
+                            "uniqueItems": true
+                          },
+                          "assetIds": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "format": "uuid",
+                              "description": "UUID. Letters such as A, B, and C are labels, not object ids."
+                            },
+                            "uniqueItems": true
+                          },
+                          "constraintIds": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "format": "uuid",
+                              "description": "UUID. Letters such as A, B, and C are labels, not object ids."
+                            },
+                            "uniqueItems": true
+                          }
+                        },
+                        "description": "Closed details object. Revision conflicts use expectedRevision and actualRevision. Document errors may include ids so the client can point at a panel.",
+                        "additionalProperties": false
                       }
                     },
                     "additionalProperties": false
@@ -15036,6 +16239,22 @@
                           },
                           {
                             "type": "string",
+                            "const": "AI_CONTEXT_INVALID"
+                          },
+                          {
+                            "type": "string",
+                            "const": "AI_SCOPE_VIOLATION"
+                          },
+                          {
+                            "type": "string",
+                            "const": "AI_CHAIN_LIMIT"
+                          },
+                          {
+                            "type": "string",
+                            "const": "TEXT_METRICS_UNAVAILABLE"
+                          },
+                          {
+                            "type": "string",
                             "const": "IDEMPOTENCY_KEY_REUSED"
                           },
                           {
@@ -15103,6 +16322,128 @@
                       "message": {
                         "type": "string",
                         "minLength": 1
+                      },
+                      "details": {
+                        "type": "object",
+                        "properties": {
+                          "reason": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "const": "region-occupied"
+                              },
+                              {
+                                "type": "string",
+                                "const": "region-too-small"
+                              },
+                              {
+                                "type": "string",
+                                "const": "cross-selection-constraint"
+                              },
+                              {
+                                "type": "string",
+                                "const": "group-resize"
+                              },
+                              {
+                                "type": "string",
+                                "const": "outside-layout-conflict"
+                              },
+                              {
+                                "type": "string",
+                                "const": "invalid-units"
+                              },
+                              {
+                                "type": "string",
+                                "const": "region-outside-margins"
+                              },
+                              {
+                                "type": "string",
+                                "const": "missing-glyph"
+                              },
+                              {
+                                "type": "string",
+                                "const": "layout-margin"
+                              },
+                              {
+                                "type": "string",
+                                "const": "layout-overlap"
+                              },
+                              {
+                                "type": "string",
+                                "const": "layout-min-size"
+                              },
+                              {
+                                "type": "string",
+                                "const": "layout-constraint"
+                              },
+                              {
+                                "type": "string",
+                                "const": "layout-max-height"
+                              },
+                              {
+                                "type": "string",
+                                "const": "unsupported-text-layout"
+                              },
+                              {
+                                "type": "string",
+                                "const": "turn-limit"
+                              },
+                              {
+                                "type": "string",
+                                "const": "command-limit"
+                              },
+                              {
+                                "type": "string",
+                                "const": "empty-selection"
+                              },
+                              {
+                                "type": "string",
+                                "const": "scope-conflict"
+                              }
+                            ]
+                          },
+                          "expectedRevision": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991,
+                            "description": "Non-negative safe integer. Revisions start at 0 and only increase."
+                          },
+                          "actualRevision": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991,
+                            "description": "Non-negative safe integer. Revisions start at 0 and only increase."
+                          },
+                          "panelIds": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "format": "uuid",
+                              "description": "UUID. Letters such as A, B, and C are labels, not object ids."
+                            },
+                            "uniqueItems": true
+                          },
+                          "assetIds": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "format": "uuid",
+                              "description": "UUID. Letters such as A, B, and C are labels, not object ids."
+                            },
+                            "uniqueItems": true
+                          },
+                          "constraintIds": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "format": "uuid",
+                              "description": "UUID. Letters such as A, B, and C are labels, not object ids."
+                            },
+                            "uniqueItems": true
+                          }
+                        },
+                        "description": "Closed details object. Revision conflicts use expectedRevision and actualRevision. Document errors may include ids so the client can point at a panel.",
+                        "additionalProperties": false
                       }
                     },
                     "additionalProperties": false
@@ -15759,6 +17100,22 @@
                           },
                           {
                             "type": "string",
+                            "const": "AI_CONTEXT_INVALID"
+                          },
+                          {
+                            "type": "string",
+                            "const": "AI_SCOPE_VIOLATION"
+                          },
+                          {
+                            "type": "string",
+                            "const": "AI_CHAIN_LIMIT"
+                          },
+                          {
+                            "type": "string",
+                            "const": "TEXT_METRICS_UNAVAILABLE"
+                          },
+                          {
+                            "type": "string",
                             "const": "IDEMPOTENCY_KEY_REUSED"
                           },
                           {
@@ -15826,6 +17183,128 @@
                       "message": {
                         "type": "string",
                         "minLength": 1
+                      },
+                      "details": {
+                        "type": "object",
+                        "properties": {
+                          "reason": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "const": "region-occupied"
+                              },
+                              {
+                                "type": "string",
+                                "const": "region-too-small"
+                              },
+                              {
+                                "type": "string",
+                                "const": "cross-selection-constraint"
+                              },
+                              {
+                                "type": "string",
+                                "const": "group-resize"
+                              },
+                              {
+                                "type": "string",
+                                "const": "outside-layout-conflict"
+                              },
+                              {
+                                "type": "string",
+                                "const": "invalid-units"
+                              },
+                              {
+                                "type": "string",
+                                "const": "region-outside-margins"
+                              },
+                              {
+                                "type": "string",
+                                "const": "missing-glyph"
+                              },
+                              {
+                                "type": "string",
+                                "const": "layout-margin"
+                              },
+                              {
+                                "type": "string",
+                                "const": "layout-overlap"
+                              },
+                              {
+                                "type": "string",
+                                "const": "layout-min-size"
+                              },
+                              {
+                                "type": "string",
+                                "const": "layout-constraint"
+                              },
+                              {
+                                "type": "string",
+                                "const": "layout-max-height"
+                              },
+                              {
+                                "type": "string",
+                                "const": "unsupported-text-layout"
+                              },
+                              {
+                                "type": "string",
+                                "const": "turn-limit"
+                              },
+                              {
+                                "type": "string",
+                                "const": "command-limit"
+                              },
+                              {
+                                "type": "string",
+                                "const": "empty-selection"
+                              },
+                              {
+                                "type": "string",
+                                "const": "scope-conflict"
+                              }
+                            ]
+                          },
+                          "expectedRevision": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991,
+                            "description": "Non-negative safe integer. Revisions start at 0 and only increase."
+                          },
+                          "actualRevision": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991,
+                            "description": "Non-negative safe integer. Revisions start at 0 and only increase."
+                          },
+                          "panelIds": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "format": "uuid",
+                              "description": "UUID. Letters such as A, B, and C are labels, not object ids."
+                            },
+                            "uniqueItems": true
+                          },
+                          "assetIds": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "format": "uuid",
+                              "description": "UUID. Letters such as A, B, and C are labels, not object ids."
+                            },
+                            "uniqueItems": true
+                          },
+                          "constraintIds": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "format": "uuid",
+                              "description": "UUID. Letters such as A, B, and C are labels, not object ids."
+                            },
+                            "uniqueItems": true
+                          }
+                        },
+                        "description": "Closed details object. Revision conflicts use expectedRevision and actualRevision. Document errors may include ids so the client can point at a panel.",
+                        "additionalProperties": false
                       }
                     },
                     "additionalProperties": false
@@ -16379,6 +17858,22 @@
                           },
                           {
                             "type": "string",
+                            "const": "AI_CONTEXT_INVALID"
+                          },
+                          {
+                            "type": "string",
+                            "const": "AI_SCOPE_VIOLATION"
+                          },
+                          {
+                            "type": "string",
+                            "const": "AI_CHAIN_LIMIT"
+                          },
+                          {
+                            "type": "string",
+                            "const": "TEXT_METRICS_UNAVAILABLE"
+                          },
+                          {
+                            "type": "string",
                             "const": "IDEMPOTENCY_KEY_REUSED"
                           },
                           {
@@ -16446,6 +17941,128 @@
                       "message": {
                         "type": "string",
                         "minLength": 1
+                      },
+                      "details": {
+                        "type": "object",
+                        "properties": {
+                          "reason": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "const": "region-occupied"
+                              },
+                              {
+                                "type": "string",
+                                "const": "region-too-small"
+                              },
+                              {
+                                "type": "string",
+                                "const": "cross-selection-constraint"
+                              },
+                              {
+                                "type": "string",
+                                "const": "group-resize"
+                              },
+                              {
+                                "type": "string",
+                                "const": "outside-layout-conflict"
+                              },
+                              {
+                                "type": "string",
+                                "const": "invalid-units"
+                              },
+                              {
+                                "type": "string",
+                                "const": "region-outside-margins"
+                              },
+                              {
+                                "type": "string",
+                                "const": "missing-glyph"
+                              },
+                              {
+                                "type": "string",
+                                "const": "layout-margin"
+                              },
+                              {
+                                "type": "string",
+                                "const": "layout-overlap"
+                              },
+                              {
+                                "type": "string",
+                                "const": "layout-min-size"
+                              },
+                              {
+                                "type": "string",
+                                "const": "layout-constraint"
+                              },
+                              {
+                                "type": "string",
+                                "const": "layout-max-height"
+                              },
+                              {
+                                "type": "string",
+                                "const": "unsupported-text-layout"
+                              },
+                              {
+                                "type": "string",
+                                "const": "turn-limit"
+                              },
+                              {
+                                "type": "string",
+                                "const": "command-limit"
+                              },
+                              {
+                                "type": "string",
+                                "const": "empty-selection"
+                              },
+                              {
+                                "type": "string",
+                                "const": "scope-conflict"
+                              }
+                            ]
+                          },
+                          "expectedRevision": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991,
+                            "description": "Non-negative safe integer. Revisions start at 0 and only increase."
+                          },
+                          "actualRevision": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991,
+                            "description": "Non-negative safe integer. Revisions start at 0 and only increase."
+                          },
+                          "panelIds": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "format": "uuid",
+                              "description": "UUID. Letters such as A, B, and C are labels, not object ids."
+                            },
+                            "uniqueItems": true
+                          },
+                          "assetIds": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "format": "uuid",
+                              "description": "UUID. Letters such as A, B, and C are labels, not object ids."
+                            },
+                            "uniqueItems": true
+                          },
+                          "constraintIds": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "format": "uuid",
+                              "description": "UUID. Letters such as A, B, and C are labels, not object ids."
+                            },
+                            "uniqueItems": true
+                          }
+                        },
+                        "description": "Closed details object. Revision conflicts use expectedRevision and actualRevision. Document errors may include ids so the client can point at a panel.",
+                        "additionalProperties": false
                       }
                     },
                     "additionalProperties": false
@@ -17023,6 +18640,22 @@
                           },
                           {
                             "type": "string",
+                            "const": "AI_CONTEXT_INVALID"
+                          },
+                          {
+                            "type": "string",
+                            "const": "AI_SCOPE_VIOLATION"
+                          },
+                          {
+                            "type": "string",
+                            "const": "AI_CHAIN_LIMIT"
+                          },
+                          {
+                            "type": "string",
+                            "const": "TEXT_METRICS_UNAVAILABLE"
+                          },
+                          {
+                            "type": "string",
                             "const": "IDEMPOTENCY_KEY_REUSED"
                           },
                           {
@@ -17090,6 +18723,128 @@
                       "message": {
                         "type": "string",
                         "minLength": 1
+                      },
+                      "details": {
+                        "type": "object",
+                        "properties": {
+                          "reason": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "const": "region-occupied"
+                              },
+                              {
+                                "type": "string",
+                                "const": "region-too-small"
+                              },
+                              {
+                                "type": "string",
+                                "const": "cross-selection-constraint"
+                              },
+                              {
+                                "type": "string",
+                                "const": "group-resize"
+                              },
+                              {
+                                "type": "string",
+                                "const": "outside-layout-conflict"
+                              },
+                              {
+                                "type": "string",
+                                "const": "invalid-units"
+                              },
+                              {
+                                "type": "string",
+                                "const": "region-outside-margins"
+                              },
+                              {
+                                "type": "string",
+                                "const": "missing-glyph"
+                              },
+                              {
+                                "type": "string",
+                                "const": "layout-margin"
+                              },
+                              {
+                                "type": "string",
+                                "const": "layout-overlap"
+                              },
+                              {
+                                "type": "string",
+                                "const": "layout-min-size"
+                              },
+                              {
+                                "type": "string",
+                                "const": "layout-constraint"
+                              },
+                              {
+                                "type": "string",
+                                "const": "layout-max-height"
+                              },
+                              {
+                                "type": "string",
+                                "const": "unsupported-text-layout"
+                              },
+                              {
+                                "type": "string",
+                                "const": "turn-limit"
+                              },
+                              {
+                                "type": "string",
+                                "const": "command-limit"
+                              },
+                              {
+                                "type": "string",
+                                "const": "empty-selection"
+                              },
+                              {
+                                "type": "string",
+                                "const": "scope-conflict"
+                              }
+                            ]
+                          },
+                          "expectedRevision": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991,
+                            "description": "Non-negative safe integer. Revisions start at 0 and only increase."
+                          },
+                          "actualRevision": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991,
+                            "description": "Non-negative safe integer. Revisions start at 0 and only increase."
+                          },
+                          "panelIds": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "format": "uuid",
+                              "description": "UUID. Letters such as A, B, and C are labels, not object ids."
+                            },
+                            "uniqueItems": true
+                          },
+                          "assetIds": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "format": "uuid",
+                              "description": "UUID. Letters such as A, B, and C are labels, not object ids."
+                            },
+                            "uniqueItems": true
+                          },
+                          "constraintIds": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "format": "uuid",
+                              "description": "UUID. Letters such as A, B, and C are labels, not object ids."
+                            },
+                            "uniqueItems": true
+                          }
+                        },
+                        "description": "Closed details object. Revision conflicts use expectedRevision and actualRevision. Document errors may include ids so the client can point at a panel.",
+                        "additionalProperties": false
                       }
                     },
                     "additionalProperties": false
@@ -19204,6 +20959,91 @@
             },
             "description": "Neither orderedUnitIds nor rows. Order comes from panelOrder.",
             "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "required": [
+              "family",
+              "orderedUnitIds",
+              "sizing"
+            ],
+            "properties": {
+              "family": {
+                "type": "string",
+                "const": "selection-row"
+              },
+              "orderedUnitIds": {
+                "type": "array",
+                "items": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "pattern": "^panel:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+                    },
+                    {
+                      "type": "string",
+                      "pattern": "^group:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+                    }
+                  ]
+                },
+                "minItems": 2,
+                "maxItems": 3,
+                "uniqueItems": true
+              },
+              "sizing": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "const": "preserve"
+                  },
+                  {
+                    "type": "string",
+                    "const": "equal-width"
+                  },
+                  {
+                    "type": "string",
+                    "const": "equal-height"
+                  }
+                ]
+              },
+              "regionMm": {
+                "type": "object",
+                "required": [
+                  "x",
+                  "y",
+                  "width",
+                  "height"
+                ],
+                "properties": {
+                  "x": {
+                    "type": "number",
+                    "description": "Millimeters."
+                  },
+                  "y": {
+                    "type": "number",
+                    "description": "Millimeters."
+                  },
+                  "width": {
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "description": "Finite length in millimeters."
+                  },
+                  "height": {
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "description": "Finite length in millimeters."
+                  }
+                },
+                "description": "Rectangle in document millimeters.",
+                "additionalProperties": false
+              },
+              "gapMm": {
+                "type": "number",
+                "minimum": 0,
+                "description": "Finite length in millimeters, zero allowed."
+              }
+            },
+            "additionalProperties": false
           }
         ],
         "description": "At most one of orderedUnitIds and rows. primaryPanelId is omitted when the request does not set one; the stored setting uses null instead."
@@ -19538,6 +21378,91 @@
                                 }
                               },
                               "description": "Neither orderedUnitIds nor rows. Order comes from panelOrder.",
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "required": [
+                                "family",
+                                "orderedUnitIds",
+                                "sizing"
+                              ],
+                              "properties": {
+                                "family": {
+                                  "type": "string",
+                                  "const": "selection-row"
+                                },
+                                "orderedUnitIds": {
+                                  "type": "array",
+                                  "items": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string",
+                                        "pattern": "^panel:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+                                      },
+                                      {
+                                        "type": "string",
+                                        "pattern": "^group:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+                                      }
+                                    ]
+                                  },
+                                  "minItems": 2,
+                                  "maxItems": 3,
+                                  "uniqueItems": true
+                                },
+                                "sizing": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "const": "preserve"
+                                    },
+                                    {
+                                      "type": "string",
+                                      "const": "equal-width"
+                                    },
+                                    {
+                                      "type": "string",
+                                      "const": "equal-height"
+                                    }
+                                  ]
+                                },
+                                "regionMm": {
+                                  "type": "object",
+                                  "required": [
+                                    "x",
+                                    "y",
+                                    "width",
+                                    "height"
+                                  ],
+                                  "properties": {
+                                    "x": {
+                                      "type": "number",
+                                      "description": "Millimeters."
+                                    },
+                                    "y": {
+                                      "type": "number",
+                                      "description": "Millimeters."
+                                    },
+                                    "width": {
+                                      "type": "number",
+                                      "exclusiveMinimum": 0,
+                                      "description": "Finite length in millimeters."
+                                    },
+                                    "height": {
+                                      "type": "number",
+                                      "exclusiveMinimum": 0,
+                                      "description": "Finite length in millimeters."
+                                    }
+                                  },
+                                  "description": "Rectangle in document millimeters.",
+                                  "additionalProperties": false
+                                },
+                                "gapMm": {
+                                  "type": "number",
+                                  "minimum": 0,
+                                  "description": "Finite length in millimeters, zero allowed."
+                                }
+                              },
                               "additionalProperties": false
                             }
                           ],
@@ -19930,7 +21855,7 @@
                           "description": "Finite length in millimeters."
                         }
                       },
-                      "description": "Uniform scale. The v0.1 AI action keeps the top-left corner. It has no anchor field.",
+                      "description": "Uniform scale with the top-left corner fixed.",
                       "additionalProperties": false
                     },
                     {

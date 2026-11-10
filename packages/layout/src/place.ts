@@ -2,7 +2,7 @@ import { TOLERANCES, type FigureDocumentV1 } from "@panelstudio/contracts";
 import {
   croppedAspect,
   labelBounds,
-  unitContentBox,
+  unitGeometry,
   unitTopInset,
   type LayoutAssetFacts,
   type Rect,
@@ -29,6 +29,7 @@ export function placeStack(
   width: number,
   gutterH: number,
   gutterV: number,
+  commonFirstInset = 0,
 ): Placement | null {
   if (!(width > 0) || rows.length === 0) return null;
   const frames = new Map<string, Rect>();
@@ -36,7 +37,7 @@ export function placeStack(
   for (let index = 0; index < rows.length; index += 1) {
     const row = rows[index];
     if (!row || row.length === 0 || row.length > 3) return null;
-    const headroom = row.reduce((max, unit) => Math.max(max, unitTopInset(document, unit)), 0);
+    const headroom = row.reduce((max, unit) => Math.max(max, unitTopInset(document, unit)), index === 0 ? commonFirstInset : 0);
     const contentY = index === 0 ? originY + headroom : previousBottom + Math.max(gutterV, headroom);
     const placed = placeRow(document, assets, row, contentY, originX, width, gutterH);
     if (!placed) return null;
@@ -63,59 +64,45 @@ function placeRow(
   gutterH: number,
 ): Map<string, Rect> | null {
   const gaps = (row.length - 1) * gutterH;
-  let fixed = 0;
-  let aspectSum = 0;
+  let fixed = 0, aspectSum = 0;
   const aspects = new Map<string, number>();
   for (const unit of row) {
     if (unit.kind === "group") {
-      const box = unitContentBox(document, unit);
-      if (!box) return null;
-      fixed += box.width;
-      continue;
+      fixed += unitGeometry(document, unit).occupied.width;
+    } else {
+      const aspect = croppedAspect(document, assets, unit.panelId);
+      if (aspect === null) return null;
+      aspectSum += aspect;
+      aspects.set(unit.panelId, aspect);
     }
-    const aspect = croppedAspect(document, assets, unit.panelId);
-    if (aspect === null) return null;
-    aspectSum += aspect;
-    aspects.set(unit.panelId, aspect);
   }
   const remaining = width - gaps - fixed;
-  const scalable = aspects.size;
-  if (scalable === 0) {
-    if (fixed + gaps > width + TOLERANCES.geometryComparisonMm) return null;
-  } else if (!(remaining > 0) || !(aspectSum > 0)) {
-    return null;
-  }
-  const sharedHeight = scalable > 0 ? remaining / aspectSum : 0;
-  const frames = new Map<string, Rect>();
-  let x = left;
-  for (const unit of row) {
-    if (unit.kind === "group") {
-      const box = unitContentBox(document, unit);
-      if (!box) return null;
-      const dx = x - box.x;
-      const dy = contentY - box.y;
-      for (const panelId of unit.panelIds) {
-        const current = document.panels[panelId]?.frameMm;
-        if (!current) return null;
-        frames.set(panelId, {
-          x: current.x + dx,
-          y: current.y + dy,
-          width: current.width,
-          height: current.height,
-        });
-      }
-      x += box.width + gutterH;
-      continue;
+  if (remaining < -TOLERANCES.geometryComparisonMm || (aspectSum > 0 && remaining <= 0)) return null;
+  const measure = (height: number) => row.map((unit) => unitGeometry(document, unit,
+    unit.kind === "panel" ? {width: aspects.get(unit.panelId)! * height, height} : undefined));
+  const capacity = (shapes: ReturnType<typeof measure>) => shapes.reduce((sum, u) => sum + u.occupied.width, gaps);
+  const upper = aspectSum === 0 ? 0 : remaining / aspectSum;
+  let shapes = measure(upper);
+  if (capacity(shapes) > width + TOLERANCES.geometryComparisonMm) {
+    if (aspectSum === 0 || capacity(measure(0)) > width + TOLERANCES.geometryComparisonMm) return null;
+    let low = 0, high = upper;
+    for (let i = 0; i < 48; i++) {
+      const mid = (low + high) / 2;
+      if (capacity(measure(mid)) <= width) low = mid;
+      else high = mid;
     }
-    const aspect = aspects.get(unit.panelId);
-    if (aspect === undefined) return null;
-    const frameWidth = aspect * sharedHeight;
-    const frameHeight = frameWidth / aspect;
-    if (!(frameWidth > 0) || !(frameHeight > 0)) return null;
-    frames.set(unit.panelId, { x, y: contentY, width: frameWidth, height: frameHeight });
-    x += frameWidth + gutterH;
+    if (low <= 0) return null;
+    shapes = measure(low);
   }
-  if (x - gutterH > left + width + TOLERANCES.geometryComparisonMm) return null;
+  let leftEdge = left;
+  const frames = new Map<string, Rect>();
+  for (const unit of shapes) {
+    for (const item of unit.frames) {
+      const f = item.frameMm;
+      frames.set(item.panelId, { ...f, x: leftEdge - unit.occupied.x + f.x, y: contentY + f.y });
+    }
+    leftEdge += unit.occupied.width + gutterH;
+  }
   return frames;
 }
 
@@ -147,21 +134,24 @@ export function placeHeroLeft(
   if (secondaryRows.length === 0 || !(innerWidth > gutterH + SEARCH_EDGE_MM * 2)) return null;
   const minimums = secondaryRows.map((row) => minimumRowWidth(document, row, gutterH));
   const qMin = Math.max(SEARCH_EDGE_MM, ...minimums);
-  const qMax = innerWidth - gutterH - SEARCH_EDGE_MM;
+  const hero: Unit = { kind: "panel", panelId: primaryId };
+  const qMax = innerWidth - gutterH - minimumRowWidth(document, [hero], gutterH);
   if (!(qMax > qMin)) return null;
 
+  const firstInset = Math.max(unitTopInset(document, hero), ...secondaryRows[0]!.map((unit) => unitTopInset(document, unit)));
   const measure = (columnWidth: number): HeroLeftPlacement | null => {
     const primaryWidth = innerWidth - gutterH - columnWidth;
     if (!(primaryWidth > 0) || !(columnWidth > 0)) return null;
     const left = placeStack(
       document,
       assets,
-      [[{ kind: "panel", panelId: primaryId }]],
+      [[hero]],
       originX,
       originY,
       primaryWidth,
       gutterH,
       gutterV,
+      firstInset,
     );
     const right = placeStack(
       document,
@@ -172,6 +162,7 @@ export function placeHeroLeft(
       columnWidth,
       gutterH,
       gutterV,
+      firstInset,
     );
     if (!left || !right) return null;
     const frames = new Map<string, Rect>([...left.frames, ...right.frames]);
@@ -214,16 +205,7 @@ export function placeHeroLeft(
 
 function minimumRowWidth(document: FigureDocumentV1, row: Unit[], gutterH: number): number {
   const gaps = (row.length - 1) * gutterH;
-  let fixed = 0;
-  let scalable = 0;
-  for (const unit of row) {
-    if (unit.kind === "group") {
-      const box = unitContentBox(document, unit);
-      fixed += box?.width ?? 0;
-    } else {
-      scalable += 1;
-    }
-  }
-  if (scalable === 0) return fixed + gaps;
-  return fixed + gaps + SEARCH_EDGE_MM;
+  const lower = row.reduce((sum, unit) =>
+    sum + unitGeometry(document, unit, unit.kind === "panel" ? {width:0, height:0} : undefined).occupied.width, gaps);
+  return lower + (row.some((unit) => unit.kind === "panel") ? SEARCH_EDGE_MM : 0);
 }

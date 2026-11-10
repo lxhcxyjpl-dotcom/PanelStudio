@@ -55,6 +55,7 @@ export function fontList(): {
 
 /** Zip of the font files and the OFL texts. Cached because the bytes do not change at runtime. */
 export function fontBundle(): { bytes: Buffer; mediaType: string; filename: string } {
+  bundleBytes ??= buildBundle();
   return { bytes: bundleBytes, mediaType: "application/zip", filename: "panelstudio-fonts.zip" };
 }
 
@@ -98,7 +99,7 @@ export function missingGlyphs(family: string, weight: 400 | 700, text: string): 
   return missing;
 }
 
-const bundleBytes = buildBundle();
+let bundleBytes: Buffer | undefined;
 
 function buildBundle(): Buffer {
   const entries: Record<string, Uint8Array> = {};
@@ -108,9 +109,15 @@ function buildBundle(): Buffer {
   for (const name of LICENSES) {
     entries[name] = readFileSync(path.join(fontsDir, name));
   }
-  entries["README.txt"] = strToU8(
-    "PanelStudio bundled fonts. See README.md. Editable SVG uses the family names and does not outline text.\n",
-  );
+  const illustrator = path.resolve(fontsDir, "../scripts/illustrator");
+  for (const filename of ["restore-label-fonts.jsx", "label-faces.jsxinc"]) {
+    entries["Illustrator/" + filename] = readFileSync(path.join(illustrator, filename));
+  }
+  entries["README.txt"] = strToU8([
+    "PanelStudio bundled fonts. See README.md and the OFL license files.",
+    "Install the four static font files. If Illustrator substitutes a label face, open the exported SVG, then use File > Scripts > Other Script and select Illustrator/restore-label-fonts.jsx. Keep the two script files together.",
+    "安装四个静态字体。若 Illustrator 替换编号字体或字重，请打开导出的 SVG，在 文件 → 脚本 → 其他脚本 中选择 Illustrator/restore-label-fonts.jsx。同目录的两个脚本文件需要放在一起。完成后可另存为 .ai。",
+  ].join("\n"));
   return Buffer.from(zipSync(entries, { level: 6 }));
 }
 

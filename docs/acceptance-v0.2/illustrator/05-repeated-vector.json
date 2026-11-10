@@ -1,0 +1,235 @@
+{
+  "sample": "05-repeated-vector",
+  "version": "30.7.0",
+  "build": "114R",
+  "checks": [
+    {
+      "name": "Artboard dimensions within 0.1 mm",
+      "pass": true,
+      "value": [
+        172,
+        80
+      ]
+    },
+    {
+      "name": "Independent raster objects",
+      "pass": true,
+      "value": [
+        1,
+        0
+      ]
+    },
+    {
+      "name": "Editable gradient paint",
+      "pass": true,
+      "value": 2
+    },
+    {
+      "name": "Native label (A)",
+      "pass": true,
+      "value": "TextFrame"
+    },
+    {
+      "name": "Font and weight (A)",
+      "pass": true,
+      "value": "NotoSans-Bold"
+    },
+    {
+      "name": "Label size within 0.1 pt (A)",
+      "pass": true,
+      "value": 0
+    },
+    {
+      "name": "Label baseline within 0.1 mm (A)",
+      "pass": true,
+      "value": [
+        0,
+        -0.0001
+      ]
+    },
+    {
+      "name": "Independent panel group (A)",
+      "pass": true,
+      "value": "panel-4410dd49-ac77-454b-8bf8-f57f1dff0476"
+    },
+    {
+      "name": "Crop frame within 0.1 mm (A)",
+      "pass": true,
+      "value": [
+        12,
+        18,
+        34,
+        17
+      ]
+    },
+    {
+      "name": "Native label (B)",
+      "pass": true,
+      "value": "TextFrame"
+    },
+    {
+      "name": "Font and weight (B)",
+      "pass": true,
+      "value": "NotoSans-Bold"
+    },
+    {
+      "name": "Label size within 0.1 pt (B)",
+      "pass": true,
+      "value": 0
+    },
+    {
+      "name": "Label baseline within 0.1 mm (B)",
+      "pass": true,
+      "value": [
+        0,
+        -0.0003
+      ]
+    },
+    {
+      "name": "Independent panel group (B)",
+      "pass": true,
+      "value": "panel-b2f82f2e-78a7-4df9-8cba-01662cdccb41"
+    },
+    {
+      "name": "Crop frame within 0.1 mm (B)",
+      "pass": true,
+      "value": [
+        59,
+        25,
+        34,
+        17
+      ]
+    },
+    {
+      "name": "Native label (C)",
+      "pass": true,
+      "value": "TextFrame"
+    },
+    {
+      "name": "Font and weight (C)",
+      "pass": true,
+      "value": "NotoSans-Bold"
+    },
+    {
+      "name": "Label size within 0.1 pt (C)",
+      "pass": true,
+      "value": 0
+    },
+    {
+      "name": "Label baseline within 0.1 mm (C)",
+      "pass": true,
+      "value": [
+        0.0001,
+        0.0001
+      ]
+    },
+    {
+      "name": "Independent panel group (C)",
+      "pass": true,
+      "value": "panel-07a5836b-5078-4315-82b1-27b689559f50"
+    },
+    {
+      "name": "Crop frame within 0.1 mm (C)",
+      "pass": true,
+      "value": [
+        106,
+        32,
+        34,
+        43.7143
+      ]
+    },
+    {
+      "name": "Independent 1 mm translation (A)",
+      "pass": true,
+      "value": 1
+    },
+    {
+      "name": "Independent 1 mm translation (B)",
+      "pass": true,
+      "value": 1
+    },
+    {
+      "name": "Independent 1 mm translation (C)",
+      "pass": true,
+      "value": 1
+    },
+    {
+      "name": "Native AI reopen",
+      "pass": true,
+      "value": 1
+    },
+    {
+      "name": "Edited native label persisted",
+      "pass": true,
+      "value": "X"
+    },
+    {
+      "name": "Edited imported native text persisted",
+      "pass": true,
+      "value": "n=13"
+    },
+    {
+      "name": "Requested label faces survived native reopen",
+      "pass": true,
+      "value": [
+        "NotoSans-Bold",
+        "NotoSans-Bold",
+        "NotoSans-Bold"
+      ]
+    },
+    {
+      "name": "Label sizes survived native reopen within 0.1 pt",
+      "pass": true,
+      "value": 3
+    },
+    {
+      "name": "Edited Bezier handle persisted",
+      "pass": true,
+      "value": [
+        189.354316632579,
+        146.267721281053
+      ]
+    },
+    {
+      "name": "Rasters persisted after reopen",
+      "pass": true,
+      "value": 1
+    }
+  ],
+  "panels": [
+    {
+      "label": "(A)",
+      "font": "NotoSans-Bold",
+      "family": "Noto Sans",
+      "sizePt": 12,
+      "baselineMm": [
+        12,
+        16.9999
+      ]
+    },
+    {
+      "label": "(B)",
+      "font": "NotoSans-Bold",
+      "family": "Noto Sans",
+      "sizePt": 12,
+      "baselineMm": [
+        59,
+        23.9997
+      ]
+    },
+    {
+      "label": "(C)",
+      "font": "NotoSans-Bold",
+      "family": "Noto Sans",
+      "sizePt": 12,
+      "baselineMm": [
+        106.0001,
+        31.0001
+      ]
+    }
+  ],
+  "fontRestoration": {
+    "labels": 3,
+    "changed": 0
+  }
+}

@@ -1,9 +1,11 @@
 import { mkdirSync } from "node:fs";
+import { randomUUID } from "node:crypto";
 import path from "node:path";
 import Database from "better-sqlite3";
 import type {
   AIProviderConfig,
   Asset,
+  CandidateProvenance,
   Diagnostic,
   DomainCommand,
   FigureDocumentV1,
@@ -128,6 +130,40 @@ CREATE INDEX IF NOT EXISTS assets_project ON assets(projectId);
 CREATE INDEX IF NOT EXISTS jobs_project ON jobs(projectId);
 `;
 
+const DATABASE_VERSION = 3;
+const ASSET_COLUMNS = `id, projectId, createdAt, originalFilename, originalMediaType, originalByteLength,
+  originalSha256, status, importJobId, normalizedJson, diagnosticsJson, removedFromLibraryAt,
+  originalBlobPath, renderBlobPath, thumbnailBlobPath`;
+
+function migrateProjectAssetIds(db: Database.Database): void {
+  // No other table has a foreign key to assets. Document JSON keeps its existing UUIDs.
+  db.exec(`
+    ALTER TABLE assets RENAME TO assets_with_global_ids;
+    CREATE TABLE assets (
+      id TEXT NOT NULL,
+      projectId TEXT NOT NULL,
+      createdAt TEXT NOT NULL,
+      originalFilename TEXT NOT NULL,
+      originalMediaType TEXT NOT NULL,
+      originalByteLength INTEGER NOT NULL,
+      originalSha256 TEXT NOT NULL,
+      status TEXT NOT NULL,
+      importJobId TEXT NOT NULL,
+      normalizedJson TEXT,
+      diagnosticsJson TEXT NOT NULL,
+      removedFromLibraryAt TEXT,
+      originalBlobPath TEXT NOT NULL,
+      renderBlobPath TEXT,
+      thumbnailBlobPath TEXT,
+      PRIMARY KEY (projectId, id),
+      FOREIGN KEY (projectId) REFERENCES projects(id)
+    );
+    INSERT INTO assets (${ASSET_COLUMNS}) SELECT ${ASSET_COLUMNS} FROM assets_with_global_ids;
+    DROP TABLE assets_with_global_ids;
+    CREATE INDEX assets_project ON assets(projectId, createdAt, id);
+  `);
+}
+
 export type ProjectRecord = {
   id: string;
   title: string;
@@ -193,7 +229,7 @@ export type IdempotencyRecord = {
   responseJson: string;
 };
 
-export type CandidateRecord = {
+export type CandidateRecord = CandidateProvenance & {
   id: string;
   projectId: string;
   baseRevision: number;
@@ -241,10 +277,45 @@ type AssetRow = {
 export function openDatabase(dataDir: string): Database.Database {
   mkdirSync(dataDir, { recursive: true });
   const db = new Database(path.join(dataDir, "panelstudio.sqlite"));
-  db.pragma("journal_mode = WAL");
-  db.pragma("foreign_keys = ON");
-  db.exec(SCHEMA);
-  return db;
+  try {
+    const version = db.pragma("user_version", { simple: true }) as number;
+    if (version > DATABASE_VERSION) throw new Error(`PanelStudio database version ${version} is newer than supported version ${DATABASE_VERSION}.`);
+    if (version < DATABASE_VERSION) {
+      const tables = db.prepare("SELECT name FROM sqlite_schema WHERE type = 'table' AND name NOT LIKE 'sqlite_%'").all() as Array<{ name: string }>;
+      if (tables.length) {
+        const names = new Set(tables.map((table) => table.name));
+        if (!["projects", "project_revisions", "assets", "candidates", "jobs", "provider_settings"].every((name) => names.has(name))) {
+          throw new Error("Unrecognized PanelStudio database. Migration stopped.");
+        }
+        // VACUUM INTO reads a consistent SQLite snapshot, including committed WAL pages.
+        const backupDir = path.join(dataDir, "backups");
+        mkdirSync(backupDir, { recursive: true });
+        db.prepare("VACUUM INTO ?").run(path.join(backupDir, `before-v0.2-${randomUUID()}.sqlite`));
+      }
+      immediate(db, () => {
+        const current = db.pragma("user_version", { simple: true }) as number;
+        if (current === DATABASE_VERSION) return;
+        if (current > DATABASE_VERSION) throw new Error("The database was upgraded by a newer PanelStudio process.");
+        if (current < 2) {
+          db.exec(SCHEMA);
+          db.exec(`
+            ALTER TABLE candidates ADD COLUMN parentCandidateId TEXT;
+            ALTER TABLE candidates ADD COLUMN sourceJobId TEXT;
+            CREATE INDEX ai_history_project ON jobs(projectId, createdAt DESC, id DESC) WHERE kind = 'ai_layout';
+            CREATE INDEX ai_history_revision ON jobs(projectId, json_extract(inputJson,'$.request.baseRevision'), createdAt DESC, id DESC) WHERE kind = 'ai_layout';
+          `);
+        }
+        migrateProjectAssetIds(db);
+        db.pragma(`user_version = ${DATABASE_VERSION}`);
+      });
+    }
+    db.pragma("journal_mode = WAL");
+    db.pragma("foreign_keys = ON");
+    return db;
+  } catch (error) {
+    db.close();
+    throw error;
+  }
 }
 
 export function immediate<T>(db: Database.Database, fn: () => T): T {
@@ -373,8 +444,8 @@ export function renameProject(db: Database.Database, id: string, title: string, 
 }
 
 /** Keeps the bytes. Historical revisions can still read a removed library asset. */
-export function markAssetRemoved(db: Database.Database, id: string, removedAt: string): void {
-  db.prepare(`UPDATE assets SET removedFromLibraryAt = ? WHERE id = ?`).run(removedAt, id);
+export function markAssetRemoved(db: Database.Database, projectId: string, id: string, removedAt: string): void {
+  db.prepare(`UPDATE assets SET removedFromLibraryAt = ? WHERE projectId = ? AND id = ?`).run(removedAt, projectId, id);
 }
 
 export function insertRevision(db: Database.Database, revision: RevisionRecord): void {
@@ -466,8 +537,8 @@ export function insertAsset(db: Database.Database, asset: AssetRecord): void {
   });
 }
 
-export function getAsset(db: Database.Database, id: string): AssetRecord | null {
-  const row = db.prepare(`SELECT * FROM assets WHERE id = ?`).get(id) as AssetRow | undefined;
+export function getAsset(db: Database.Database, projectId: string, id: string): AssetRecord | null {
+  const row = db.prepare(`SELECT * FROM assets WHERE projectId = ? AND id = ?`).get(projectId, id) as AssetRow | undefined;
   return row ? mapAsset(row) : null;
 }
 
@@ -596,33 +667,7 @@ export function updateJobProject(db: Database.Database, id: string, projectId: s
 }
 
 export function getJob(db: Database.Database, id: string): JobRecord | null {
-  const row = db.prepare(`SELECT * FROM jobs WHERE id = ?`).get(id) as
-    | {
-        id: string;
-        projectId: string | null;
-        kind: Job["kind"];
-        status: Job["status"];
-        phase: string;
-        resultJson: string | null;
-        errorJson: string | null;
-        createdAt: string;
-        startedAt: string | null;
-        finishedAt: string | null;
-      }
-    | undefined;
-  if (!row) return null;
-  return {
-    id: row.id,
-    projectId: row.projectId,
-    kind: row.kind,
-    status: row.status,
-    phase: row.phase,
-    createdAt: row.createdAt,
-    startedAt: row.startedAt,
-    finishedAt: row.finishedAt,
-    result: row.resultJson ? (JSON.parse(row.resultJson) as Job["result"]) : null,
-    error: row.errorJson ? (JSON.parse(row.errorJson) as Job["error"]) : null,
-  };
+  return getJobDetail(db, id);
 }
 
 export function insertJobEvent(
@@ -653,14 +698,16 @@ export function insertCandidate(db: Database.Database, candidate: CandidateRecor
   db.prepare(
     `INSERT INTO candidates (
       id, projectId, baseRevision, origin, validationMode, commandsJson, resultDocumentHash,
-      summary, diagnosticsJson, scoreJson, engineVersion, fontRegistryVersion, createdAt
+      summary, diagnosticsJson, scoreJson, engineVersion, fontRegistryVersion, createdAt, parentCandidateId, sourceJobId
     ) VALUES (
       @id, @projectId, @baseRevision, @origin, @validationMode, @commandsJson, @resultDocumentHash,
-      @summary, @diagnosticsJson, @scoreJson, @engineVersion, @fontRegistryVersion, @createdAt
+      @summary, @diagnosticsJson, @scoreJson, @engineVersion, @fontRegistryVersion, @createdAt, @parentCandidateId, @sourceJobId
     )
     ON CONFLICT(id) DO NOTHING`,
   ).run({
     id: candidate.id,
+    parentCandidateId: candidate.parentCandidateId,
+    sourceJobId: candidate.sourceJobId,
     projectId: candidate.projectId,
     baseRevision: candidate.baseRevision,
     origin: candidate.origin,
@@ -683,6 +730,8 @@ export function getCandidate(db: Database.Database, id: string): CandidateRecord
         projectId: string;
         baseRevision: number;
         origin: "layout" | "ai";
+        parentCandidateId: string | null;
+        sourceJobId: string | null;
         validationMode: "edit" | "layout";
         commandsJson: string;
         resultDocumentHash: string;
@@ -700,6 +749,8 @@ export function getCandidate(db: Database.Database, id: string): CandidateRecord
     projectId: row.projectId,
     baseRevision: row.baseRevision,
     origin: row.origin,
+    parentCandidateId: row.parentCandidateId,
+    sourceJobId: row.sourceJobId,
     validationMode: row.validationMode,
     commands: JSON.parse(row.commandsJson) as DomainCommand[],
     resultDocumentHash: row.resultDocumentHash,
@@ -821,6 +872,14 @@ type JobRow = {
 };
 
 function mapJob(row: JobRow): JobDetail {
+  const result = row.resultJson ? JSON.parse(row.resultJson) as Job["result"] : null;
+  // v0.1 embedded candidate DTOs in job results. Preserve the original bytes on disk.
+  if (row.kind === "ai_layout" && result && "kind" in result && result.kind === "candidates") {
+    for (const candidate of result.candidates) {
+      candidate.parentCandidateId ??= null;
+      candidate.sourceJobId ??= null;
+    }
+  }
   return {
     id: row.id,
     projectId: row.projectId,
@@ -830,7 +889,7 @@ function mapJob(row: JobRow): JobDetail {
     createdAt: row.createdAt,
     startedAt: row.startedAt,
     finishedAt: row.finishedAt,
-    result: row.resultJson ? (JSON.parse(row.resultJson) as Job["result"]) : null,
+    result,
     error: row.errorJson ? (JSON.parse(row.errorJson) as Job["error"]) : null,
     input: JSON.parse(row.inputJson) as unknown,
     cancelRequested: row.cancelRequested === 1,
@@ -840,6 +899,24 @@ function mapJob(row: JobRow): JobDetail {
 export function getJobDetail(db: Database.Database, id: string): JobDetail | null {
   const row = db.prepare(`SELECT * FROM jobs WHERE id = ?`).get(id) as JobRow | undefined;
   return row ? mapJob(row) : null;
+}
+
+export function queryAiHistory(
+  db: Database.Database, projectId: string, baseRevision: number | null, after: KeyCursor | null, limit: number,
+): PageRows<JobDetail> {
+  const conditions = ["projectId = @projectId", "kind = 'ai_layout'"];
+  const args: Record<string, string | number> = { projectId, take: limit + 1 };
+  if (baseRevision !== null) {
+    conditions.push("json_extract(inputJson,'$.request.baseRevision') = @baseRevision");
+    args.baseRevision = baseRevision;
+  }
+  if (after) {
+    conditions.push("(createdAt,id) < (@createdAt,@id)");
+    args.createdAt = after.createdAt;
+    args.id = after.id;
+  }
+  const rows = db.prepare(`SELECT * FROM jobs WHERE ${conditions.join(" AND ")} ORDER BY createdAt DESC, id DESC LIMIT @take`).all(args) as JobRow[];
+  return pageOf(rows.map(mapJob), limit);
 }
 
 export function listActiveAiJobs(db: Database.Database): JobDetail[] {

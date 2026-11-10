@@ -1,14 +1,19 @@
 import {
   AI_ACTION_NAMES,
+  type AIEditScope,
   resolveLabelText,
   type FigureDocumentV1,
 } from "@panelstudio/contracts";
-import { canonicalJson } from "@panelstudio/core";
+import { canonicalJson, resolvePanelLabel } from "@panelstudio/core";
+
+export type TurnTranscript = { prompt: string; response: string; options?: string[] };
 
 export type FrozenScene = {
   baseRevision: number;
   configRevision: number;
   selectedPanelIds: string[];
+  scope: AIEditScope;
+  previousTurns: TurnTranscript[];
   actions: readonly string[];
   canvas: {
     widthMm: number;
@@ -28,6 +33,8 @@ export type FrozenScene = {
     heightMm: number;
     locked: boolean;
     groupId: string | null;
+    labelBaselineMm: { x: number; y: number } | null;
+    labelOverrides: FigureDocumentV1["panels"][string]["labelOverrides"];
   }>;
   groups: Array<{ id: string; name: string; panelIds: string[]; locked: boolean }>;
   constraints: FigureDocumentV1["layoutSettings"]["constraints"];
@@ -35,7 +42,7 @@ export type FrozenScene = {
 
 export function buildScene(
   document: FigureDocumentV1,
-  input: { baseRevision: number; configRevision: number; selectedPanelIds: string[] },
+  input: { baseRevision: number; configRevision: number; selectedPanelIds: string[]; scope?: AIEditScope; previousTurns?: TurnTranscript[] },
 ): FrozenScene {
   const groups = Object.entries(document.groups).map(([id, group]) => ({
     id,
@@ -51,6 +58,8 @@ export function buildScene(
     baseRevision: input.baseRevision,
     configRevision: input.configRevision,
     selectedPanelIds: [...input.selectedPanelIds],
+    scope: input.scope ?? "document",
+    previousTurns: input.previousTurns ?? [],
     actions: AI_ACTION_NAMES,
     canvas: {
       widthMm: document.canvas.widthMm,
@@ -63,6 +72,7 @@ export function buildScene(
     panels: document.panelOrder.flatMap((panelId, index) => {
       const panel = document.panels[panelId];
       if (!panel) return [];
+      const label = resolvePanelLabel(document, panelId);
       return [
         {
           panelId,
@@ -79,6 +89,8 @@ export function buildScene(
           heightMm: panel.frameMm.height,
           locked: panel.locked,
           groupId: groupOf.get(panelId) ?? null,
+          labelBaselineMm: label ? { x: label.x - panel.frameMm.x, y: label.y - panel.frameMm.y } : null,
+          labelOverrides: panel.labelOverrides,
         },
       ];
     }),

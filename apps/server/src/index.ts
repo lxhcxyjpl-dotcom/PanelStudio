@@ -6,10 +6,12 @@ import {
   type TypeBoxTypeProvider,
 } from "@fastify/type-provider-typebox";
 import Fastify, { type FastifyInstance } from "fastify";
-import { drainAiJobs, failInterruptedAiJobs } from "./ai-jobs.js";
+import { closeAiScheduler, drainAiJobs, failInterruptedAiJobs } from "./ai-jobs.js";
 import { BlobStore } from "./blobs.js";
 import { openDatabase } from "./db.js";
 import type { AppContext } from "./pipeline.js";
+import { RenderPool } from "./render-pool.js";
+import { finishInterruptedRenders } from "./render-jobs.js";
 import { registerRoutes } from "./routes.js";
 
 export type ServerOptions = {
@@ -36,10 +38,13 @@ export function createServer(options: ServerOptions = {}) {
     blobs: new BlobStore(dataDir),
     now: () => new Date().toISOString(),
     dataDir,
+    renders: new RenderPool(),
+    renderJobs: new Set(),
     deferAiJobs: options.deferAiJobs,
     aiFetch: options.aiFetch,
   };
   failInterruptedAiJobs(ctx);
+  finishInterruptedRenders(ctx);
   const app = Fastify({
     logger: false,
     genReqId: () => randomUUID(),
@@ -50,6 +55,9 @@ export function createServer(options: ServerOptions = {}) {
   registerRoutes(app, ctx);
   drains.set(app, () => drainAiJobs(ctx));
   app.addHook("onClose", async () => {
+    await closeAiScheduler(ctx);
+    await ctx.renders.close();
+    await Promise.allSettled([...ctx.renderJobs]);
     db.close();
   });
   return app;

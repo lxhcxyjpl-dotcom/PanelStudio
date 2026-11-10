@@ -11,6 +11,7 @@ import {
   acceptCandidate,
   boot,
   cancelCrop,
+  cancelNudge,
   commitCrop,
   continueEditing,
   createGroup,
@@ -29,6 +30,9 @@ import {
 import { patch, useWorkspace } from "../state/store";
 import { baseDocument, candidatesStale } from "../state/types";
 import { CanvasStage } from "./CanvasStage";
+import { proposalChanges, labelName } from "../model/changes";
+import { cancelGesture } from "./gesture";
+import { labelDiagnostics } from "@panelstudio/core/labels";
 import { Dialogs } from "./Dialogs";
 import { Inspector } from "./Inspector";
 import { LeftSidebar } from "./LeftSidebar";
@@ -49,6 +53,7 @@ export function Workspace() {
       if (event.relatedTarget === null) patch({ draggingFiles: false });
     };
     const onDrop = (event: DragEvent) => {
+      if (![...(event.dataTransfer?.types ?? [])].includes("Files")) return;
       event.preventDefault();
       patch({ draggingFiles: false });
       const files = [...(event.dataTransfer?.files ?? [])];
@@ -79,10 +84,13 @@ export function Workspace() {
         event.preventDefault();
         return;
       }
-      if (current.dialog) return;
+      if (current.dialog || event.defaultPrevented) return;
       if (isTyping(event.target)) return;
       const key = event.key.toLowerCase();
       const command = event.metaKey || event.ctrlKey;
+      if (event.key === "Escape" && cancelGesture()) { event.preventDefault(); return; }
+      if (event.key === "Escape" && current.interaction) { cancelNudge(); event.preventDefault(); return; }
+      if (current.compareMode !== "editing" && (["delete", "backspace", "c"].includes(key) || (command && key === "g"))) return;
       if (command && key === "z") {
         event.preventDefault();
         void (event.shiftKey ? redo() : undo());
@@ -158,14 +166,15 @@ export function Workspace() {
         if (list) return;
         event.preventDefault();
         const documentState = baseDocument(current);
-        if (!documentState || current.crop || (current.activeCandidateId && !candidatesStale(current))) return;
+        if (!documentState || current.crop || current.compareMode !== "editing") return;
         const step = event.shiftKey ? NUDGE_MM.shiftStep : NUDGE_MM.step;
         const dx = event.key === "ArrowLeft" ? -step : event.key === "ArrowRight" ? step : 0;
         const dy = event.key === "ArrowUp" ? -step : event.key === "ArrowDown" ? step : 0;
         const ids = panelIdsOf(current.selection, documentState);
-        if (current.selection.kind === "label") return;
-        if (ids.some((id) => geometryLocked(documentState, id) === "lock")) return;
-        queueNudge(ids, dx, dy);
+        if (current.selection.kind !== "label" && ids.some((id) => geometryLocked(documentState, id) === "lock")) {
+          patch({ liveMessage: t("errors.LOCKED_ELEMENT") }); return;
+        }
+        queueNudge(ids, dx, dy, current.selection.kind === "label" ? "label" : "panels");
       }
     };
     const onKeyUp = (event: KeyboardEvent) => {
@@ -183,7 +192,7 @@ export function Workspace() {
   const right = sidebarWidth("right", state.mode, state.rightWidth);
   const stale = candidatesStale(state);
   return (
-    <div className="app" data-testid="workspace" onDragEnter={() => patch({ draggingFiles: true })}>
+    <div className="app" data-testid="workspace">
       <Toolbar />
       <div className="workspace">
         <LeftSidebar />
@@ -219,7 +228,9 @@ function Banners() {
     enabled: Boolean(state.projectId),
     queryFn: () => api.assets(state.projectId ?? ""),
   });
+  const art = baseDocument(state);
   const missing = (assets.data?.items ?? []).flatMap((asset) => asset.diagnostics.filter((item) => item.code === "FONT_MISSING"));
+  const labelIssues = art ? labelDiagnostics(art) : [];
   return (
     <div className="banners">
       {state.backend === "down" || state.saveState === "offline" ? <p className="banner">{t("save.offline")}</p> : null}
@@ -240,6 +251,7 @@ function Banners() {
           )}
         </p>
       ) : null}
+      {labelIssues.map((issue, index) => <p className="banner quiet" key={`label-${index}`}>{issue.panelIds?.map((id) => art ? labelName(art, id) : "").join(", ")} · {formatDiagnostic(t, issue)}</p>)}
       {missing.length > 0 ? (
         <p className="banner quiet">
           {t("status.fontMissing")}
@@ -281,6 +293,7 @@ function CandidateDock() {
               {card.previewUrl ? <img alt="" src={card.previewUrl} /> : <span>{card.previewError ?? t("layout.loading")}</span>}
               <strong>{localizedSummary(card.candidate.summary, i18n.language)}</strong>
               <span>{t("layout.canvasSize", { width: round(canvas.widthMm), height: round(canvas.heightMm) })}</span>
+              {state.cards.length === 1 && state.candidateRoot ? proposalChanges(state.candidateRoot.document, card.candidate.previewDocument).filter((change) => change.kind === "size").map((change) => <span key={change.label}>{t("ai.changeSize", change)}</span>) : null}
               {card.candidate.diagnostics.map((item, index) => <em key={`${item.code}-${index}`}>{formatDiagnostic(t, item)}</em>)}
             </button>
           );

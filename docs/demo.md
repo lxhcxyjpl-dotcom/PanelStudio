@@ -1,4 +1,19 @@
-# Demo script
+# Recorded workflows
+
+## v0.2 continuous refinement
+
+The [20.2-second recording](demo/v0.2-refinement.webm) shows the real web workspace at 1440 × 900. The local fixture provider responds to two prompts through the normal HTTP adapter. The first turn changes the initial multi-row layout into two rows of three. The second turn keeps that arrangement and moves label A by 1 mm. After comparing root and draft, the editor applies both turns in a single revision. The final steps move label B with the mouse, make B and C equally wide, and export editable SVG.
+
+The [starting project, final SVG and native example](../examples/refinement-six/) correspond to this recording. The five separate native Illustrator acceptance files intentionally include edited labels and paths. [Screenshots](acceptance-v0.2/workspace/) and [desktop measurements](illustrator-compatibility.md) accompany the recording.
+
+To repeat the capture from a clean test database:
+
+```powershell
+$env:PANELSTUDIO_CAPTURE_V02='1'
+pnpm test:e2e --grep "v0.2 six-panel"
+```
+
+## Archived v0.1 walkthrough
 
 Handbook demonstration:
 

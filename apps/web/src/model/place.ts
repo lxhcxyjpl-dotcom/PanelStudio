@@ -1,10 +1,10 @@
 import {
   FULL_CROP,
-  fontSizePtToSvgUserUnits,
+  resolveLabelText,
   type DomainCommand,
   type FigureDocumentV1,
 } from "@panelstudio/contracts";
-import { LABEL_EM_ASCENT } from "@panelstudio/core/labels";
+import { measureLabel } from "@panelstudio/core/labels";
 
 export const PX_PER_MM = 96 / 25.4;
 
@@ -13,15 +13,23 @@ type Viewport = { width: number; height: number };
 /**
  * Places new full-crop panels inside the current canvas.
  * Overlap is allowed. Leaving the canvas is not.
- * Label clearance uses the same em box as the editor kernel.
+ * All labels on a row share enough headroom for their actual ink.
  */
 export function placePanelCommands(
   document: FigureDocumentV1,
   additions: Array<{ panelId: string; assetId: string; viewport: Viewport }>,
 ): DomainCommand[] {
   const { canvas, labelStyle } = document;
-  const ascent = fontSizePtToSvgUserUnits(labelStyle.fontSizePt) * LABEL_EM_ASCENT;
-  const labelReserve = labelStyle.placement === "outside-top-left" ? labelStyle.gapMm + ascent : 0;
+  let labelReserve = 0;
+  if (labelStyle.visible && labelStyle.placement === "outside-top-left") {
+    for (let i = 0; i < additions.length; i++) {
+      const text = resolveLabelText({ ...labelStyle, index: document.panelOrder.length + i, textOverride: null });
+      const measured = measureLabel({ ...labelStyle, text });
+      if (measured.status === "measured" && measured.inkBoundsMm) {
+        labelReserve = Math.max(labelReserve, labelStyle.gapMm - measured.inkBoundsMm.y);
+      }
+    }
+  }
   const top = Math.max(canvas.marginsMm.top, labelReserve);
   const left = canvas.marginsMm.left;
   const right = canvas.widthMm - canvas.marginsMm.right;

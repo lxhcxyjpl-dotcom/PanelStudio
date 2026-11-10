@@ -16,7 +16,7 @@ import {
   resolvePanelLabel,
 } from "@panelstudio/core";
 import { describe, expect, it } from "vitest";
-import { solveLayout, type LayoutAssetFacts, type SolveLayoutResult, type SolvedCandidate } from "./index.js";
+import { solveLayout, validateCandidateResult, type LayoutAssetFacts, type SolveLayoutResult, type SolvedCandidate } from "./index.js";
 
 const fixtureDir = path.join(path.dirname(fileURLToPath(import.meta.url)), "../../../fixtures/layout");
 
@@ -30,7 +30,7 @@ type FixturePanel = {
 type Fixture = {
   id: string;
   expect: "candidates" | "conflict";
-  family?: LayoutRequest["family"];
+  family?: Exclude<LayoutRequest["family"], "selection-row">;
   primary?: number | null;
   locked?: number[];
   groups?: Array<{ id: string; panels: number[] }>;
@@ -136,7 +136,7 @@ function assertCandidateLaw(document: FigureDocumentV1, assets: Record<string, L
     expect(panel.frameMm.width).toBeGreaterThanOrEqual(preview.layoutSettings.minPanelSizeMm.width - TOLERANCES.geometryComparisonMm);
     expect(panel.frameMm.height).toBeGreaterThanOrEqual(preview.layoutSettings.minPanelSizeMm.height - TOLERANCES.geometryComparisonMm);
     const label = resolvePanelLabel(preview, panelId);
-    if (label) {
+    if (label?.bounds) {
       expect(rectIsOnCanvas(label.bounds, preview.canvas)).toBe(true);
       expect(label.bounds.y).toBeGreaterThanOrEqual(preview.canvas.marginsMm.top - TOLERANCES.geometryComparisonMm);
       expect(label.bounds.x).toBeGreaterThanOrEqual(preview.canvas.marginsMm.left - TOLERANCES.geometryComparisonMm);
@@ -345,8 +345,8 @@ describe("label reservation and soft raster PPI", () => {
     expect(preview).toBeTruthy();
     if (!preview) return;
     const label = resolvePanelLabel(preview, panelId(1));
-    expect(label && label.bounds.y).toBeGreaterThanOrEqual(preview.canvas.marginsMm.top - TOLERANCES.geometryComparisonMm);
-    expect(label && preview.panels[panelId(1)] && label.bounds.y + label.bounds.height).toBeLessThanOrEqual(
+    expect(label?.bounds?.y).toBeGreaterThanOrEqual(preview.canvas.marginsMm.top - TOLERANCES.geometryComparisonMm);
+    expect(label?.bounds && preview.panels[panelId(1)] && label.bounds.y + label.bounds.height).toBeLessThanOrEqual(
       (preview.panels[panelId(1)]?.frameMm.y ?? 0) + TOLERANCES.geometryComparisonMm,
     );
   });
@@ -368,7 +368,7 @@ describe("label reservation and soft raster PPI", () => {
     const other = candidate.previewDocument.panels[panelId(2)]?.frameMm;
     const label = resolvePanelLabel(candidate.previewDocument, panelId(1));
     expect(frame && label).toBeTruthy();
-    if (!frame || !label || !other) return;
+    if (!frame || !label?.bounds || !other) return;
     expect(frame.y).toBeCloseTo(inside.document.canvas.marginsMm.top, 3);
     const overlapsOwn =
       Math.min(frame.x + frame.width, label.bounds.x + label.bounds.width) - Math.max(frame.x, label.bounds.x) > 0 &&
@@ -424,5 +424,98 @@ describe("locks that already match a template", () => {
     for (const candidate of again) {
       expect(framesNearlyEqual(candidate.previewDocument.panels[id]?.frameMm ?? panel.frameMm, panel.frameMm)).toBe(true);
     }
+  });
+});
+
+describe("selection row", () => {
+  const a = panelId(1), b = panelId(2), c = panelId(3);
+  const group = "44444444-4444-4444-8444-444444444444";
+  const region = {x: 10, y: 10, width: 100, height: 70};
+  function scene() {
+    return materialize({id:"local", expect:"candidates", labelPlacement:"inside-top-left", panels:[
+      {id:1, aspect:[2,1], frame:[10,18,40,20]},
+      {id:2, aspect:[1,1], frame:[58,29,28,28]},
+      {id:3, aspect:[1,1], frame:[135,20,22,22]},
+    ]});
+  }
+  const request = (sizing: "preserve" | "equal-width" | "equal-height", orderedUnitIds = [`panel:${a}`,`panel:${b}`]) =>
+    ({family:"selection-row" as const, orderedUnitIds, sizing, regionMm: region, gapMm:4});
+  it("finds maximum feasible equal widths, preserves unselected objects and replays once", () => {
+    const input = scene();
+    const options = solved(solveLayout({...input,request:request("equal-width")}));
+    expect(options).toHaveLength(1);
+    const solution = options[0]!;
+    const {panels} = solution.previewDocument;
+    expect(panels[a]!.frameMm.width).toBeCloseTo(48, 8);
+    expect(panels[a]!.frameMm.height).toBeCloseTo(24, 8);
+    expect(panels[b]!.frameMm.width).toBeCloseTo(48, 8);
+    expect(panels[b]!.frameMm.height).toBeCloseTo(48, 8);
+    expect(panels[a]!.frameMm.y).toBe(panels[b]!.frameMm.y);
+    expect(solution.commands).toMatchObject([{ type:"panel.setFrames", items:[{panelId:a},{panelId:b}]}]);
+    const expected = structuredClone(input.document);
+    expected.panels[a]!.frameMm = panels[a]!.frameMm;
+    expected.panels[b]!.frameMm = panels[b]!.frameMm;
+    expect(solution.previewDocument).toEqual(expected);
+    expect(solveLayout({...input,request:request("equal-width")})).toEqual({ok:true,candidates:options});
+  });
+  it("finds an equal height, retains sizes in preserve mode, and bounds an omitted region", () => {
+    const input = scene();
+    const same = solved(solveLayout({...input, request:request("equal-height")}))[0]!;
+    expect(same.previewDocument.panels[a]!.frameMm.height).toBeCloseTo(32, 8);
+    expect(same.previewDocument.panels[b]!.frameMm.height).toBeCloseTo(32, 8);
+    const {regionMm: _region, ...compact} = request("preserve");
+    const kept = solved(solveLayout({...input,request:compact}))[0]!;
+    expect(kept.previewDocument.panels[b]!.frameMm).toEqual({x:54,y:18,width:28,height:28});
+  });
+  it("uses the full ink rectangle even when the baseline is manually offset", () => {
+    const input = scene();
+    input.document.panels[b]!.labelOverrides.offsetMm = {x:-8,y:-3};
+    const result = solved(solveLayout({...input,request:request("equal-width")}))[0]!.previewDocument;
+    const label = resolvePanelLabel(result,b)!.bounds!;
+    const f = result.panels[a]!.frameMm;
+    expect(label.x - (f.x + f.width)).toBeCloseTo(4,6);
+    expect(label.y).toBeCloseTo(region.y,6);
+    expect(f.y).toBe(result.panels[b]!.frameMm.y);
+    expect(f.width).toBeLessThan(48);
+  });
+  it("moves a complete rigid group, rejects group resizing and partial or repeated units", () => {
+    const input = scene(), d = input.document;
+    d.groups[group] = {name:"Pair",panelIds:[a,b],locked:false};
+    const ordered = [`group:${group}`,`panel:${c}`];
+    const regionMm = {x:8,y:12,width:160,height:80};
+    const kept = solved(solveLayout({...input,request:{...request("preserve",ordered),regionMm}}))[0]!.previewDocument;
+    expect(kept.panels[a]!.frameMm.width).toBe(d.panels[a]!.frameMm.width);
+    expect(kept.panels[b]!.frameMm.x - kept.panels[a]!.frameMm.x).toBe(d.panels[b]!.frameMm.x-d.panels[a]!.frameMm.x);
+    expect(kept.panels[b]!.frameMm.y - kept.panels[a]!.frameMm.y).toBe(d.panels[b]!.frameMm.y-d.panels[a]!.frameMm.y);
+    expect(solveLayout({...input,request:request("equal-width",ordered)})).toMatchObject({ok:false, details:{reason:"group-resize"}});
+    expect(solveLayout({...input,request:request("preserve")})).toMatchObject({ok:false, details:{reason:"invalid-units"}});
+    expect(solveLayout({...input,request:request("preserve",[`panel:${c}`,`panel:${c}`])})).toMatchObject({ok:false, details:{reason:"invalid-units"}});
+  });
+  it("locates locked panels, cross-selection constraints, obstacles and insufficient regions", () => {
+    const input = scene(), d = input.document;
+    const options = {...input,request:request("preserve")};
+    d.panels[a]!.locked = true;
+    expect(solveLayout(options)).toMatchObject({ok:false,code:"LOCKED_ELEMENT",details:{panelIds:[a]}});
+    d.panels[a]!.locked = false;
+    d.layoutSettings.constraints = [{id:group,kind:"row",panelIds:[a,c]}];
+    expect(solveLayout(options)).toMatchObject({ok:false,details:{reason:"cross-selection-constraint",constraintIds:[group]}});
+    d.layoutSettings.constraints = [];
+    d.panels[c]!.labelOverrides.offsetMm = {x:-40,y:4};
+    expect(solveLayout(options)).toMatchObject({ok:false,details:{reason:"region-occupied",panelIds:[c]}});
+    d.panels[c]!.labelOverrides.offsetMm = null;
+    expect(solveLayout({...input,request:{...request("equal-width"),regionMm:{...region,width:18}}}))
+      .toMatchObject({ok:false,details:{reason:"region-too-small"}});
+    d.panels[c]!.frameMm = {...d.panels[c]!.frameMm,width:5,height:5};
+    expect(solveLayout(options)).toMatchObject({ok:false,details:{reason:"outside-layout-conflict", panelIds:[c]}});
+  });
+  it("validates a solved layout after any descendant edit without re-solving", () => {
+    const input = scene(), d = input.document;
+    const lookup = (id:string) => ({id,originalFilename:"image",...input.assets[id]!});
+    const placed = solved(solveLayout({...input,request:request("equal-width")}))[0]!;
+    const collide = {type:"panel.setFrames" as const, items:[{panelId:c,frameMm:{x:15,y:15,width:22,height:22}}]};
+    expect(validateCandidateResult(d,placed.commands,lookup,"layout")).toEqual(placed.previewDocument);
+    expect(() => validateCandidateResult(d,[...placed.commands,collide],lookup,"edit")).not.toThrow();
+    expect(() => validateCandidateResult(d,[...placed.commands,collide],lookup,"layout"))
+      .toThrow(expect.objectContaining({code:"LAYOUT_CONFLICT",details:expect.objectContaining({reason:"layout-overlap"})}));
   });
 });

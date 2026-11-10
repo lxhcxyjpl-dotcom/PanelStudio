@@ -21,6 +21,7 @@ The table is the license field of each direct dependency at the locked version. 
 | react-i18next | 18.0.1 | MIT |
 | zustand | 5.1.0 | MIT |
 | @tanstack/react-query | 5.107.1 | MIT |
+| fontkit | 2.0.4 | MIT |
 | fflate | 0.8.3 | MIT |
 | ajv-formats | 3.0.1 | MIT |
 | @xmldom/xmldom | 0.9.12 | MIT |

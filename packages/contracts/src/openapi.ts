@@ -16,6 +16,7 @@ import { JobAcceptedSchema, JobSchema } from "./jobs.js";
 import { ProjectManifestSchema } from "./project-package.js";
 import {
   AssetPageSchema,
+  AIHistoryPageSchema,
   CapabilitiesResponseSchema,
   CreateProjectResponseSchema,
   DocumentStateSchema,
@@ -79,6 +80,7 @@ const componentSchemas = {
   LayoutCandidatesResponse: LayoutCandidatesResponseSchema,
   Candidate: CandidateSchema,
   AILayoutRequest: AILayoutRequestSchema,
+  AIHistoryPage: AIHistoryPageSchema,
   PreviewRequest: PreviewRequestSchema,
   ExportRequest: ExportRequestSchema,
   AIProviderConfig: AIProviderConfigSchema,
@@ -163,6 +165,7 @@ const assetId = {
   name: "assetId",
   in: "path",
   required: true,
+  description: "Asset UUID within this project. Importing a project package preserves its asset UUIDs.",
   schema: ref("Uuid"),
 };
 
@@ -490,6 +493,16 @@ const operations: Operation[] = [
     responses: withError({ "200": jsonResponse("Candidate.", "Candidate") }),
   },
   {
+    operationId: "listAiHistory",
+    method: "get",
+    path: "/api/v1/projects/{projectId}/ai-history",
+    tags: ["AI"],
+    summary: "Read this project's AI turns in descending creation time and job ID order.",
+    parameters: [projectId, cursorQuery, { ...limitQuery, schema: { ...limitQuery.schema, default: 20 }, description: "Page size, default 20." },
+      { name: "baseRevision", in: "query", required: false, schema: ref("Revision") }],
+    responses: withError({ "200": jsonResponse("AI history turns.", "AIHistoryPage") }),
+  },
+  {
     operationId: "createAiLayout",
     method: "post",
     path: "/api/v1/projects/{projectId}/ai-layouts",
@@ -700,7 +713,7 @@ export function buildOpenApiDocument(): Record<string, unknown> {
       version: APP_VERSION,
       license: { name: "MIT" },
       description:
-        "HTTP contract for PanelStudio v0.1. Normative handbook: docs/PanelStudio-spec-v0.1.md. Phase 0 published this contract. Phase 1 implements asset import, panel and label commands, document revisions, SVG and project-package export, and project import. Phase 2 implements the edit kernel: frames, crops, labels, groups, locks, stack order, the remaining document commands, undo, redo, and restart restore. Phase 3 implements automatic layout candidates, candidate reads, preview renders, and accepting a candidate through the transaction path. Phase 5 implements provider settings, the provider test, AI layout jobs, job cancellation, and job event replay. Phase 6 serves the bundled font list and the font zip. Project list, soft-delete, restore, and revision reads are implemented. The response model does not contain provider secrets. All paths are under /api/v1. The service listens on loopback and is deployed same-origin. Authentication, when required, is an external reverse proxy.",
+        "PanelStudio v0.2 exposes schema-1 figure documents, revisioned edits, local and whole-figure layout, and asynchronous render jobs. AI drafts can be refined against a candidate or a clarification. Accepting the cumulative candidate creates one document transaction. AI history is scoped to a project. The service uses same-origin deployment under /api/v1.",
     },
     servers: [
       {

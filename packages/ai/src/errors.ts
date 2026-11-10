@@ -1,12 +1,8 @@
-import type { ErrorCode } from "@panelstudio/contracts";
+import type { ApiError, ErrorCode } from "@panelstudio/contracts";
 
 export class AiCompileError extends Error {
   readonly code: ErrorCode;
-  readonly details: {
-    panelIds?: string[];
-    assetIds?: string[];
-    constraintIds?: string[];
-  };
+  readonly details: ApiError["error"]["details"];
 
   constructor(
     code: ErrorCode,

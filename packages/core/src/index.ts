@@ -34,13 +34,12 @@ export type { FrameAnchor } from "./geometry.js";
 export { canonicalJson, hashFigureDocument, sha256 } from "./hash.js";
 export {
   INHERITED_LABEL_OVERRIDES,
-  LABEL_EM_ADVANCE,
-  LABEL_EM_ASCENT,
-  LABEL_EM_DESCENT,
   fontFamilyForId,
   labelIsVisible,
   resolvePanelLabel,
 } from "./labels.js";
 export type { Rect, ResolvedLabel } from "./labels.js";
+export { assertLabelBounds, labelDiagnostics } from "./label-validation.js";
+export { initializeLabelFonts, measureLabel } from "@panelstudio/text-metrics";
 export { movedStackOrder, stackOrderCommand } from "./stack.js";
 export type { StackMove } from "./stack.js";

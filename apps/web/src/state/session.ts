@@ -5,8 +5,9 @@ import {
   type DomainCommand,
   type ExportRequest,
   type FigureDocumentV1,
+  type LayoutRequest,
 } from "@panelstudio/contracts";
-import { applyCommands, DocumentCommandError, type AssetLookup } from "@panelstudio/core/apply";
+import { applyCommands, type AssetLookup } from "@panelstudio/core/apply";
 import {
   alignSelection,
   distributeSelection,
@@ -22,7 +23,10 @@ import { readProjectId, writeProjectId } from "../prefs";
 import { clearRecovery, readRecovery, writeRecovery, type RecoveryDraft } from "./drafts";
 import { queryClient } from "./query";
 import { patch, syncChrome, useWorkspace } from "./store";
-import { baseDocument, type Confirmed, type ImportRow, type PendingDraft } from "./types";
+import { errorText } from "../model/feedback";
+import { resolvePanelLabel } from "@panelstudio/core/labels";
+import { belongsToProject, dismissCandidates, generateAi, generateLayout, projectEpoch, refreshAiHistory, resetCandidateSession } from "./candidate-session";
+import { baseDocument, candidatesStale, type Confirmed, type ImportRow, type PendingDraft } from "./types";
 
 import rasterUrl from "../../../../fixtures/mixed/raster.png";
 import photoUrl from "../../../../fixtures/mixed/photo.jpg";
@@ -31,10 +35,13 @@ import vectorUrl from "../../../../fixtures/mixed/panel-vector.svg";
 let chain: Promise<void> = Promise.resolve();
 let bootStarted = false;
 let nudgeTimer = 0;
-let nudge: { ids: string[]; dx: number; dy: number } | null = null;
+let nudge: { ids: string[]; dx: number; dy: number; kind: "panels" | "label"; projectId: string; epoch: number } | null = null;
 
 function later(task: () => Promise<void>): Promise<void> {
-  const run = chain.then(task, task);
+  const projectId = useWorkspace.getState().projectId;
+  const epoch = projectEpoch();
+  const guarded = () => belongsToProject(projectId, epoch) ? task() : Promise.resolve();
+  const run = chain.then(guarded, guarded);
   chain = run.then(
     () => undefined,
     () => undefined,
@@ -67,16 +74,6 @@ function lookupFor(projectId: string): AssetLookup {
 
 function say(message: string): void {
   patch({ liveMessage: message });
-}
-
-function errorText(error: unknown): string {
-  if (error instanceof ApiClientError) {
-    const key = `errors.${error.code}`;
-    const translated = i18n.t(key);
-    return translated === key ? error.message : translated;
-  }
-  if (error instanceof DocumentCommandError) return i18n.t(`errors.${error.code}`);
-  return i18n.t("errors.generic");
 }
 
 function recoveryOf(draft: PendingDraft, projectId: string): RecoveryDraft {
@@ -129,9 +126,10 @@ export async function boot(): Promise<void> {
 }
 
 export async function loadProject(projectId: string, fromBoot = false): Promise<void> {
-  const project = await api.project(projectId);
-  const document = await api.document(projectId);
-  const assets = await api.assets(projectId);
+  cancelNudge();
+  const epoch = resetCandidateSession(projectId);
+  const [project, document, assets] = await Promise.all([api.project(projectId), api.document(projectId), api.assets(projectId)]);
+  if (epoch !== projectEpoch()) return;
   queryClient.setQueryData(["assets", projectId], assets);
   writeProjectId(projectId);
   const confirmed: Confirmed = {
@@ -159,9 +157,10 @@ export async function loadProject(projectId: string, fromBoot = false): Promise<
     serverSnapshot: null,
     dialog: null,
   });
+  void refreshAiHistory(true);
   if (!fromBoot) return;
   const saved = await readRecovery(projectId).catch(() => null);
-  if (!saved || saved.pendingCommands.length === 0) return;
+  if (!belongsToProject(projectId, epoch) || !saved || saved.pendingCommands.length === 0) return;
   patch({
     draft: {
       baseRevision: saved.baseRevision,
@@ -183,6 +182,7 @@ export async function ensureProject(): Promise<string> {
   const title = current.locale === "zh-CN" ? "未命名图稿" : "Untitled figure";
   const created = await api.createProject(title, newKey());
   const fresh = await api.document(created.project.id);
+  resetCandidateSession(created.project.id);
   writeProjectId(created.project.id);
   queryClient.setQueryData(["assets", created.project.id], { items: [], nextCursor: null });
   patch({
@@ -231,6 +231,8 @@ export async function deleteCurrentProject(): Promise<void> {
   const projectId = state.projectId;
   await api.deleteProject(projectId);
   await clearRecovery(projectId);
+  if (useWorkspace.getState().projectId !== projectId) return;
+  resetCandidateSession(null);
   writeProjectId(null);
   patch({
     projectId: null,
@@ -381,9 +383,11 @@ async function transactNow(commands: DomainCommand[]): Promise<void> {
     return;
   }
   const idempotencyKey = newKey();
-  patch({ saveState: "saving", optimistic: next, interaction: null, crop: null, activeCandidateId: null });
+  const epoch = projectEpoch();
+  patch({ saveState: "saving", optimistic: next, interaction: null, crop: null, compareMode: "editing" });
   try {
     const result = await api.transaction(state.projectId, { baseRevision: state.confirmed.revision, commands }, idempotencyKey);
+    if (!belongsToProject(state.projectId, epoch)) return;
     patch({
       confirmed: {
         revision: result.revision,
@@ -398,6 +402,7 @@ async function transactNow(commands: DomainCommand[]): Promise<void> {
     });
     await remember(null, state.projectId);
   } catch (error) {
+    if (!belongsToProject(state.projectId, epoch)) return;
     await keepFailedCommand(error, {
       baseRevision: state.confirmed.revision,
       commands,
@@ -549,9 +554,11 @@ function history(direction: "undo" | "redo"): Promise<void> {
 async function runHistory(direction: "undo" | "redo", baseRevision: number, key: string): Promise<void> {
   const { projectId } = useWorkspace.getState();
   if (!projectId) return;
+  const epoch = projectEpoch();
   patch({ saveState: "saving", historyRetry: null });
   try {
     const result = direction === "undo" ? await api.undo(projectId, baseRevision, key) : await api.redo(projectId, baseRevision, key);
+    if (!belongsToProject(projectId, epoch)) return;
     patch({
       confirmed: {
         revision: result.revision,
@@ -561,11 +568,12 @@ async function runHistory(direction: "undo" | "redo", baseRevision: number, key:
       },
       optimistic: null,
       saveState: "saved",
-      activeCandidateId: null,
+      compareMode: "editing",
       historyRetry: null,
       liveMessage: i18n.t(direction === "undo" ? "history.undone" : "history.redone"),
     });
   } catch (error) {
+    if (!belongsToProject(projectId, epoch)) return;
     if (error instanceof ApiClientError && error.code === "REQUEST_INVALID") {
       patch({ saveState: "saved", liveMessage: i18n.t(direction === "undo" ? "history.undoEmpty" : "history.redoEmpty") });
       return;
@@ -584,17 +592,39 @@ async function runHistory(direction: "undo" | "redo", baseRevision: number, key:
   }
 }
 
-export function queueNudge(ids: string[], dx: number, dy: number): void {
+export function labelMove(document: FigureDocumentV1, panelId: string, dx: number, dy: number): DomainCommand {
+  const panel = document.panels[panelId];
+  const label = resolvePanelLabel(document, panelId);
+  if (!panel || !label) throw new Error(i18n.t("panels.empty"));
+  return {
+    type: "label.setOverrides", items: [{ panelId, value: { ...panel.labelOverrides,
+      offsetMm: { x: label.x - panel.frameMm.x + dx, y: label.y - panel.frameMm.y + dy },
+    } }],
+  };
+}
+
+function nudgeCommand(document: FigureDocumentV1, step: NonNullable<typeof nudge>) {
+  return step.kind === "label" ? labelMove(document, step.ids[0]!, step.dx, step.dy) : translateSelection(document, step.ids, step.dx, step.dy);
+}
+
+export function cancelNudge() {
+  window.clearTimeout(nudgeTimer);
+  nudge = null;
+  patch({ interaction: null });
+}
+
+export function queueNudge(ids: string[], dx: number, dy: number, kind: "panels" | "label" = "panels"): void {
   const state = useWorkspace.getState();
   const document = baseDocument(state);
   if (!document || !state.projectId || state.draft || ids.length === 0) return;
-  if (!nudge) nudge = { ids, dx: 0, dy: 0 };
+  if (nudge && (nudge.kind !== kind || nudge.ids.join() !== ids.join())) void flushNudge();
+  if (!nudge) nudge = { ids, kind, projectId: state.projectId, epoch: projectEpoch(), dx: 0, dy: 0 };
   nudge.dx += dx;
   nudge.dy += dy;
   try {
-    const command = translateSelection(document, nudge.ids, nudge.dx, nudge.dy);
+    const command = nudgeCommand(document, nudge);
     const preview = applyCommands(document, [command], lookupFor(state.projectId));
-    patch({ interaction: preview, activeCandidateId: null });
+    patch({ interaction: preview, compareMode: "editing" });
   } catch (error) {
     say(errorText(error));
   }
@@ -613,111 +643,15 @@ async function flushNudge(): Promise<void> {
   }
   const document = baseDocument(useWorkspace.getState());
   patch({ interaction: null });
-  if (!document) return;
-  await transact([translateSelection(document, current.ids, current.dx, current.dy)]);
+  if (!document || !belongsToProject(current.projectId, current.epoch)) return;
+  try { await transact([nudgeCommand(document, current)]); } catch (error) { say(errorText(error)); }
 }
 
-export function requestLayout(): Promise<void> {
-  return later(() => requestLayoutNow());
-}
-
-async function requestLayoutNow(): Promise<void> {
-  const state = useWorkspace.getState();
-  const document = state.confirmed?.document;
-  if (!state.projectId || !state.confirmed || !document) return;
-  const count = document.panelOrder.length;
-  if (count < RESOURCE_LIMITS.minAutoLayoutPanels || count > RESOURCE_LIMITS.maxAutoLayoutPanels) {
-    say(i18n.t("layout.needPanels"));
-    return;
-  }
-  if (state.draft) {
-    patch({ dialog: "recovery" });
-    return;
-  }
-  patch({ layoutState: "loading", layoutMessage: i18n.t("layout.loading"), liveMessage: i18n.t("layout.loading") });
-  try {
-    const result = await api.layoutCandidates(
-      state.projectId,
-      { baseRevision: state.confirmed.revision, request: { family: "auto" }, maxCandidates: 3 },
-      newKey(),
-    );
-    revokePreviews(useWorkspace.getState().cards.map((card) => card.previewUrl));
-    const cards = result.candidates.map((candidate) => ({ candidate, previewUrl: null, previewError: null }));
-    patch({
-      cards,
-      activeCandidateId: cards[0]?.candidate.id ?? null,
-      layoutState: "idle",
-      layoutMessage: null,
-      aiStatus: { phase: "idle" },
-      liveMessage: i18n.t("layout.preview"),
-    });
-    void loadPreviews(state.projectId, cards.map((card) => card.candidate.id));
-  } catch (error) {
-    const conflict = error instanceof ApiClientError && error.code === "LAYOUT_CONFLICT";
-    patch({
-      cards: [],
-      activeCandidateId: null,
-      layoutState: conflict ? "conflict" : "error",
-      layoutMessage: errorText(error),
-      liveMessage: errorText(error),
-    });
-  }
-}
-
-async function loadPreviews(projectId: string, ids: string[]): Promise<void> {
-  await Promise.all(ids.map(async (candidateId) => {
-    try {
-      const accepted = await api.preview(projectId, { source: { candidateId }, pixelWidth: 480 }, newKey());
-      const job = await waitForJob(accepted.jobId);
-      if (job.status !== "succeeded" || !job.result || !("artifactId" in job.result)) {
-        markPreview(candidateId, null, i18n.t("layout.previewFailed"));
-        return;
-      }
-      const file = await api.download(`/artifacts/${job.result.artifactId}/download`);
-      markPreview(candidateId, URL.createObjectURL(file.blob), null);
-    } catch (error) {
-      markPreview(candidateId, null, errorText(error));
-    }
-  }));
-}
-
-function markPreview(candidateId: string, previewUrl: string | null, previewError: string | null): void {
-  patch({
-    cards: useWorkspace.getState().cards.map((card) =>
-      card.candidate.id === candidateId ? { ...card, previewUrl, previewError } : card,
-    ),
-  });
-}
-
-function revokePreviews(urls: Array<string | null>): void {
-  for (const url of urls) if (url) URL.revokeObjectURL(url);
-}
-
-export function selectCandidate(candidateId: string): void {
-  if (candidatesBlocked()) return;
-  patch({ activeCandidateId: candidateId });
-}
-
-export function continueEditing(): void {
-  patch({ activeCandidateId: null });
-}
-
-export function dismissCandidates(): void {
-  revokePreviews(useWorkspace.getState().cards.map((card) => card.previewUrl));
-  const ai = useWorkspace.getState().cards.some((card) => card.candidate.origin === "ai");
-  patch({
-    cards: [],
-    activeCandidateId: null,
-    layoutState: "idle",
-    layoutMessage: null,
-    aiStatus: { phase: "idle" },
-    liveMessage: i18n.t(ai ? "ai.discarded" : "layout.cancel"),
-  });
-}
-
-function candidatesBlocked(): boolean {
-  const state = useWorkspace.getState();
-  return state.cards.length > 0 && (state.confirmed?.revision !== state.cards[0]?.candidate.baseRevision || state.draft !== null);
+export async function requestLayout(request: LayoutRequest = { family: "auto" }) {
+  const epoch = projectEpoch();
+  if (nudge) await flushNudge();
+  await chain;
+  if (projectEpoch() === epoch) await generateLayout(request);
 }
 
 export function acceptCandidate(): Promise<void> {
@@ -728,10 +662,11 @@ export function acceptCandidate(): Promise<void> {
       say(i18n.t("layout.pick"));
       return;
     }
-    if (candidatesBlocked()) {
-      patch({ activeCandidateId: null, liveMessage: i18n.t("layout.stale") });
+    if (candidatesStale(state)) {
+      patch({ compareMode: "editing", liveMessage: i18n.t("layout.stale") });
       return;
     }
+    const epoch = projectEpoch();
     patch({ saveState: "saving" });
     try {
       const result = await api.transaction(
@@ -739,7 +674,8 @@ export function acceptCandidate(): Promise<void> {
         { baseRevision: state.confirmed.revision, candidateId: card.candidate.id },
         newKey(),
       );
-      revokePreviews(state.cards.map((item) => item.previewUrl));
+      if (!belongsToProject(state.projectId, epoch)) return;
+      dismissCandidates();
       patch({
         confirmed: {
           revision: result.revision,
@@ -754,8 +690,10 @@ export function acceptCandidate(): Promise<void> {
         liveMessage: i18n.t(card.candidate.origin === "ai" ? "ai.applied" : "layout.apply"),
       });
     } catch (error) {
+      if (!belongsToProject(state.projectId, epoch)) return;
       if (error instanceof ApiClientError && (error.code === "CANDIDATE_STALE" || error.code === "REVISION_CONFLICT")) {
-        patch({ activeCandidateId: null, saveState: "saved", liveMessage: i18n.t("layout.stale") });
+        patch({ compareMode: "editing", saveState: "saved", liveMessage: i18n.t("layout.stale") });
+        await reloadFromServer();
         return;
       }
       patch({ saveState: "saved", liveMessage: errorText(error) });
@@ -929,7 +867,7 @@ export function enterCrop(panelId: string): void {
   }
   patch({
     crop: { panelId, crop: { ...panel.cropNormalized } },
-    activeCandidateId: null,
+    compareMode: "editing",
     selection: { kind: "panels", ids: [panelId] },
   });
 }
@@ -963,7 +901,7 @@ export function commitCrop(): Promise<void> {
 export function selectAll(): void {
   const document = baseDocument(useWorkspace.getState());
   if (!document || document.panelOrder.length === 0) return;
-  patch({ selection: { kind: "panels", ids: [...document.panelOrder] }, activeCandidateId: null });
+  patch({ selection: { kind: "panels", ids: [...document.panelOrder] } });
 }
 
 export function assetThumbnail(projectId: string, asset: Asset): string | null {
@@ -975,134 +913,12 @@ export function activeGroupId(document: FigureDocumentV1, panelId: string): stri
   return groupForPanel(document, panelId)?.id ?? null;
 }
 
-export function sendAiPrompt(
-  prompt: string,
-  options: { includePreviewImage: boolean; visualReview: boolean },
-): Promise<void> {
-  if (isUndoPrompt(prompt)) return undo();
-  return later(() => sendAiNow(prompt, options));
+export async function sendAiPrompt(prompt: string, options: Parameters<typeof generateAi>[1]) {
+  if (["撤销", "撤消", "undo"].includes(prompt.trim().toLowerCase())) return undo();
+  const epoch = projectEpoch();
+  if (nudge) await flushNudge();
+  await chain;
+  if (projectEpoch() === epoch) await generateAi(prompt, options);
 }
 
-export function cancelAiPrompt(): Promise<void> {
-  const status = useWorkspace.getState().aiStatus;
-  if (status.phase !== "running" || !status.jobId) return Promise.resolve();
-  return api.cancelJob(status.jobId, newKey()).then(
-    (job) => {
-      if (job.status === "cancelled") {
-        patch({ aiStatus: { phase: "cancelled" }, liveMessage: i18n.t("ai.cancelled") });
-      }
-    },
-    (error: unknown) => patch({ liveMessage: errorText(error) }),
-  );
-}
-
-async function sendAiNow(
-  prompt: string,
-  options: { includePreviewImage: boolean; visualReview: boolean },
-): Promise<void> {
-  const state = useWorkspace.getState();
-  const document = state.confirmed?.document;
-  if (!state.projectId || !state.confirmed || !document) return;
-  if (state.draft) {
-    patch({ dialog: "recovery" });
-    return;
-  }
-  const text = prompt.trim();
-  if (!text) return;
-  let settings: Awaited<ReturnType<typeof api.providerSettings>>;
-  try {
-    settings = await api.providerSettings();
-  } catch (error) {
-    patch({ aiStatus: { phase: "failed", code: "NETWORK", message: errorText(error) }, liveMessage: errorText(error) });
-    return;
-  }
-  if (!settings.config || !settings.hasSecret) {
-    patch({ aiStatus: { phase: "failed", code: "PROVIDER_NOT_CONFIGURED", message: i18n.t("ai.notConfigured") }, liveMessage: i18n.t("ai.notConfigured") });
-    return;
-  }
-  patch({ aiStatus: { phase: "running", jobId: "", label: i18n.t("ai.running") }, liveMessage: i18n.t("ai.running") });
-  try {
-    const accepted = await api.aiLayout(
-      state.projectId,
-      {
-        baseRevision: state.confirmed.revision,
-        prompt: text,
-        selectedPanelIds: selectedIds(state.selection, document),
-        replyLocale: state.locale,
-        includePreviewImage: options.includePreviewImage && settings.config.capabilities.imageInput,
-        visualReview: options.visualReview && settings.config.capabilities.imageInput,
-      },
-      newKey(),
-    );
-    patch({ aiStatus: { phase: "running", jobId: accepted.jobId, label: i18n.t("ai.running") } });
-    const job = await waitForJob(accepted.jobId);
-    if (useWorkspace.getState().aiStatus.phase === "cancelled") return;
-    if (job.status === "cancelled") {
-      patch({ aiStatus: { phase: "cancelled" }, liveMessage: i18n.t("ai.cancelled") });
-      return;
-    }
-    if (job.status === "failed") {
-      const code = job.error?.code ?? "REQUEST_INVALID";
-      const message = aiFailureMessage(code, job.error?.message ?? "");
-      patch({ aiStatus: { phase: "failed", code, message }, liveMessage: message });
-      return;
-    }
-    const result = job.status === "succeeded" ? job.result : null;
-    if (!result || !("kind" in result)) {
-      patch({ aiStatus: { phase: "failed", code: "REQUEST_INVALID", message: i18n.t("ai.jobFailed") }, liveMessage: i18n.t("ai.jobFailed") });
-      return;
-    }
-    if (result.kind === "clarification") {
-      patch({
-        aiStatus: { phase: "clarification", question: result.question, options: result.options ?? [] },
-        liveMessage: result.question,
-      });
-      return;
-    }
-    if (result.kind === "unsupported") {
-      patch({ aiStatus: { phase: "unsupported", reason: result.reason }, liveMessage: result.reason });
-      return;
-    }
-    revokePreviews(useWorkspace.getState().cards.map((card) => card.previewUrl));
-    const cards = result.candidates.map((candidate) => ({ candidate, previewUrl: null as string | null, previewError: null as string | null }));
-    const stale = cards[0] && cards[0].candidate.baseRevision !== useWorkspace.getState().confirmed?.revision;
-    patch({
-      cards,
-      activeCandidateId: stale ? null : cards[0]?.candidate.id ?? null,
-      aiStatus: { phase: "idle" },
-      layoutState: "idle",
-      layoutMessage: null,
-      liveMessage: stale ? i18n.t("ai.stale") : i18n.t("ai.ready"),
-    });
-    if (state.projectId) void loadPreviews(state.projectId, cards.map((card) => card.candidate.id));
-  } catch (error) {
-    const message = errorText(error);
-    patch({ aiStatus: { phase: "failed", code: error instanceof ApiClientError ? error.code : "NETWORK", message }, liveMessage: message });
-  }
-}
-
-function selectedIds(selection: ReturnType<typeof useWorkspace.getState>["selection"], document: FigureDocumentV1): string[] {
-  if (selection.kind === "panels") return selection.ids.filter((id) => document.panels[id]);
-  if (selection.kind === "group") return document.groups[selection.groupId]?.panelIds ?? [];
-  if (selection.kind === "label") return document.panels[selection.panelId] ? [selection.panelId] : [];
-  return [];
-}
-
-function isUndoPrompt(prompt: string): boolean {
-  const text = prompt.trim().toLowerCase();
-  return text === "撤销" || text === "撤消" || text === "undo";
-}
-
-function aiFailureMessage(code: string, message: string): string {
-  if (code === "PROVIDER_NOT_CONFIGURED") return i18n.t("ai.notConfigured");
-  if (code === "MODEL_OUTPUT_INVALID") return i18n.t("ai.invalidOutput");
-  if (code === "PROVIDER_CONFIG_CHANGED") return i18n.t("ai.configChanged");
-  if (code === "LAYOUT_CONFLICT" || code === "LOCKED_ELEMENT" || code === "GROUP_PARTIAL_EDIT" || code === "OUTSIDE_CANVAS") {
-    const key = `errors.${code}`;
-    const translated = i18n.t(key);
-    return translated === key ? message : translated;
-  }
-  return message || i18n.t("ai.jobFailed");
-}
-
-export { candidatesBlocked as layoutIsStale };
+export { cancelAiPrompt, continueEditing, dismissCandidates, selectCandidate } from "./candidate-session";

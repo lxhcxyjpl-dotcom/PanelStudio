@@ -141,7 +141,9 @@ test("reports a real layout conflict and restores the project after reload", asy
   await page.getByTestId("layout-button").click();
   const response = await conflict;
   expect(response.status()).toBe(422);
-  await expect(page.getByText("布局约束无解").first()).toBeVisible();
+  const problem = await response.json();
+  expect(problem.error).toMatchObject({ code: "LAYOUT_CONFLICT", details: { reason: "layout-min-size" } });
+  await expect(page.getByText("有图块低于布局最小尺寸。", { exact: false }).first()).toBeVisible();
   await page.reload();
   await page.getByRole("tab", { name: "面板" }).click();
   await expect(page.getByTestId("panel-row")).toHaveCount(2);

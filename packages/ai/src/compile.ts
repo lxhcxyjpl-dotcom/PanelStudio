@@ -1,6 +1,8 @@
 import {
   ENGINE_VERSIONS,
+  RESOURCE_LIMITS,
   resolveLabelText,
+  type AIEditScope,
   type AIIntent,
   type Diagnostic,
   type DomainCommand,
@@ -51,6 +53,7 @@ export function compileProposal(
   document: FigureDocumentV1,
   intent: Extract<AIIntent, { kind: "proposal" }>,
   assets: AssetLookup,
+  selection?: { scope: AIEditScope; selectedPanelIds: string[] },
 ): CompileResult {
   let current = document;
   const commands: DomainCommand[] = [];
@@ -59,10 +62,18 @@ export function compileProposal(
   const diagnostics: Diagnostic[] = [];
   const layoutAssets = layoutFacts(document, assets);
   for (const action of intent.actions) {
-    const produced = compileAction(current, action, layoutAssets, assets, notes);
+    const selected = selection?.scope === "selection" ? selection.selectedPanelIds : null;
+    if (selected && (action.type === "set_canvas" || action.type === "set_gutter" || action.type === "relabel" ||
+      action.type === "layout" && action.request.family !== "selection-row")) {
+      throw new AiCompileError("AI_SCOPE_VIOLATION", "This change requires document scope.", { reason: "scope-conflict" });
+    }
+    const produced = compileAction(current, action, layoutAssets, assets, notes, selected);
     if (produced.score) score = produced.score;
     diagnostics.push(...produced.diagnostics);
     if (produced.commands.length === 0) continue;
+    if (commands.length + produced.commands.length > RESOURCE_LIMITS.maxCommandsPerTransaction) {
+      throw new AiCompileError("AI_CHAIN_LIMIT", "This draft exceeds 64 commands.", { reason: "command-limit" });
+    }
     current = applyCommands(current, produced.commands, assets);
     commands.push(...produced.commands);
   }
@@ -70,6 +81,7 @@ export function compileProposal(
   if (canonicalJson(replay) !== canonicalJson(current)) {
     throw new AiCompileError("DOCUMENT_INVALID", "The compiled commands did not replay.");
   }
+  if (selection?.scope === "selection") assertSelectionResult(document, current, selection.selectedPanelIds, intent.actions);
   const validationMode = intent.actions.some((action) => action.type === "layout") ? "layout" : "edit";
   const summary = [intent.summary, ...notes].filter((part) => part.length > 0).join(" ");
   return {
@@ -88,6 +100,7 @@ function compileAction(
   layoutAssets: Record<string, LayoutAssetFacts>,
   assets: AssetLookup,
   notes: string[],
+  selected: string[] | null,
 ): { commands: DomainCommand[]; score?: LayoutScore; diagnostics: Diagnostic[] } {
   switch (action.type) {
     case "set_canvas": {
@@ -125,6 +138,20 @@ function compileAction(
     case "set_label_style": {
       if (Object.keys(action.patch).length === 0) {
         throw new AiCompileError("MODEL_OUTPUT_INVALID", "set_label_style did not name a field.");
+      }
+      if (selected) {
+        const { sequence, format, gapMm, visible, placement, ...typography } = action.patch;
+        if (sequence !== undefined || format !== undefined || gapMm !== undefined) {
+          throw new AiCompileError("AI_SCOPE_VIOLATION", "Label sequence, format and gap require document scope.", { reason: "scope-conflict" });
+        }
+        if (visible === true && !document.labelStyle.visible) {
+          throw new AiCompileError("AI_SCOPE_VIOLATION", "Showing a label while all labels are hidden requires document scope.", { reason: "scope-conflict" });
+        }
+        return { commands: [{ type: "label.setOverrides", items: selected.map((panelId) => ({
+          panelId, value: mergeOverrides(document.panels[panelId]!.labelOverrides, {
+            visible, placement, ...(Object.keys(typography).length ? { typography } : {}),
+          }),
+        })) }], diagnostics: [] };
       }
       return {
         commands: [{ type: "label.setStyle", labelStyle: { ...document.labelStyle, ...action.patch } }],
@@ -216,6 +243,38 @@ function compileAction(
     }
     default:
       throw new AiCompileError("MODEL_OUTPUT_INVALID", "The action is not supported.");
+  }
+}
+
+/** Compare against the immediate working draft, including every field on unselected objects. */
+function assertSelectionResult(
+  before: FigureDocumentV1, after: FigureDocumentV1, ids: string[],
+  actions: Extract<AIIntent, { kind: "proposal" }>["actions"],
+): void {
+  const allowed = structuredClone(before);
+  const selected = new Set(ids);
+  const members = new Set(Object.values(before.groups).flatMap((group) => group.panelIds));
+  for (const id of ids) {
+    const panel = after.panels[id];
+    const target = allowed.panels[id];
+    if (!target || !panel) continue;
+    target.frameMm = panel.frameMm; // Rigid translation and proportional scaling were checked by the edit kernel.
+    if (!members.has(id)) {
+      target.labelOverrides = panel.labelOverrides;
+      target.locked = panel.locked;
+    }
+  }
+  for (const action of actions) {
+    if (action.type !== "set_lock") continue;
+    for (const target of action.targets) {
+      if (target.kind !== "group") continue;
+      const group = allowed.groups[target.id];
+      if (group && group.panelIds.every((id) => selected.has(id))) group.locked = action.locked;
+    }
+  }
+  if (canonicalJson(allowed) !== canonicalJson(after)) {
+    const panelIds = before.panelOrder.filter((id) => canonicalJson(allowed.panels[id]) !== canonicalJson(after.panels[id]));
+    throw new AiCompileError("AI_SCOPE_VIOLATION", "The proposal changes fields outside the frozen selection.", { panelIds, reason: "scope-conflict" });
   }
 }
 

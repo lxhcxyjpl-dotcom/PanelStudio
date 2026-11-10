@@ -17,7 +17,8 @@ import {
   cropIsInsideUnitSquare,
   rectIsOnCanvas,
 } from "./geometry.js";
-import { INHERITED_LABEL_OVERRIDES, resolvePanelLabel } from "./labels.js";
+import { INHERITED_LABEL_OVERRIDES } from "./labels.js";
+import { assertLabelBounds } from "./label-validation.js";
 
 export { DocumentCommandError } from "./errors.js";
 
@@ -47,6 +48,7 @@ export function applyCommands(
     applyOne(next, command, assets);
   }
   assertFigureDocument(next, assets);
+  assertLabelBounds(document, next);
   return next;
 }
 
@@ -476,11 +478,9 @@ export function assertFigureDocument(document: FigureDocumentV1, assets: AssetLo
       outside.push(panelId);
       continue;
     }
-    const label = resolvePanelLabel(document, panelId);
-    if (label && !rectIsOnCanvas(label.bounds, document.canvas)) outside.push(panelId);
   }
   if (outside.length > 0) {
-    throw new DocumentCommandError("OUTSIDE_CANVAS", "A panel or its label is outside the canvas.", {
+    throw new DocumentCommandError("OUTSIDE_CANVAS", "A panel is outside the canvas.", {
       panelIds: [...new Set(outside)],
     });
   }

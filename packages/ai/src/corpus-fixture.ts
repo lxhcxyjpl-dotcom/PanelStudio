@@ -15,6 +15,36 @@ export function fixtureIntent(prompt: string, scene: FrozenScene): AIIntent | nu
     summary,
     actions,
   });
+  if (text === "保留现在的排版，把所有编号改为小写。" || text === "Keep this layout and make all labels lowercase.") {
+    return proposal("使用小写自动编号。", [{ type: "set_label_style", patch: { sequence: "lower-alpha" } }]);
+  }
+  if (text === "在这个草案上，把 A 的编号向右移动 1 mm。" || text === "On this draft, move label A 1 mm to the right.") {
+    const a = panel("A") ?? panel("a");
+    if (!a?.labelBaselineMm) return { version: 1, kind: "clarification", question: "请选择要移动的可见编号。" };
+    return proposal("编号基线向右移动 1 mm。", [{ type: "set_panel_label", panelId: a.panelId,
+      patch: { offsetMm: { x: a.labelBaselineMm.x + 1, y: a.labelBaselineMm.y } } }]);
+  }
+  if (text === "只把选中图块的编号改成 9 pt 黑色。" || text === "Make only the selected labels black and 9 pt." || text === "只把 B、C 的编号改成 9 pt 黑色。") {
+    const ids = text.includes("B、C") ? [id("B"), id("C")].filter((v): v is string => Boolean(v)) : scene.selectedPanelIds;
+    if (!ids.length || text.includes("B、C") && ids.length !== 2) return { version: 1, kind: "clarification", question: "请先选中要调整的图块。" };
+    return proposal("所指编号改为 9 pt 黑色。", ids.map((panelId) => ({ type: "set_panel_label", panelId,
+      patch: { typography: { fontSizePt: 9, color: "#000000" } } })));
+  }
+  const namedRow = text === "把 B 和 C 排成一行，保持原来的尺寸，其他图不动。" || text === "Arrange B and C in one row at their current sizes. Leave the other panels in place.";
+  const equalRow = text === "把选中的两张图设成等宽，并排放在当前区域。" || text === "Give the two selected panels equal widths in their current region.";
+  const tighterRow = text === "把选中图块排成一行，缩小单元间距。" || text === "Arrange the selected panels in a row with a smaller gap." ||
+    text === "这个方案可以，再把选中区域的间距缩小一点。";
+  if (namedRow || equalRow || tighterRow) {
+    const ids = namedRow ? [id("B"), id("C")] : scene.selectedPanelIds;
+    if (ids.some((item) => !item)) return { version: 1, kind: "clarification", question: "没有找到 B 和 C，请选中要排列的图块。" };
+    const panels = scene.panels.filter((p) => ids.includes(p.panelId));
+    const orderedUnitIds = [...new Set(panels.map((p) => p.groupId ? `group:${p.groupId}` : `panel:${p.panelId}`))];
+    if (orderedUnitIds.length < 2 || orderedUnitIds.length > (equalRow ? 2 : 3)) return { version: 1, kind: "clarification", question: "请选中两个或三个完整排版单元。" };
+    if (equalRow && panels.some((p) => p.groupId)) return { version: 1, kind: "unsupported", reason: "等宽整理需要两张未分组的图块。" };
+    return proposal("在局部区域内整理单行。", [{ type: "layout", request: { family: "selection-row",
+      orderedUnitIds, sizing: equalRow ? "equal-width" : "preserve",
+      ...(tighterRow ? { gapMm: Math.max(0, scene.gutterMm.horizontal - 1) } : {}) } }]);
+  }
   if (text === "把六张图排成两行三列") {
     if (scene.panels.length < 6) {
       return { version: 1, kind: "clarification", question: "需要六张图才能排成两行三列。", options: ["使用现有面板自动排版"] };

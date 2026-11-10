@@ -8,6 +8,10 @@ export const ErrorCodeSchema = Type.Union([
   Type.Literal("PROJECT_DELETED"),
   Type.Literal("REVISION_CONFLICT"),
   Type.Literal("CANDIDATE_STALE"),
+  Type.Literal("AI_CONTEXT_INVALID"),
+  Type.Literal("AI_SCOPE_VIOLATION"),
+  Type.Literal("AI_CHAIN_LIMIT"),
+  Type.Literal("TEXT_METRICS_UNAVAILABLE"),
   Type.Literal("IDEMPOTENCY_KEY_REUSED"),
   Type.Literal("ASSET_IN_USE"),
   Type.Literal("FILE_TOO_LARGE"),
@@ -41,6 +45,10 @@ export const ERROR_CODES: Record<
   PROJECT_DELETED: { httpStatus: 409, scene: "project is soft-deleted" },
   REVISION_CONFLICT: { httpStatus: 409, scene: "document revision conflict" },
   CANDIDATE_STALE: { httpStatus: 409, scene: "candidate is stale" },
+  AI_CONTEXT_INVALID: { httpStatus: 422, scene: "invalid draft or clarification context" },
+  AI_SCOPE_VIOLATION: { httpStatus: 422, scene: "change outside the frozen selection" },
+  AI_CHAIN_LIMIT: { httpStatus: 422, scene: "draft turn or cumulative command limit reached" },
+  TEXT_METRICS_UNAVAILABLE: { httpStatus: 422, scene: "label cannot be measured using the specified font" },
   IDEMPOTENCY_KEY_REUSED: {
     httpStatus: 409,
     scene: "idempotency key reused for a different request",
@@ -79,6 +87,17 @@ export const ERROR_CODES: Record<
 
 export const ApiErrorDetailsSchema = object(
   {
+    reason: Type.Optional(Type.Union([
+      Type.Literal("region-occupied"), Type.Literal("region-too-small"),
+      Type.Literal("cross-selection-constraint"), Type.Literal("group-resize"),
+      Type.Literal("outside-layout-conflict"), Type.Literal("invalid-units"),
+      Type.Literal("region-outside-margins"), Type.Literal("missing-glyph"),
+      Type.Literal("layout-margin"), Type.Literal("layout-overlap"), Type.Literal("layout-min-size"),
+      Type.Literal("layout-constraint"), Type.Literal("layout-max-height"),
+      Type.Literal("unsupported-text-layout"), Type.Literal("turn-limit"),
+      Type.Literal("command-limit"), Type.Literal("empty-selection"),
+      Type.Literal("scope-conflict"),
+    ])),
     expectedRevision: Type.Optional(RevisionSchema),
     actualRevision: Type.Optional(RevisionSchema),
     panelIds: Type.Optional(Type.Array(UuidSchema, { uniqueItems: true })),

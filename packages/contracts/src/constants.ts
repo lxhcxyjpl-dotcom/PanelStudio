@@ -3,22 +3,22 @@ const MiB = 1024 * 1024;
 /** Document schema version. The only figure document model is version 1. */
 export const SCHEMA_VERSION = 1 as const;
 
-/**
- * Application version reported by health.
- * v0.1.0 is the public release candidate. Layout and SVG engines stay at the
- * versions shipped in phases 3 and 1.
- */
-export const APP_VERSION = "0.1.0" as const;
+export const APP_VERSION = "0.2.0" as const;
 
-/**
- * Layout scoring is recorded with this engine version.
- * The SVG compiler shipped in phase 1. The font registry version identifies the
- * bundled family list, which is still Noto Sans and Noto Sans SC.
- */
+const latinFaces = {
+  400: { filename: "NotoSans-Regular.ttf", sha256: "62242803a747b82168913100ddd893fb480e8747fd4669a5fb6c2b4891d3d48c" },
+  700: { filename: "NotoSans-Bold.ttf", sha256: "683f9c36fbe2de420e5b1029203a19c5b4651da1be6c35906daafa994825f4a6" },
+} as const;
+const chineseFaces = {
+  400: { filename: "NotoSansSC-Regular.ttf", sha256: "20575d590f1263a97fa011ae0e0adf530318056b7d0f0358712228df7ec0a3bd" },
+  700: { filename: "NotoSansSC-Bold.ttf", sha256: "f141543fb78454749becd7deb036303dbacfedb9c20e51b15777a7878fed3add" },
+} as const;
+
 export const ENGINE_VERSIONS = {
-  layout: "0.1.0",
-  svg: "0.1.0",
-  fontRegistry: "1",
+  layout: "0.2.0",
+  svg: "0.2.0",
+  fontRegistry: ["fontkit-2.0.4-ink-v1", ...Object.values(latinFaces).map((f) => f.sha256),
+    ...Object.values(chineseFaces).map((f) => f.sha256)].join(":"),
 } as const;
 
 export const NORMALIZATION_VERSION = "1";
@@ -131,7 +131,7 @@ export const RENDER_MEDIA_TYPES = ["image/png", "image/svg+xml"] as const;
 
 export const EXPORT_FORMATS = ["svg", "png", "project"] as const;
 
-export const LAYOUT_FAMILIES = ["auto", "rows", "hero-top", "hero-left"] as const;
+export const LAYOUT_FAMILIES = ["auto", "rows", "hero-top", "hero-left", "selection-row"] as const;
 
 export const NON_DOCUMENT_CLIENT_STATE = [
   "theme",
@@ -182,12 +182,14 @@ export const BUNDLED_FONTS = [
   {
     fontId: "noto-sans",
     family: "Noto Sans",
+    files: latinFaces,
     weights: [400, 700],
     bundled: true,
   },
   {
     fontId: "noto-sans-sc",
     family: "Noto Sans SC",
+    files: chineseFaces,
     weights: [400, 700],
     bundled: true,
   },

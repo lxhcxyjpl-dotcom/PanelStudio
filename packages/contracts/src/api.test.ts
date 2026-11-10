@@ -3,7 +3,7 @@ import { CandidateSchema } from "./candidate.js";
 import { CapabilitiesResponseSchema, HealthResponseSchema, PHASE0_CAPABILITY_SAMPLE } from "./api.js";
 import { APP_VERSION, SCHEMA_VERSION } from "./constants.js";
 import { AIProviderSettingsSchema } from "./ai.js";
-import { JobSchema } from "./jobs.js";
+import { AIHistoryTurnSchema, JobSchema, type AIHistoryTurn } from "./jobs.js";
 import { CandidateRowSchema } from "./storage.js";
 import { ASSET_ID, expectInvalid, expectValid, PANEL_ID, PROJECT_ID } from "./test-utils.js";
 
@@ -30,6 +30,17 @@ describe("API objects", () => {
     const keys = Object.keys(AIProviderSettingsSchema.properties);
     expect(keys).toEqual(["configRevision", "hasSecret", "config"]);
     expect(JSON.stringify(AIProviderSettingsSchema)).not.toContain("encryptedSecret");
+  });
+
+  it("accepts an optional persisted summary only for candidate history results", () => {
+    const turn: AIHistoryTurn = { jobId: PANEL_ID, projectId: PROJECT_ID, baseRevision: 1, context: { kind: "revision" },
+      scope: "document", resolvedSelectedPanelIds: [], prompt: "Move A", replyLocale: "en-US", status: "succeeded",
+      phase: "ready", createdAt: timestamp, finishedAt: timestamp, error: null, isStale: false,
+      result: { kind: "candidates", candidateIds: [ASSET_ID] } };
+    expectValid(AIHistoryTurnSchema, turn);
+    expectValid(AIHistoryTurnSchema, { ...turn, result: { ...turn.result, summary: "Moved A." } });
+    expectInvalid(AIHistoryTurnSchema, { ...turn, result: { ...turn.result, summary: "" } });
+    expectInvalid(AIHistoryTurnSchema, { ...turn, result: { kind: "unsupported", reason: "Outside the editor", summary: "Moved A." } });
   });
 
   it("requires job results only after success", () => {

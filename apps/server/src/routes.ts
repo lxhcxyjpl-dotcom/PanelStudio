@@ -22,6 +22,7 @@ import {
   SSE_HEARTBEAT_INTERVAL_MS,
 } from "./ai-jobs.js";
 import { listJobEvents } from "./db.js";
+import { listAiHistory } from "./ai-context.js";
 import { fontBundle, fontList } from "./fonts.js";
 import { ApiException, requireIdempotencyKey, sendError } from "./http.js";
 import {
@@ -307,6 +308,14 @@ export function registerRoutes(app: FastifyInstance, ctx: AppContext): void {
     const key = requireIdempotencyKey(request);
     const result = enqueueProviderTest(ctx, key, hashJson(request.body ?? null));
     return reply.status(result.status).send(result.body);
+  });
+
+  app.get("/api/v1/projects/:projectId/ai-history", async (request) => {
+    const page = pageQuery(request.query);
+    const raw = oneQuery(queryRecord(request.query).baseRevision);
+    const base = raw === undefined ? null : typeof raw === "string" && /^(0|[1-9]\d*)$/u.test(raw) ? Number(raw) : NaN;
+    if (base !== null && !Number.isSafeInteger(base)) throw new ApiException("REQUEST_INVALID", "baseRevision must be a non-negative integer.");
+    return listAiHistory(ctx, projectIdOf(request.params), base, page.cursor, page.limit ?? 20);
   });
 
   app.post("/api/v1/projects/:projectId/ai-layouts", async (request, reply) => {

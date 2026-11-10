@@ -18,4 +18,4 @@ export { parseModelJson, validateIntent } from "./parse.js";
 export { systemPrompt, userPrompt } from "./prompt.js";
 export { resolveModelIntent, reviewModelIntent, transportMessage } from "./resolve.js";
 export { buildScene, sceneText } from "./scene.js";
-export type { FrozenScene } from "./scene.js";
+export type { FrozenScene, TurnTranscript } from "./scene.js";

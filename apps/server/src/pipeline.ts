@@ -24,19 +24,17 @@ import {
   type PreviewRequest,
   type TransactionRequest,
 } from "@panelstudio/contracts";
-import { solveLayout } from "@panelstudio/layout";
+import { solveLayout, validateCandidateResult } from "@panelstudio/layout";
 import {
   DocumentCommandError,
   applyCommands,
   assertFigureDocument,
   canonicalJson,
-  contentPlacement,
   hashFigureDocument,
-  resolvePanelLabel,
   sha256,
   type ReadyAssetFacts,
 } from "@panelstudio/core";
-import { compileFigureSvg, normalizeSvg, SvgImportError, type ExportPanel } from "@panelstudio/svg";
+import { normalizeSvg, SvgImportError } from "@panelstudio/svg";
 import type { BlobStore } from "./blobs.js";
 import {
   cancelOpenJobsForProject,
@@ -49,7 +47,6 @@ import {
   getProject,
   getRevision,
   immediate,
-  insertArtifact,
   insertAsset,
   insertCandidate,
   insertIdempotency,
@@ -75,9 +72,12 @@ import {
   type ProjectRecord,
 } from "./db.js";
 import { buildProjectPackage, readProjectPackage, type PackagedAsset } from "./figure-package.js";
-import { isBundledFamily, missingGlyphs, packagedFontFiles } from "./fonts.js";
+import { packagedFontFiles } from "./fonts.js";
 import { ApiException } from "./http.js";
 import { normalizeRaster, rasterizeSvg, sniffMediaType, type RasterMediaType } from "./raster.js";
+import { PNG_RENDERER, type RenderPool } from "./render-pool.js";
+import { compileSnapshot, type RenderSnapshot } from "./render-task.js";
+import { queueRenderJob } from "./render-jobs.js";
 import type Database from "better-sqlite3";
 
 export type AppContext = {
@@ -85,6 +85,8 @@ export type AppContext = {
   blobs: BlobStore;
   now: () => string;
   dataDir: string;
+  renders: RenderPool;
+  renderJobs: Set<Promise<void>>;
   deferAiJobs?: boolean;
   aiFetch?: typeof fetch;
 };
@@ -214,7 +216,7 @@ export function removeUnusedAsset(ctx: AppContext, projectId: string, assetId: s
         assetIds: [assetId],
       });
     }
-    if (!asset.removedFromLibraryAt) markAssetRemoved(ctx.db, assetId, ctx.now());
+    if (!asset.removedFromLibraryAt) markAssetRemoved(ctx.db, projectId, assetId, ctx.now());
     return publicAsset(requireAsset(ctx, projectId, assetId));
   });
 }
@@ -482,7 +484,7 @@ function acceptCandidate(
   const current = requireRevision(ctx, project.id, project.currentRevision);
   let next: FigureDocumentV1;
   try {
-    next = applyCommands(current.document, candidate.commands, (assetId) => readyFacts(ctx, project.id, assetId));
+    next = validateCandidateResult(current.document, candidate.commands, (assetId) => readyFacts(ctx, project.id, assetId), candidate.validationMode);
   } catch (error) {
     if (error instanceof DocumentCommandError) {
       throw new ApiException(error.code, error.message, error.details);
@@ -556,6 +558,8 @@ export function createLayoutCandidates(
         projectId,
         baseRevision: request.baseRevision,
         origin: "layout" as const,
+        parentCandidateId: null,
+        sourceJobId: null,
         validationMode: "layout" as const,
         commands: candidate.commands,
         resultDocumentHash: hashFigureDocument(candidate.previewDocument),
@@ -566,6 +570,15 @@ export function createLayoutCandidates(
         fontRegistryVersion: ENGINE_VERSIONS.fontRegistry,
         createdAt: now,
       };
+      try {
+        const verified = validateCandidateResult(current.document, record.commands, (id) => readyFacts(ctx, projectId, id), "layout");
+        if (hashFigureDocument(verified) !== record.resultDocumentHash) {
+          throw new ApiException("CANDIDATE_STALE", "The layout preview does not replay.");
+        }
+      } catch (error) {
+        if (error instanceof DocumentCommandError) throw new ApiException(error.code, error.message, error.details);
+        throw error;
+      }
       insertCandidate(ctx.db, record);
       return publicCandidate(record, candidate.previewDocument);
     });
@@ -620,70 +633,13 @@ export function createPreview(
   ) {
     throw new ApiException("EXPORT_TOO_LARGE", "The preview exceeds the output limit.");
   }
-  const jobId = randomUUID();
-  const now = ctx.now();
-  try {
-    const compiled = compileDocument(ctx, projectId, source.document, source.revision, false);
-    const png = rasterizeSvg(compiled.svg, request.pixelWidth);
-    const stored = ctx.blobs.put(png);
-    const artifactId = randomUUID();
-    return immediate(ctx.db, () => {
-      const again = takeReplay(ctx, `preview:${projectId}`, key, requestHash);
-      if (again) return again;
-      insertArtifact(ctx.db, {
-        id: artifactId,
-        projectId,
-        revision: source.revision,
-        candidateId: source.candidateId,
-        kind: "preview",
-        mediaType: "image/png",
-        filename: "preview.png",
-        byteLength: png.byteLength,
-        sha256: stored.sha256,
-        blobPath: stored.relativePath,
-        rendererVersion: "resvg-js@2.6.2",
-        createdAt: now,
-      });
-      writeJob(ctx, {
-        id: jobId,
-        projectId,
-        kind: "preview",
-        status: "succeeded",
-        phase: "ready",
-        createdAt: now,
-        startedAt: now,
-        finishedAt: now,
-        result: { artifactId },
-        error: null,
-        inputJson: request,
-      });
-      const response = { jobId };
-      remember(ctx, `preview:${projectId}`, key, requestHash, 202, response);
-      return { status: 202, body: response };
+  return queueRenderJob(ctx, { projectId, revision: source.revision, candidateId: source.candidateId, format: "preview" },
+    request, `preview:${projectId}`, key, requestHash, async () => {
+      const snapshot = renderSnapshot(ctx, projectId, source.document, source.revision);
+      const image = await ctx.renders.render(snapshot, request.pixelWidth);
+      return { bytes: Buffer.from(image.bytes), diagnostics: image.diagnostics, mediaType: "image/png",
+        filename: "preview.png", rendererVersion: PNG_RENDERER };
     });
-  } catch (error) {
-    const failed = failureOf(error);
-    return immediate(ctx.db, () => {
-      const again = takeReplay(ctx, `preview:${projectId}`, key, requestHash);
-      if (again) return again;
-      writeJob(ctx, {
-        id: jobId,
-        projectId,
-        kind: "preview",
-        status: "failed",
-        phase: "failed",
-        createdAt: now,
-        startedAt: now,
-        finishedAt: now,
-        result: null,
-        error: { code: failed.code, message: failed.message },
-        inputJson: request,
-      });
-      const response = { jobId };
-      remember(ctx, `preview:${projectId}`, key, requestHash, 202, response);
-      return { status: 202, body: response };
-    });
-  }
 }
 
 function previewSource(
@@ -692,22 +648,8 @@ function previewSource(
   request: PreviewRequest,
 ): { document: FigureDocumentV1; revision: number; candidateId: string | null } {
   if ("candidateId" in request.source) {
-    const candidate = getCandidate(ctx.db, request.source.candidateId);
-    if (!candidate || candidate.projectId !== projectId) {
-      throw new ApiException("NOT_FOUND", "Candidate was not found.");
-    }
-    const revision = getRevision(ctx.db, projectId, candidate.baseRevision);
-    if (!revision) throw new ApiException("CANDIDATE_STALE", "The candidate does not match this document.");
-    let document: FigureDocumentV1;
-    try {
-      document = applyCommands(revision.document, candidate.commands, (assetId) => readyFacts(ctx, projectId, assetId));
-    } catch (error) {
-      if (error instanceof DocumentCommandError) {
-        throw new ApiException("CANDIDATE_STALE", "The candidate does not match this document.", error.details);
-      }
-      throw error;
-    }
-    return { document, revision: candidate.baseRevision, candidateId: candidate.id };
+    const candidate = readCandidate(ctx, projectId, request.source.candidateId);
+    return { document: candidate.previewDocument, revision: candidate.baseRevision, candidateId: candidate.id };
   }
   const revision = getRevision(ctx.db, projectId, request.source.revision);
   if (!revision) throw new ApiException("NOT_FOUND", "That revision was not found.");
@@ -735,6 +677,8 @@ function publicCandidate(
     projectId: string;
     baseRevision: number;
     origin: "layout" | "ai";
+    parentCandidateId: string | null;
+    sourceJobId: string | null;
     validationMode: "edit" | "layout";
     commands: DomainCommand[];
     resultDocumentHash: string;
@@ -750,6 +694,8 @@ function publicCandidate(
     projectId: candidate.projectId,
     baseRevision: candidate.baseRevision,
     origin: candidate.origin,
+    parentCandidateId: candidate.parentCandidateId ?? null,
+    sourceJobId: candidate.sourceJobId ?? null,
     validationMode: candidate.validationMode,
     summary: candidate.summary,
     commands: candidate.commands,
@@ -851,75 +797,8 @@ export async function exportFigure(
       throw new ApiException("EXPORT_TOO_LARGE", "The PNG export exceeds the output limit.");
     }
   }
-  const jobId = randomUUID();
-  const now = ctx.now();
-  try {
-    const produced = await produceExport(ctx, project, revision.document, revision.revision, request);
-    const stored = ctx.blobs.put(produced.bytes);
-    const artifactId = randomUUID();
-    const result = {
-      artifactId,
-      revision: revision.revision,
-      format: request.format,
-      diagnostics: produced.diagnostics,
-    };
-    return immediate(ctx.db, () => {
-      const again = takeReplay(ctx, `export:${projectId}`, key, requestHash);
-      if (again) return again;
-      insertArtifact(ctx.db, {
-        id: artifactId,
-        projectId,
-        revision: revision.revision,
-        candidateId: null,
-        kind: request.format,
-        mediaType: produced.mediaType,
-        filename: produced.filename,
-        byteLength: produced.bytes.byteLength,
-        sha256: stored.sha256,
-        blobPath: stored.relativePath,
-        rendererVersion: produced.rendererVersion,
-        createdAt: now,
-      });
-      writeJob(ctx, {
-        id: jobId,
-        projectId,
-        kind: "export",
-        status: "succeeded",
-        phase: "ready",
-        createdAt: now,
-        startedAt: now,
-        finishedAt: now,
-        result,
-        error: null,
-        inputJson: request,
-      });
-      const response = { jobId };
-      remember(ctx, `export:${projectId}`, key, requestHash, 202, response);
-      return { status: 202, body: response };
-    });
-  } catch (error) {
-    const failed = failureOf(error);
-    return immediate(ctx.db, () => {
-      const again = takeReplay(ctx, `export:${projectId}`, key, requestHash);
-      if (again) return again;
-      writeJob(ctx, {
-        id: jobId,
-        projectId,
-        kind: "export",
-        status: "failed",
-        phase: "failed",
-        createdAt: now,
-        startedAt: now,
-        finishedAt: now,
-        result: null,
-        error: { code: failed.code, message: failed.message },
-        inputJson: request,
-      });
-      const response = { jobId };
-      remember(ctx, `export:${projectId}`, key, requestHash, 202, response);
-      return { status: 202, body: response };
-    });
-  }
+  return queueRenderJob(ctx, { projectId, revision: revision.revision, candidateId: null, format: request.format },
+    request, "export:" + projectId, key, requestHash, () => produceExport(ctx, project, revision.document, revision.revision, request));
 }
 
 export async function importProjectPackage(
@@ -941,17 +820,14 @@ export async function importProjectPackage(
       throw new ApiException("DOCUMENT_INVALID", "The packaged title is invalid.");
     }
     const projectId = randomUUID();
-    const idMap = new Map(unpacked.assets.map((asset) => [asset.id, randomUUID()]));
-    const document = structuredClone(unpacked.document);
-    for (const panel of Object.values(document.panels)) {
-      const mapped = idMap.get(panel.assetId);
-      if (!mapped) throw new ApiException("DOCUMENT_INVALID", "The document references a missing asset.");
-      panel.assetId = mapped;
-    }
-    assertFigureDocument(document, (assetId) => factsForImport(unpacked.assets, idMap, assetId));
+    const document = unpacked.document;
+    const facts = new Map(unpacked.assets.map((asset) => [asset.id, {
+      id: asset.id, originalFilename: asset.originalFilename, viewport: asset.normalized.viewport,
+      rasterPixelSize: asset.normalized.rasterPixelSize,
+    }]));
+    assertFigureDocument(document, (assetId) => facts.get(assetId) ?? null);
     const stored = unpacked.assets.map((asset) => ({
       asset,
-      id: idMap.get(asset.id) ?? "",
       original: ctx.blobs.put(asset.original),
       render: ctx.blobs.put(asset.render),
       thumbnail: ctx.blobs.put(asset.thumbnail),
@@ -982,7 +858,7 @@ export async function importProjectPackage(
       );
       for (const item of stored) {
         insertAsset(ctx.db, {
-          id: item.id,
+          id: item.asset.id,
           projectId,
           createdAt: now,
           originalFilename: item.asset.originalFilename,
@@ -1141,41 +1017,26 @@ async function produceExport(
   request: ExportRequest,
 ): Promise<{ bytes: Buffer; mediaType: string; filename: string; rendererVersion: string; diagnostics: Diagnostic[] }> {
   const stem = fileStem(project.title);
-  if (request.format === "svg" || request.format === "png") {
-    const compiled = compileDocument(ctx, project.id, document, revision, request.format === "svg" ? request.options.includeMetadata : false);
-    if (request.format === "svg") {
-      return {
-        bytes: Buffer.from(compiled.svg),
-        mediaType: "image/svg+xml",
-        filename: `${stem}.svg`,
-        rendererVersion: ENGINE_VERSIONS.svg,
-        diagnostics: compiled.diagnostics,
-      };
-    }
-    const width = pngPixelsFromMm(document.canvas.widthMm, request.options.dpi);
-    const png = rasterizeSvg(compiled.svg, width);
-    return {
-      bytes: png,
-      mediaType: "image/png",
-      filename: `${stem}.png`,
-      rendererVersion: "resvg-js@2.6.2",
-      diagnostics: compiled.diagnostics,
-    };
+  const snapshot = renderSnapshot(ctx, project.id, document, revision);
+  if (request.format === "svg") {
+    const compiled = compileSnapshot(snapshot, request.options.includeMetadata);
+    return { bytes: Buffer.from(compiled.svg), mediaType: "image/svg+xml", filename: stem + ".svg",
+      rendererVersion: ENGINE_VERSIONS.svg, diagnostics: compiled.diagnostics };
+  }
+  if (request.format === "png") {
+    const image = await ctx.renders.render(snapshot, pngPixelsFromMm(document.canvas.widthMm, request.options.dpi));
+    return { bytes: Buffer.from(image.bytes), mediaType: "image/png", filename: stem + ".png",
+      rendererVersion: PNG_RENDERER, diagnostics: image.diagnostics };
   }
   const assets = packageAssets(ctx, project.id);
-  const compiled = compileDocument(ctx, project.id, document, revision, false);
   let preview: Buffer | null = null;
-  const diagnostics = [...compiled.diagnostics];
+  const diagnostics: Diagnostic[] = [];
   try {
-    const previewWidth = Math.min(1200, pngPixelsFromMm(document.canvas.widthMm, 150));
-    preview = rasterizeSvg(compiled.svg, previewWidth);
+    const image = await ctx.renders.render(snapshot, Math.min(1200, pngPixelsFromMm(document.canvas.widthMm, 150)));
+    preview = Buffer.from(image.bytes);
+    diagnostics.push(...image.diagnostics);
   } catch {
-    diagnostics.push({
-      code: "PREVIEW_UNAVAILABLE",
-      severity: "warning",
-      messageKey: "export.previewUnavailable",
-      params: {},
-    });
+    diagnostics.push({ code: "PREVIEW_UNAVAILABLE", severity: "warning", messageKey: "export.previewUnavailable", params: {} });
   }
   const families = fontDependencies(document, assets);
   const packed = buildProjectPackage({
@@ -1196,98 +1057,25 @@ async function produceExport(
   };
 }
 
-export function renderDocumentPng(
-  ctx: AppContext,
-  projectId: string,
-  document: FigureDocumentV1,
-  revision: number,
-  pixelWidth: number,
-): Buffer {
-  const compiled = compileDocument(ctx, projectId, document, revision, false);
-  return rasterizeSvg(compiled.svg, pixelWidth);
+export async function renderDocumentPng(ctx: AppContext, projectId: string, document: FigureDocumentV1,
+  revision: number, pixelWidth: number): Promise<Buffer> {
+  const result = await ctx.renders.render(renderSnapshot(ctx, projectId, document, revision), pixelWidth);
+  return Buffer.from(result.bytes);
 }
 
-function compileDocument(
-  ctx: AppContext,
-  projectId: string,
-  document: FigureDocumentV1,
-  revision: number,
-  includeMetadata: boolean,
-): { svg: string; diagnostics: Diagnostic[] } {
-  const panels: ExportPanel[] = document.stackOrder.map((panelId) => {
-    const panel = document.panels[panelId];
-    if (!panel) throw new ApiException("DOCUMENT_INVALID", "The document is missing a panel.");
+function renderSnapshot(ctx: AppContext, projectId: string, document: FigureDocumentV1, revision: number): RenderSnapshot {
+  const assets: RenderSnapshot["assets"] = {};
+  for (const [panelId, panel] of Object.entries(document.panels)) {
+    if (assets[panel.assetId]) continue;
     const asset = requireAsset(ctx, projectId, panel.assetId);
     if (asset.status !== "ready" || !asset.normalized || !asset.renderBlobPath) {
       throw new ApiException("DOCUMENT_INVALID", "A panel references an asset that is not ready.", {
-        assetIds: [panel.assetId],
-        panelIds: [panelId],
+        assetIds: [panel.assetId], panelIds: [panelId],
       });
     }
-    const place = contentPlacement(panel.frameMm, panel.cropNormalized, asset.normalized.viewport);
-    const resolved = resolvePanelLabel(document, panelId);
-    const label = resolved
-      ? {
-          text: resolved.text,
-          x: resolved.x,
-          y: resolved.y,
-          fontFamily: resolved.fontFamily,
-          fontSizeUser: resolved.fontSizeUser,
-          fontWeight: resolved.fontWeight,
-          color: resolved.color,
-        }
-      : null;
-    if (asset.normalized.renderMediaType === "image/svg+xml") {
-      return {
-        kind: "vector" as const,
-        panelId,
-        frame: panel.frameMm,
-        label,
-        normalizedSvg: ctx.blobs.read(asset.renderBlobPath).toString("utf8"),
-        x: place.x,
-        y: place.y,
-        scale: place.scale,
-      };
-    }
-    return {
-      kind: "raster" as const,
-      panelId,
-      frame: panel.frameMm,
-      label,
-      png: ctx.blobs.read(asset.renderBlobPath),
-      x: place.x,
-      y: place.y,
-      width: place.width,
-      height: place.height,
-    };
-  });
-  const compiled = compileFigureSvg({
-    widthMm: document.canvas.widthMm,
-    heightMm: document.canvas.heightMm,
-    revision,
-    includeMetadata,
-    panels,
-  });
-  const diagnostics: Diagnostic[] = compiled.fontFamilies
-    .filter((family) => !isBundledFamily(family))
-    .map((family) => ({
-      code: "FONT_MISSING",
-      severity: "warning" as const,
-      messageKey: "font.notInstalled",
-      params: { family },
-    }));
-  for (const panel of panels) {
-    if (!panel.label) continue;
-    const glyphs = missingGlyphs(panel.label.fontFamily, panel.label.fontWeight, panel.label.text);
-    if (glyphs.length === 0) continue;
-    diagnostics.push({
-      code: "FONT_MISSING",
-      severity: "warning",
-      messageKey: "font.missingGlyph",
-      params: { family: panel.label.fontFamily, glyphs: glyphs.join(" ") },
-    });
+    assets[panel.assetId] = { normalized: asset.normalized, blobPath: asset.renderBlobPath };
   }
-  return { svg: compiled.svg, diagnostics };
+  return { document, revision, dataDir: ctx.dataDir, assets };
 }
 
 function packageAssets(ctx: AppContext, projectId: string): PackagedAsset[] {
@@ -1321,26 +1109,9 @@ function fontDependencies(document: FigureDocumentV1, assets: PackagedAsset[]) {
   return families;
 }
 
-function factsForImport(
-  assets: PackagedAsset[],
-  idMap: Map<string, string>,
-  assetId: string,
-): ReadyAssetFacts | null {
-  for (const asset of assets) {
-    if (idMap.get(asset.id) !== assetId) continue;
-    return {
-      id: assetId,
-      originalFilename: asset.originalFilename,
-      viewport: asset.normalized.viewport,
-      rasterPixelSize: asset.normalized.rasterPixelSize,
-    };
-  }
-  return null;
-}
-
 function readyFacts(ctx: AppContext, projectId: string, assetId: string): ReadyAssetFacts | null {
-  const asset = getAsset(ctx.db, assetId);
-  if (!asset || asset.projectId !== projectId || asset.status !== "ready" || !asset.normalized) return null;
+  const asset = getAsset(ctx.db, projectId, assetId);
+  if (!asset || asset.status !== "ready" || !asset.normalized) return null;
   return {
     id: asset.id,
     originalFilename: asset.originalFilename,
@@ -1362,8 +1133,8 @@ function requireRevision(ctx: AppContext, projectId: string, revision: number) {
 }
 
 function requireAsset(ctx: AppContext, projectId: string, assetId: string): AssetRecord {
-  const asset = getAsset(ctx.db, assetId);
-  if (!asset || asset.projectId !== projectId) throw new ApiException("NOT_FOUND", "The asset was not found.");
+  const asset = getAsset(ctx.db, projectId, assetId);
+  if (!asset) throw new ApiException("NOT_FOUND", "The asset was not found.");
   return asset;
 }
 

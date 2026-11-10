@@ -1,5 +1,5 @@
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { RESOURCE_LIMITS, type Project } from "@panelstudio/contracts";
 import { api, ApiClientError } from "../api/client";
@@ -21,7 +21,7 @@ import {
   undo,
 } from "../state/session";
 import { patch, useWorkspace } from "../state/store";
-import { candidatesStale } from "../state/types";
+import { resetCandidateSession } from "../state/candidate-session";
 import { cropInvalid } from "../model/document-ui";
 import { Button, Icon } from "./widgets";
 
@@ -201,7 +201,7 @@ export function Toolbar() {
           if (file) void importPackage(file);
         }}
       />
-      {state.activeCandidateId && !candidatesStale(state) ? (
+      {state.compareMode !== "editing" ? (
         <span className="sr-only">{t("layout.preview")}</span>
       ) : null}
     </header>
@@ -248,6 +248,7 @@ function ProjectName() {
   const { t } = useTranslation();
   const title = useWorkspace((state) => state.title);
   const projectId = useWorkspace((state) => state.projectId);
+  const cancelled = useRef(false);
   const [editing, setEditing] = useState(false);
   const [text, setText] = useState(title);
   useEffect(() => setText(title), [title]);
@@ -259,16 +260,18 @@ function ProjectName() {
       value={editing ? text : title}
       title={title}
       onFocus={() => {
+        cancelled.current = false;
         setEditing(true);
         setText(title);
       }}
       onChange={(event) => setText(event.target.value)}
       onBlur={() => {
         setEditing(false);
-        if (text.trim() && text !== title) void renameTitle(text.trim()).catch((error: unknown) => patch({ liveMessage: error instanceof Error ? error.message : t("errors.generic") }));
+        if (!cancelled.current && text.trim() && text !== title) void renameTitle(text.trim()).catch((error: unknown) => patch({ liveMessage: error instanceof Error ? error.message : t("errors.generic") }));
         else setText(title);
       }}
       onKeyDown={(event) => {
+        if (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return;
         if (event.key === "Enter") {
           event.preventDefault();
           event.currentTarget.blur();
@@ -276,6 +279,7 @@ function ProjectName() {
         if (event.key === "Escape") {
           event.preventDefault();
           event.stopPropagation();
+          cancelled.current = true;
           setText(title);
           setEditing(false);
           event.currentTarget.blur();
@@ -319,6 +323,7 @@ function actual(): void {
 }
 
 async function newProject(): Promise<void> {
+  resetCandidateSession(null);
   writeProjectId(null);
   patch({
     projectId: null,

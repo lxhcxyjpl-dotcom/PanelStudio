@@ -1,9 +1,9 @@
 import Type, { type Static } from "typebox";
 import { LAYOUT_SCORE_WEIGHTS } from "./constants.js";
-import { NonEmptyStringSchema, NonNegativeMmSchema, PositiveMmSchema, UuidSchema } from "./primitives.js";
+import { NonEmptyStringSchema, NonNegativeMmSchema, PositiveMmSchema, RectMmSchema, UuidSchema } from "./primitives.js";
 import { nullable, object } from "./schema.js";
 
-export const LayoutFamilySchema = Type.Union(
+const GlobalLayoutFamilySchema = Type.Union(
   [
     Type.Literal("auto"),
     Type.Literal("rows"),
@@ -15,6 +15,7 @@ export const LayoutFamilySchema = Type.Union(
       "rows: 1–3 units per row. hero-top: primary on the top row. hero-left: primary on the left. auto searches the applicable families. Layout order does not change labels.",
   },
 );
+export const LayoutFamilySchema = Type.Union([GlobalLayoutFamilySchema, Type.Literal("selection-row")]);
 
 export const UnitIdSchema = Type.Union([
   Type.String({
@@ -41,7 +42,7 @@ export const GutterOverrideSchema = object({
 });
 
 const layoutRequestFields = {
-  family: LayoutFamilySchema,
+  family: GlobalLayoutFamilySchema,
   primaryPanelId: Type.Optional(UuidSchema),
   canvasOverride: Type.Optional(CanvasOverrideSchema),
   gutterOverrideMm: Type.Optional(GutterOverrideSchema),
@@ -71,11 +72,20 @@ export const LayoutRequestDefaultOrderSchema = object(layoutRequestFields, {
   description: "Neither orderedUnitIds nor rows. Order comes from panelOrder.",
 });
 
+export const SelectionRowLayoutRequestSchema = object({
+  family: Type.Literal("selection-row"),
+  orderedUnitIds: Type.Array(UnitIdSchema, { minItems: 2, maxItems: 3, uniqueItems: true }),
+  sizing: Type.Union([Type.Literal("preserve"), Type.Literal("equal-width"), Type.Literal("equal-height")]),
+  regionMm: Type.Optional(RectMmSchema),
+  gapMm: Type.Optional(NonNegativeMmSchema),
+});
+
 export const LayoutRequestSchema = Type.Union(
   [
     LayoutRequestByOrderSchema,
     LayoutRequestByRowsSchema,
     LayoutRequestDefaultOrderSchema,
+    SelectionRowLayoutRequestSchema,
   ],
   {
     description:
@@ -116,5 +126,6 @@ export const LAYOUT_SCORE_WEIGHT_SUM =
   LAYOUT_SCORE_WEIGHTS.movement;
 
 export type LayoutRequest = Static<typeof LayoutRequestSchema>;
+export type SelectionRowLayoutRequest = Static<typeof SelectionRowLayoutRequestSchema>;
 export type LayoutScore = Static<typeof LayoutScoreSchema>;
 export type UnitId = Static<typeof UnitIdSchema>;

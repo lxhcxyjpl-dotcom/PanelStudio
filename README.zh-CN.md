@@ -4,23 +4,20 @@
 
 PanelStudio 是一个本地或自部署的科研多面板排版编辑器。导入已经画好的子图，应用给出版式并加上面板编号，再导出可以在 Adobe Illustrator 里继续编辑的 SVG。
 
-规范正文是 [`docs/PanelStudio-spec-v0.1.md`](docs/PanelStudio-spec-v0.1.md)。当前版本是 v0.1.0。AI 是可选的：不配置模型，导入、排版、编辑和导出仍然可用。
+**当前版本为 0.2.0。** 支持在一份未应用的草案上连续精修、对照原稿、一次应用和一次撤销。现有 schema 1 项目和工程包可继续打开。AI 为可选功能。
 
-## 核心流程
+## 精修流程
 
-导入图片 → 一键排版 → 用一句话或鼠标调整 → 导出 SVG → 在 Illustrator 里继续改。
+1. 导入最多八张已绘好的子图，生成初始排版。
+2. 在 AI 面板选择全图或选中对象。同一份草案可以继续调整，也可以回答澄清问题。切换原稿与草案查看累计变化。生成期间可以继续手动编辑。
+3. 应用草案后，直接移动编号、拖动整组或多选对象，或在面板列表中调整编号顺序。选中两个或三个完整单元，可在指定区域内按原尺寸、等宽或等高排成一行。
+4. 导出可编辑 SVG。图块、支持的原生路径和文字、栅格素材保持独立。编号的屏幕预览和布局使用内置 Noto 字体的实际度量。
 
-![空编辑器](docs/screenshots/01-empty.png)
+![六图连续精修](docs/acceptance-v0.2/workspace/03-refined.png)
 
-![导入六张图](docs/screenshots/02-imported.png)
+[可复现的六图工程](examples/refinement-six/) · [实机界面录像](docs/demo/v0.2-refinement.webm) · [本机 Illustrator 验收记录](docs/illustrator-compatibility.md)
 
-![布局候选](docs/screenshots/03-layout.png)
-
-![一句话把 C 设成主图](docs/screenshots/05-ai-primary.png)
-
-![导出对话框，显示内置字体名](docs/screenshots/06-export.png)
-
-这些截图来自正在运行的应用。同一段应用内流程的 Playwright 录像是 [`docs/demo/in-app-walkthrough.webm`](docs/demo/in-app-walkthrough.webm)。录像里没有 Illustrator。那一句调整由本地语料替身回答，不是托管模型。讲解稿在 [`docs/demo.md`](docs/demo.md)。Illustrator 里改编号和曲线需要人来录。
+在本机 Illustrator 30.7 中，中文混排样稿直接打开时出现字重替换。若遇到同一情况，可运行导出字体包中的编号字体还原脚本，再保存为 .ai。五组样稿的复测结果见上方实机验收记录。
 
 ## 运行
 
@@ -39,13 +36,13 @@ pnpm --filter @panelstudio/web dev
 
 打开 `http://127.0.0.1:5173`。数据目录、`master.key` 和自部署说明在 [`docs/install.md`](docs/install.md)。
 
-数据目录默认是 `$HOME/.panelstudio`。保存模型密钥时会在那里生成 `master.key`，权限 `0600`。不要把这个文件提交到仓库。
+数据目录默认是 `$HOME/.panelstudio`。保存模型密钥时会在那里生成 `master.key`，在 POSIX 系统上使用 `0600` 权限。不要把这个文件提交到仓库。
 
 项目菜单可以打开这台服务上的其他项目，软删除当前项目，或恢复已删除的项目。删除后素材和历史还在，新的修改会被拒绝，未完成的任务会被取消。路由对照见 [`docs/v0.1-gap-close.md`](docs/v0.1-gap-close.md)。
 
 ## 格式与限制
 
-支持 PNG、JPEG、WebP，以及文档列出的 SVG 子集。一个项目最多 8 个面板。可编辑 SVG 保留矢量和编号文字，不把文字转成轮廓。v0.1 不导入 PDF、EPS 或原生 `.ai`，也不提供转曲导出。
+支持 PNG、JPEG、WebP，以及文档列出的 SVG 子集。一个项目最多 8 个面板。可编辑 SVG 保留矢量和编号文字，不把文字转成轮廓。当前版本不导入 PDF、EPS 或原生 `.ai`，也不提供转曲导出。
 
 详见 [`docs/format-support.md`](docs/format-support.md)。
 
@@ -56,7 +53,7 @@ pnpm --filter @panelstudio/web dev
 ## 其他
 
 - [测试记录](docs/test-record.md)
-- [Illustrator 对照表](docs/illustrator-compatibility.md)：每一行都是 needs manual check
+- [Illustrator 对照表](docs/illustrator-compatibility.md)
 - [依赖与字体许可](docs/licenses.md)
-- [阶段 6 记录](docs/phase-6-decisions.md)
+- [v0.2 实施决定](docs/v0.2-decisions.md)
 - [v0.1 路由对照](docs/v0.1-gap-close.md)

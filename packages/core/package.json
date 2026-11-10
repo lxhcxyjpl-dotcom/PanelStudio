@@ -1,6 +1,6 @@
 {
   "name": "@panelstudio/core",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "license": "MIT",
   "type": "module",
@@ -17,7 +17,8 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@panelstudio/contracts": "workspace:*"
+    "@panelstudio/contracts": "workspace:*",
+    "@panelstudio/text-metrics": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "22.20.5",

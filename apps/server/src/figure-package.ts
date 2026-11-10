@@ -1,6 +1,7 @@
 import {
   RESOURCE_LIMITS,
   SCHEMA_VERSION,
+  UuidSchema,
   isFigureDocument,
   isProjectManifest,
   type Diagnostic,
@@ -9,6 +10,7 @@ import {
   type ProjectManifest,
 } from "@panelstudio/contracts";
 import { sha256 } from "@panelstudio/core";
+import { Check } from "typebox/value";
 import { strFromU8, strToU8, unzipSync, zipSync } from "fflate";
 import { ApiException } from "./http.js";
 
@@ -183,6 +185,7 @@ function readAssets(files: Map<string, Buffer>): PackagedAsset[] {
   }
   const assets: PackagedAsset[] = [];
   for (const id of [...ids].sort()) {
+    if (!Check(UuidSchema, id)) throw new ApiException("DOCUMENT_INVALID", "A packaged asset has an invalid UUID.");
     const metaBytes = files.get(`assets/${id}/asset.json`);
     if (!metaBytes) continue;
     const meta = parseJson(metaBytes.toString("utf8"), "asset") as {

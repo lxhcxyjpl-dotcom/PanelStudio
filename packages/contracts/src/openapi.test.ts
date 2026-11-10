@@ -31,6 +31,7 @@ const paths = [
   "POST /api/v1/projects/{projectId}/layout-candidates",
   "GET /api/v1/projects/{projectId}/candidates/{candidateId}",
   "POST /api/v1/projects/{projectId}/ai-layouts",
+  "GET /api/v1/projects/{projectId}/ai-history",
   "POST /api/v1/projects/{projectId}/previews",
   "POST /api/v1/projects/{projectId}/exports",
   "POST /api/v1/project-imports",

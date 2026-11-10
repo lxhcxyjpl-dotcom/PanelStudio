@@ -7,16 +7,9 @@ import {
   type LabelStyle,
   type LabelTypography,
 } from "@panelstudio/contracts";
-
-/**
- * Approximate em box for on-canvas checks.
- * Font files are not vendored, so phase 1 does not measure Noto outlines.
- * Ascent 0.8em covers capitals; descent 0.2em covers a typical descender.
- * Advance 0.7em is a Latin cap width used as the label's horizontal extent.
- */
-export const LABEL_EM_ASCENT = 0.8;
-export const LABEL_EM_DESCENT = 0.2;
-export const LABEL_EM_ADVANCE = 0.7;
+import { measureLabel, type LabelMeasureResult } from "@panelstudio/text-metrics";
+export { measureLabel, initializeLabelFonts } from "@panelstudio/text-metrics";
+export { labelDiagnostics } from "./label-validation.js";
 
 export const INHERITED_LABEL_OVERRIDES: LabelOverrides = {
   visible: null,
@@ -36,7 +29,8 @@ export type ResolvedLabel = {
   fontSizeUser: number;
   fontWeight: 400 | 700;
   color: string;
-  bounds: Rect;
+  bounds: Rect | null;
+  measurement: LabelMeasureResult;
 };
 
 export function fontFamilyForId(fontId: LabelTypography["fontId"]): string {
@@ -65,6 +59,7 @@ function typography(style: LabelStyle, overrides: LabelOverrides): LabelTypograp
 export function resolvePanelLabel(
   document: FigureDocumentV1,
   panelId: string,
+  proposedFrame?: Rect,
 ): ResolvedLabel | null {
   const panel = document.panels[panelId];
   if (!panel) return null;
@@ -80,23 +75,23 @@ export function resolvePanelLabel(
     format: style.format,
   });
   const face = typography(style, overrides);
+  const frame = proposedFrame ?? panel.frameMm;
   const fontSizeUser = fontSizePtToSvgUserUnits(face.fontSizePt);
   const placement = overrides.placement ?? style.placement;
   let x: number;
   let y: number;
   if (overrides.offsetMm) {
-    x = panel.frameMm.x + overrides.offsetMm.x;
-    y = panel.frameMm.y + overrides.offsetMm.y;
+    x = frame.x + overrides.offsetMm.x;
+    y = frame.y + overrides.offsetMm.y;
   } else if (placement === "outside-top-left") {
-    x = panel.frameMm.x;
-    y = panel.frameMm.y - style.gapMm;
+    x = frame.x;
+    y = frame.y - style.gapMm;
   } else {
-    x = panel.frameMm.x + style.gapMm;
-    y = panel.frameMm.y + style.gapMm + fontSizeUser;
+    x = frame.x + style.gapMm;
+    y = frame.y + style.gapMm + fontSizeUser;
   }
-  const ascent = fontSizeUser * LABEL_EM_ASCENT;
-  const descent = fontSizeUser * LABEL_EM_DESCENT;
-  const width = Math.max(1, [...text].length) * fontSizeUser * LABEL_EM_ADVANCE;
+  const measurement = measureLabel({ ...face, text });
+  const ink = measurement.status === "measured" ? measurement.inkBoundsMm : null;
   return {
     text,
     x,
@@ -105,11 +100,7 @@ export function resolvePanelLabel(
     fontSizeUser,
     fontWeight: face.fontWeight,
     color: face.color,
-    bounds: {
-      x,
-      y: y - ascent,
-      width,
-      height: ascent + descent,
-    },
+    bounds: ink ? { ...ink, x: x + ink.x, y: y + ink.y } : null,
+    measurement,
   };
 }

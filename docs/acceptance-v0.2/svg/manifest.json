@@ -1,0 +1,272 @@
+[
+  {
+    "name": "01-mixed",
+    "width": 180,
+    "height": 86,
+    "panels": [
+      {
+        "id": "e168d82e-b42a-4a9c-ab42-f0678bc00363",
+        "frame": {
+          "x": 12,
+          "y": 18,
+          "width": 34,
+          "height": 17
+        },
+        "text": "A",
+        "size": 9,
+        "font": "Noto Sans",
+        "weight": 700,
+        "x": 12,
+        "y": 17
+      },
+      {
+        "id": "43dc187d-87a9-4f85-a194-577e2a255ad6",
+        "frame": {
+          "x": 59,
+          "y": 25,
+          "width": 34,
+          "height": 17
+        },
+        "text": "B",
+        "size": 9,
+        "font": "Noto Sans",
+        "weight": 700,
+        "x": 59,
+        "y": 24
+      },
+      {
+        "id": "e4a1aa83-90a3-4d96-ab3c-c02ceb915d1b",
+        "frame": {
+          "x": 106,
+          "y": 32,
+          "width": 34,
+          "height": 22.666666666666668
+        },
+        "text": "C",
+        "size": 9,
+        "font": "Noto Sans",
+        "weight": 700,
+        "x": 106,
+        "y": 31
+      }
+    ],
+    "rasters": 2,
+    "opacity": null
+  },
+  {
+    "name": "02-cropped",
+    "width": 160,
+    "height": 75,
+    "panels": [
+      {
+        "id": "c9d4e158-3768-4b81-9066-410b295e1956",
+        "frame": {
+          "x": 12,
+          "y": 18,
+          "width": 34,
+          "height": 21.15555555555555
+        },
+        "text": "A",
+        "size": 10,
+        "font": "Noto Sans",
+        "weight": 400,
+        "x": 12,
+        "y": 17
+      },
+      {
+        "id": "de0deb30-4210-4e8f-8b2b-04be3f86ef30",
+        "frame": {
+          "x": 59,
+          "y": 25,
+          "width": 34,
+          "height": 17
+        },
+        "text": "B",
+        "size": 10,
+        "font": "Noto Sans",
+        "weight": 400,
+        "x": 59,
+        "y": 24
+      },
+      {
+        "id": "f6e216bf-445b-40f4-873a-38bc87df4c25",
+        "frame": {
+          "x": 106,
+          "y": 32,
+          "width": 34,
+          "height": 17
+        },
+        "text": "C",
+        "size": 10,
+        "font": "Noto Sans",
+        "weight": 400,
+        "x": 106,
+        "y": 31
+      }
+    ],
+    "rasters": 2,
+    "opacity": null
+  },
+  {
+    "name": "03-cjk",
+    "width": 175,
+    "height": 83,
+    "panels": [
+      {
+        "id": "55ea6c54-a510-4ef7-b439-87f09f7928ea",
+        "frame": {
+          "x": 12,
+          "y": 18,
+          "width": 34,
+          "height": 17
+        },
+        "text": "图甲",
+        "size": 11,
+        "font": "Noto Sans SC",
+        "weight": 700,
+        "x": 12,
+        "y": 17
+      },
+      {
+        "id": "8c27d7d6-92e1-479d-bc71-c23c8bf28799",
+        "frame": {
+          "x": 59,
+          "y": 25,
+          "width": 34,
+          "height": 43.714285714285715
+        },
+        "text": "(β)",
+        "size": 11,
+        "font": "Noto Sans SC",
+        "weight": 700,
+        "x": 59,
+        "y": 24
+      },
+      {
+        "id": "4c88db65-ff99-448b-bd1b-aab381ea2de2",
+        "frame": {
+          "x": 106,
+          "y": 32,
+          "width": 34,
+          "height": 22.666666666666668
+        },
+        "text": "III",
+        "size": 11,
+        "font": "Noto Sans SC",
+        "weight": 700,
+        "x": 106,
+        "y": 31
+      }
+    ],
+    "rasters": 2,
+    "opacity": null
+  },
+  {
+    "name": "04-alpha",
+    "width": 155,
+    "height": 85,
+    "panels": [
+      {
+        "id": "2d08c9cb-34ea-47c7-b8d1-a9208746633f",
+        "frame": {
+          "x": 12,
+          "y": 18,
+          "width": 34,
+          "height": 17
+        },
+        "text": "A",
+        "size": 8,
+        "font": "Noto Sans",
+        "weight": 400,
+        "x": 12,
+        "y": 17
+      },
+      {
+        "id": "b5c4b9c3-bbb4-4d8e-92b7-e634ad69111f",
+        "frame": {
+          "x": 59,
+          "y": 25,
+          "width": 34,
+          "height": 17
+        },
+        "text": "B",
+        "size": 8,
+        "font": "Noto Sans",
+        "weight": 400,
+        "x": 59,
+        "y": 24
+      },
+      {
+        "id": "48032c49-4928-4e62-97b8-9106a2919092",
+        "frame": {
+          "x": 106,
+          "y": 32,
+          "width": 34,
+          "height": 17
+        },
+        "text": "C",
+        "size": 8,
+        "font": "Noto Sans",
+        "weight": 400,
+        "x": 106,
+        "y": 31
+      }
+    ],
+    "rasters": 1,
+    "opacity": 62
+  },
+  {
+    "name": "05-repeated-vector",
+    "width": 172,
+    "height": 80,
+    "panels": [
+      {
+        "id": "4410dd49-ac77-454b-8bf8-f57f1dff0476",
+        "frame": {
+          "x": 12,
+          "y": 18,
+          "width": 34,
+          "height": 17
+        },
+        "text": "(A)",
+        "size": 12,
+        "font": "Noto Sans",
+        "weight": 700,
+        "x": 12,
+        "y": 17
+      },
+      {
+        "id": "b2f82f2e-78a7-4df9-8cba-01662cdccb41",
+        "frame": {
+          "x": 59,
+          "y": 25,
+          "width": 34,
+          "height": 17
+        },
+        "text": "(B)",
+        "size": 12,
+        "font": "Noto Sans",
+        "weight": 700,
+        "x": 59,
+        "y": 24
+      },
+      {
+        "id": "07a5836b-5078-4315-82b1-27b689559f50",
+        "frame": {
+          "x": 106,
+          "y": 32,
+          "width": 34,
+          "height": 43.714285714285715
+        },
+        "text": "(C)",
+        "size": 12,
+        "font": "Noto Sans",
+        "weight": 700,
+        "x": 106,
+        "y": 31
+      }
+    ],
+    "rasters": 1,
+    "opacity": null
+  }
+]

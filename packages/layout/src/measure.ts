@@ -1,12 +1,10 @@
 import {
   MM_PER_INCH,
   TOLERANCES,
-  fontSizePtToSvgUserUnits,
-  resolveLabelText,
   type FigureDocumentV1,
   type LayoutRequest,
 } from "@panelstudio/contracts";
-import { LABEL_EM_ADVANCE, LABEL_EM_ASCENT, LABEL_EM_DESCENT, labelIsVisible } from "@panelstudio/core";
+import { resolvePanelLabel, type ReadyAssetFacts } from "@panelstudio/core";
 
 export type Rect = { x: number; y: number; width: number; height: number };
 
@@ -57,42 +55,14 @@ export function insideMargins(rect: Rect, canvas: FigureDocumentV1["canvas"]): b
   );
 }
 
-/**
- * Label box for a proposed frame.
- * The em box matches the phase 1 label metrics: 0.8 ascent, 0.2 descent, 0.7 advance.
- */
+/** Ink on the proposed frame, in document coordinates. Strict layout validates unmeasurable labels. */
 export function labelBounds(document: FigureDocumentV1, panelId: string, frame: Rect): Rect | null {
-  const panel = document.panels[panelId];
-  if (!panel) return null;
-  const style = document.labelStyle;
-  const overrides = panel.labelOverrides;
-  if (!labelIsVisible(style, overrides)) return null;
-  const index = document.panelOrder.indexOf(panelId);
-  if (index < 0) return null;
-  const text = resolveLabelText({
-    index,
-    textOverride: overrides.text,
-    sequence: style.sequence,
-    format: style.format,
-  });
-  const fontSizePt = overrides.typography?.fontSizePt ?? style.fontSizePt;
-  const fontSizeUser = fontSizePtToSvgUserUnits(fontSizePt);
-  const placement = overrides.placement ?? style.placement;
-  let x = frame.x;
-  let y = frame.y;
-  if (overrides.offsetMm) {
-    x = frame.x + overrides.offsetMm.x;
-    y = frame.y + overrides.offsetMm.y;
-  } else if (placement === "outside-top-left") {
-    y = frame.y - style.gapMm;
-  } else {
-    x = frame.x + style.gapMm;
-    y = frame.y + style.gapMm + fontSizeUser;
-  }
-  const ascent = fontSizeUser * LABEL_EM_ASCENT;
-  const descent = fontSizeUser * LABEL_EM_DESCENT;
-  const width = Math.max(1, [...text].length) * fontSizeUser * LABEL_EM_ADVANCE;
-  return { x, y: y - ascent, width, height: ascent + descent };
+  return resolvePanelLabel(document, panelId, frame)?.bounds ?? null;
+}
+
+export function occupiedRects(document: FigureDocumentV1, panelId: string, frame: Rect): Rect[] {
+  const ink = labelBounds(document, panelId, frame);
+  return ink ? [frame, ink] : [frame];
 }
 
 /** Space the outside label needs above this panel's current frame. Translation-invariant. */
@@ -135,6 +105,21 @@ export function unitContentBox(document: FigureDocumentV1, unit: Unit): Rect | n
     return frame ? { ...frame } : null;
   }
   return unionRect(framesOf(document, unit.panelIds));
+}
+
+/** Ink and content relative to the common content top-left; rigid-group members retain their spacing. */
+export function unitGeometry(document: FigureDocumentV1, unit: Unit, size?: {width: number; height: number}) {
+  const content = unitContentBox(document, unit)!;
+  const ids = unit.kind === "group" ? unit.panelIds : [unit.panelId];
+  const frames = ids.map((panelId) => {
+    const f = document.panels[panelId]!.frameMm;
+    return { panelId, frameMm: { x: f.x - content.x, y: f.y - content.y,
+      width: size?.width ?? f.width, height: size?.height ?? f.height } };
+  });
+  // Zero dimensions are used only for measuring the limiting width during a capacity search.
+  const occupied = unionRect(frames.flatMap((item) => occupiedRects(document, item.panelId, item.frameMm))) ??
+    { x: 0, y: 0, width: 0, height: 0 };
+  return { frames, occupied };
 }
 
 export function croppedAspect(
@@ -206,4 +191,15 @@ export function splitUnits(units: Unit[], pattern: number[]): Unit[][] {
 
 export function patternKey(rows: Unit[][]): string {
   return rows.map((row) => String(row.length)).join("-");
+}
+
+export function assetFacts(assets: Readonly<Record<string, LayoutAssetFacts>>, assetId: string): ReadyAssetFacts | null {
+  const facts = assets[assetId];
+  if (!facts) return null;
+  return {
+    id: assetId,
+    originalFilename: "asset",
+    viewport: facts.viewport,
+    rasterPixelSize: facts.rasterPixelSize,
+  };
 }

@@ -27,6 +27,8 @@ describe("bundled fonts", () => {
     expect(Buffer.from(entries["OFL-NotoSansSC.txt"] ?? []).toString("utf8")).toContain("Reserved Font Name 'Source'");
     expect(Buffer.from(entries["NotoSans-Bold.ttf"] ?? []).subarray(0, 4).toString("latin1")).toBe("\x00\x01\x00\x00");
     expect(entries["NotoSansSC-Regular.ttf"]?.byteLength).toBeGreaterThan(1000);
+    expect(Buffer.from(entries["Illustrator/restore-label-fonts.jsx"] ?? []).toString("utf8")).toContain('#include "label-faces.jsxinc"');
+    expect(entries["Illustrator/label-faces.jsxinc"]?.byteLength).toBeGreaterThan(0);
     const license = readFileSync(path.join(root, "fonts/OFL-NotoSans.txt"), "utf8");
     expect(license).toContain("SIL OPEN FONT LICENSE");
   });

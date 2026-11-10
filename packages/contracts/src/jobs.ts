@@ -2,7 +2,7 @@ import Type, { type Static, type TSchema } from "typebox";
 import { CandidateSchema } from "./candidate.js";
 import { JOB_EVENT_NAMES } from "./constants.js";
 import { DiagnosticSchema } from "./diagnostics.js";
-import { ErrorCodeSchema } from "./errors.js";
+import { ApiErrorDetailsSchema, ErrorCodeSchema } from "./errors.js";
 import {
   DateTimeSchema,
   ExportFormatSchema,
@@ -10,7 +10,7 @@ import {
   RevisionSchema,
   UuidSchema,
 } from "./primitives.js";
-import { StructuredOutputSchema } from "./ai.js";
+import { AIContextSchema, AIEditScopeSchema, StructuredOutputSchema } from "./ai.js";
 import { nullable, object } from "./schema.js";
 
 export const ProgressSchema = object({
@@ -21,6 +21,7 @@ export const ProgressSchema = object({
 export const JobErrorSchema = object({
   code: ErrorCodeSchema,
   message: NonEmptyStringSchema,
+  details: Type.Optional(ApiErrorDetailsSchema),
 });
 
 export const AssetImportResultSchema = object({ assetId: UuidSchema });
@@ -162,3 +163,31 @@ export const JobEventDataSchema = object(
 export type Job = Static<typeof JobSchema>;
 export type JobResult = Static<typeof JobResultSchema>;
 export type AILayoutJobResult = Static<typeof AILayoutJobResultSchema>;
+
+export const AIHistoryTurnSchema = object({
+  jobId: UuidSchema,
+  projectId: UuidSchema,
+  baseRevision: RevisionSchema,
+  context: AIContextSchema,
+  scope: AIEditScopeSchema,
+  resolvedSelectedPanelIds: Type.Array(UuidSchema, { uniqueItems: true }),
+  prompt: NonEmptyStringSchema,
+  replyLocale: NonEmptyStringSchema,
+  status: JobEventDataSchema.properties.status,
+  phase: NonEmptyStringSchema,
+  createdAt: DateTimeSchema,
+  finishedAt: nullable(DateTimeSchema),
+  result: nullable(Type.Union([
+    object({
+      kind: Type.Literal("candidates"),
+      candidateIds: Type.Array(UuidSchema),
+      summary: Type.Optional(NonEmptyStringSchema),
+    }),
+    object({ kind: Type.Literal("clarification"), question: NonEmptyStringSchema,
+      options: Type.Optional(Type.Array(NonEmptyStringSchema)) }),
+    object({ kind: Type.Literal("unsupported"), reason: NonEmptyStringSchema }),
+  ])),
+  error: nullable(JobErrorSchema),
+  isStale: Type.Boolean(),
+});
+export type AIHistoryTurn = Static<typeof AIHistoryTurnSchema>;

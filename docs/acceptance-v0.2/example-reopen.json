@@ -1,0 +1,20 @@
+{
+  "version": "30.7.0",
+  "build": "114R",
+  "labels": "ABCDEF",
+  "separatePanelGroups": 6,
+  "rasterObjects": 1,
+  "paths": 52,
+  "widthMm": 179.999994913737,
+  "heightMm": 89.7075196160214,
+  "fontNames": [
+    "NotoSans-Bold",
+    "NotoSans-Bold",
+    "NotoSans-Bold",
+    "NotoSans-Bold",
+    "NotoSans-Bold",
+    "NotoSans-Bold"
+  ],
+  "sourceSvgSha256": "f172741f6640be4e97caf06eab94c8e6c738e6c7f30e1392df8febe022ae6172",
+  "nativeAiSha256": "d125cc0caa3e27133091455319a0e043513b7de089a22636734a027b724aa118"
+}

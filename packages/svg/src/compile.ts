@@ -89,7 +89,7 @@ function renderVector(panel: Extract<ExportPanel, { kind: "vector" }>): string {
 }
 
 function renderLabel(panelId: string, label: ExportLabel): string {
-  return `<text id="panel-${panelId}-label" x="${formatSvgNumber(label.x)}" y="${formatSvgNumber(label.y)}" font-family="${escapeAttr(label.fontFamily)}" font-size="${formatSvgNumber(label.fontSizeUser)}" font-weight="${label.fontWeight}" fill="${escapeAttr(label.color)}">${escapeText(label.text)}</text>`;
+  return `<text id="panel-${panelId}-label" xml:space="preserve" x="${formatSvgNumber(label.x)}" y="${formatSvgNumber(label.y)}" font-family="${escapeAttr(label.fontFamily)}" font-size="${formatSvgNumber(label.fontSizeUser)}" font-weight="${label.fontWeight}" fill="${escapeAttr(label.color)}">${escapeText(label.text)}</text>`;
 }
 
 function fontFamilies(svg: string, panels: ExportPanel[]): string[] {

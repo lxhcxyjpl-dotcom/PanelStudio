@@ -19,6 +19,18 @@ export function panelIdsOf(selection: Selection, document: FigureDocumentV1): st
   return [];
 }
 
+/** Preserve the user's unit order while expanding rigid groups exactly once. */
+export function completePanelIds(document: FigureDocumentV1, ids: string[]): string[] {
+  return [...new Set(ids.flatMap((id) => document.panels[id] ? groupForPanel(document, id)?.group.panelIds ?? [id] : []))];
+}
+
+export function orderedUnits(document: FigureDocumentV1, ids: string[]): string[] {
+  return [...new Set(ids.filter((id) => document.panels[id]).map((id) => {
+    const group = groupForPanel(document, id);
+    return group ? `group:${group.id}` : `panel:${id}`;
+  }))];
+}
+
 export function geometryLocked(document: FigureDocumentV1, panelId: string): "lock" | "group" | null {
   const panel = document.panels[panelId];
   if (!panel) return "lock";
@@ -65,3 +77,15 @@ export function mergedOverrides(current: LabelOverrides, patch: Partial<LabelOve
 }
 
 export type { Selection };
+
+export function clickedSelection(doc: FigureDocumentV1, start: Selection, id: string, extend: boolean, dragging = false): Selection {
+  const group = groupForPanel(doc, id);
+  const selected = completePanelIds(doc, panelIdsOf(start, doc));
+  const incoming = group?.group.panelIds ?? [id];
+  if (dragging && selected.includes(id) && start.kind !== "label") return start;
+  if (extend) {
+    const ids = selected.includes(id) && !dragging ? selected.filter((item) => !incoming.includes(item)) : [...new Set([...selected, ...incoming])];
+    return ids.length ? { kind: "panels", ids } : { kind: "none" };
+  }
+  return group ? { kind: "group", groupId: group.id } : { kind: "panels", ids: [id] };
+}

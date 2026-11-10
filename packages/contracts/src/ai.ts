@@ -67,8 +67,20 @@ export const SecretDeleteResponseSchema = object({
   hasSecret: Type.Literal(false),
 });
 
+export const AIContextSchema = Type.Union([
+  object({ kind: Type.Literal("revision") }),
+  object({ kind: Type.Literal("candidate"), candidateId: UuidSchema }),
+  object({ kind: Type.Literal("clarification"), jobId: UuidSchema }),
+], { description: "Defaults to revision. Candidate and clarification IDs must belong to this project and its original baseRevision." });
+
+export const AIEditScopeSchema = Type.Union([Type.Literal("document"), Type.Literal("selection")], {
+  description: "Defaults to document for a new draft. A continuation inherits its previous scope and expanded selection unless explicitly changed. Clarifications retain both.",
+});
+
 export const AILayoutRequestSchema = object({
   baseRevision: RevisionSchema,
+  context: Type.Optional(AIContextSchema),
+  scope: Type.Optional(AIEditScopeSchema),
   prompt: Type.String({
     minLength: 1,
     maxLength: RESOURCE_LIMITS.maxAiPromptCharacters,
@@ -170,7 +182,7 @@ export const AIScaleToWidthActionSchema = object(
   },
   {
     description:
-      "Uniform scale. The v0.1 AI action keeps the top-left corner. It has no anchor field.",
+      "Uniform scale with the top-left corner fixed.",
   },
 );
 
@@ -246,6 +258,8 @@ export type AlignEdge = Static<typeof AlignEdgeSchema>;
 export type AIProviderConfig = Static<typeof AIProviderConfigSchema>;
 export type AIProviderSettings = Static<typeof AIProviderSettingsSchema>;
 export type AILayoutRequest = Static<typeof AILayoutRequestSchema>;
+export type AIContext = Static<typeof AIContextSchema>;
+export type AIEditScope = Static<typeof AIEditScopeSchema>;
 export type AIAction = Static<typeof AIActionSchema>;
 export type AIIntent = Static<typeof AIIntentSchema>;
 export type TargetRef = Static<typeof TargetRefSchema>;

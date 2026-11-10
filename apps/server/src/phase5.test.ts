@@ -77,11 +77,16 @@ describe("phase 5 AI", () => {
     });
     const { app, projectId, dataDir } = await openProject(directories, true);
     await configure(app, mock.port);
-    const secretRow = new Database(path.join(dataDir, "panelstudio.sqlite"), { readonly: true })
-      .prepare(`SELECT encryptedSecret FROM provider_settings`)
-      .get() as { encryptedSecret: string };
-    expect(secretRow.encryptedSecret).not.toContain(SECRET);
-    expect(statSync(path.join(dataDir, "master.key")).mode & 0o777).toBe(0o600);
+    const connection = new Database(path.join(dataDir, "panelstudio.sqlite"), { readonly: true });
+    try {
+      const row = connection.prepare("SELECT encryptedSecret FROM provider_settings").get() as { encryptedSecret: string };
+      expect(row.encryptedSecret).toMatch(/^v1\./);
+      expect(row.encryptedSecret).not.toContain(SECRET);
+    } finally { connection.close(); }
+    const keyFile = statSync(path.join(dataDir, "master.key"));
+    expect(keyFile.size).toBe(32);
+    // Windows exposes ACLs separately from the POSIX permissions returned by stat().
+    if (process.platform !== "win32") expect(keyFile.mode & 0o777).toBe(0o600);
     const settings = await app.inject({ method: "GET", url: "/api/v1/settings/ai-provider" });
     expect(JSON.stringify(settings.json())).not.toContain(SECRET);
     expect(settings.json().hasSecret).toBe(true);

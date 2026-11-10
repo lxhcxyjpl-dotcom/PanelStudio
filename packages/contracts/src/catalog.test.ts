@@ -76,7 +76,10 @@ describe("catalogs", () => {
     expect(ERROR_CODES.PROVIDER_CONFIG_CHANGED.httpStatus).toBeNull();
     expect(ERROR_CODES.MODEL_OUTPUT_INVALID.httpStatus).toBeNull();
     expect(ERROR_CODES.SERVER_RESTARTED.httpStatus).toBeNull();
-    expect(Object.keys(ERROR_CODES)).toHaveLength(21);
+    for (const code of ["AI_CONTEXT_INVALID", "AI_SCOPE_VIOLATION", "AI_CHAIN_LIMIT", "TEXT_METRICS_UNAVAILABLE"] as const) {
+      expect(ERROR_CODES[code].httpStatus).toBe(422);
+    }
+    expect(Object.keys(ERROR_CODES)).toHaveLength(25);
   });
 
   it("records the SVG preserve and reject lists", () => {

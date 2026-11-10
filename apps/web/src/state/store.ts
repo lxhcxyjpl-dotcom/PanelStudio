@@ -8,6 +8,16 @@ const prefs = readPrefs();
 
 export const useWorkspace = create<WorkspaceState>(() => ({
   ...prefs,
+  compareMode: "editing",
+  candidateRoot: null,
+  aiScope: "document",
+  scopeChanged: false,
+  frozenScope: null,
+  awaitingAnswer: null,
+  aiHistory: [],
+  historyCursor: null,
+  aiPrompt: "",
+  marquee: null,
   mode: workspaceMode(typeof window === "undefined" ? 1440 : window.innerWidth),
   leftOpen: false,
   rightOpen: false,

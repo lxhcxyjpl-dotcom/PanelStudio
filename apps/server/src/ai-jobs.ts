@@ -5,15 +5,14 @@ import {
   ENGINE_VERSIONS,
   RESOURCE_LIMITS,
   SSE_HEARTBEAT_INTERVAL_MS,
-  isAIIntent,
   isAILayoutRequest,
   isAIProviderConfig,
   isSecretWriteRequest,
-  type AILayoutRequest,
+  type AIIntent,
+  type AILayoutJobResult,
   type AIProviderConfig,
   type AIProviderSettings,
   type Candidate,
-  type ErrorCode,
   type FigureDocumentV1,
   type Job,
 } from "@panelstudio/contracts";
@@ -30,9 +29,10 @@ import {
   transportMessage,
 } from "@panelstudio/ai";
 import { Check } from "typebox/value";
+import { validateCandidateResult } from "@panelstudio/layout";
+import { currentEngines, frozenInput, materializeParent, prepareTurn, requestOf } from "./ai-context.js";
 import {
   DocumentCommandError,
-  applyCommands,
   canonicalJson,
   hashFigureDocument,
   type AssetLookup,
@@ -64,7 +64,9 @@ import { ApiException } from "./http.js";
 import { renderDocumentPng, type AppContext } from "./pipeline.js";
 import { decryptSecret, encryptSecret, masterKey } from "./secret.js";
 
-const tails = new WeakMap<AppContext["db"], Promise<void>>();
+type Schedule = { pending: Set<Promise<void>>; requested: boolean; closing: boolean };
+const schedules = new WeakMap<AppContext["db"], Schedule>();
+const MAX_ACTIVE_PROVIDER_CALLS = 2;
 const inflight = new Map<string, AbortController>();
 
 type Response = { status: number; body: unknown };
@@ -182,13 +184,8 @@ export function enqueueAiLayout(
     }
     const revision = getRevision(ctx.db, projectId, body.baseRevision);
     if (!revision) throw new ApiException("NOT_FOUND", "That revision was not found.");
-    const missing = body.selectedPanelIds.filter((id) => !revision.document.panels[id]);
-    if (missing.length > 0) {
-      throw new ApiException("REQUEST_INVALID", "The selection names a panel that is not in this revision.", {
-        panelIds: missing,
-      });
-    }
     const provider = readProvider(ctx.db);
+    const turn = prepareTurn(ctx, projectId, body, revision.document, revision.documentHash, provider?.configRevision ?? 0, assetLookup(ctx, projectId));
     const jobId = randomUUID();
     const now = ctx.now();
     insertJob(ctx.db, {
@@ -202,7 +199,7 @@ export function enqueueAiLayout(
       finishedAt: null,
       result: null,
       error: null,
-      inputJson: { request: body, configRevision: provider?.configRevision ?? 0 },
+      inputJson: turn,
     });
     appendJobEvent(ctx.db, {
       jobId,
@@ -225,11 +222,9 @@ export function cancelAiJob(ctx: AppContext, jobId: string, key: string, request
     if (replay) return replay;
     const job = getJobDetail(ctx.db, jobId);
     if (!job) throw new ApiException("NOT_FOUND", "The job was not found.");
-    if (job.status === "queued") {
+    if (job.status === "queued" || job.status === "running") {
       markCancelRequested(ctx.db, jobId);
       finish(ctx, jobId, "cancelled", "cancelled", null, null);
-    } else if (job.status === "running") {
-      markCancelRequested(ctx.db, jobId);
     }
     const current = requireJob(ctx, jobId);
     remember(ctx, `job-cancel:${jobId}`, key, requestHash, 202, current);
@@ -259,11 +254,39 @@ export function abortProjectJobs(ctx: AppContext, projectId: string): void {
 
 export function scheduleAiJobs(ctx: AppContext): void {
   if (ctx.deferAiJobs) return;
-  let tail = tails.get(ctx.db) ?? Promise.resolve();
-  for (const job of listQueuedAiJobs(ctx.db)) {
-    tail = tail.then(() => runAiJob(ctx, job.id)).catch(() => undefined);
+  const state = schedules.get(ctx.db) ?? { pending: new Set<Promise<void>>(), requested: false, closing: false };
+  schedules.set(ctx.db, state);
+  if (state.closing || state.requested || state.pending.size >= MAX_ACTIVE_PROVIDER_CALLS) return;
+  state.requested = true;
+  queueMicrotask(() => {
+    state.requested = false;
+    if (state.closing) return;
+    const slots = MAX_ACTIVE_PROVIDER_CALLS - state.pending.size;
+    for (const job of listQueuedAiJobs(ctx.db).slice(0, slots)) {
+      const running = runAiJob(ctx, job.id).finally(() => {
+        state.pending.delete(running);
+        scheduleAiJobs(ctx);
+      });
+      state.pending.add(running);
+      void running.catch(() => undefined);
+    }
+  });
+}
+
+/** Close connections only after outstanding provider completions have observed shutdown. */
+export async function closeAiScheduler(ctx: AppContext): Promise<void> {
+  const state = schedules.get(ctx.db);
+  if (!state) return;
+  state.closing = true;
+  for (const job of listActiveAiJobs(ctx.db)) {
+    if (job.status !== "running") continue;
+    finish(ctx, job.id, "failed", "failed", null, {
+      code: "SERVER_RESTARTED", message: "The server stopped before this request finished.",
+    });
+    inflight.get(job.id)?.abort();
   }
-  tails.set(ctx.db, tail);
+  await Promise.allSettled(state.pending);
+  schedules.delete(ctx.db);
 }
 
 export async function drainAiJobs(ctx: AppContext): Promise<void> {
@@ -361,169 +384,115 @@ async function runProviderTest(ctx: AppContext, job: JobDetail, signal: AbortSig
 }
 
 async function runLayout(ctx: AppContext, job: JobDetail, signal: AbortSignal): Promise<void> {
-  const request = layoutRequestOf(job);
+  const input = frozenInput(job);
   const projectId = job.projectId;
-  if (!request || !projectId) {
-    finish(ctx, job.id, "failed", "failed", null, { code: "REQUEST_INVALID", message: "The AI request is invalid." });
-    return;
-  }
-  const project = getProject(ctx.db, projectId);
-  if (!project) {
-    finish(ctx, job.id, "failed", "failed", null, { code: "NOT_FOUND", message: "The project was not found." });
-    return;
-  }
-  if (project.deletedAt) {
-    finish(ctx, job.id, "cancelled", "cancelled", null, null);
-    return;
-  }
+  if (!input || !projectId) throw new ApiException("AI_CONTEXT_INVALID", "The frozen draft context cannot be restored.");
+  const { request } = input;
   if (isDirectUndo(request.prompt)) {
-    finish(ctx, job.id, "succeeded", "ready", {
-      kind: "unsupported",
-      reason: "Undo uses the history stack and was not sent to the model.",
-    }, null);
+    finish(ctx, job.id, "succeeded", "ready", { kind: "unsupported", reason: "Undo uses the history stack." }, null);
     return;
   }
   const ready = openProvider(ctx, job);
   if (!ready) return;
-  const revision = getRevision(ctx.db, projectId, request.baseRevision);
-  if (!revision) {
-    finish(ctx, job.id, "failed", "failed", null, { code: "NOT_FOUND", message: "That revision was not found." });
-    return;
+  const root = getRevision(ctx.db, projectId, request.baseRevision);
+  if (!root || root.documentHash !== input.rootHash || !currentEngines(input)) {
+    throw new ApiException("CANDIDATE_STALE", "The root revision or engine version has changed.");
   }
-  const scene = buildScene(revision.document, {
-    baseRevision: request.baseRevision,
-    configRevision: ready.provider.configRevision,
-    selectedPanelIds: request.selectedPanelIds,
-  });
-  const preview = request.includePreviewImage && ready.config.capabilities.imageInput
-    ? tryPng(ctx, projectId, revision.document, request.baseRevision)
-    : null;
+  const assets = assetLookup(ctx, projectId);
+  const work = materializeParent(ctx, projectId, request.baseRevision, root.document, input.parentCandidateId, assets);
+  if (hashFigureDocument(work.document) !== input.sourceHash) throw new ApiException("CANDIDATE_STALE", "The draft input hash has changed.");
+  const scope = { scope: request.scope ?? "document", selectedPanelIds: request.selectedPanelIds };
+  const sceneInput = { ...scope, baseRevision: request.baseRevision,
+    configRevision: input.configRevision, previousTurns: input.previousTurns };
+  const scene = buildScene(work.document, sceneInput);
+  const canRender = ready.config.capabilities.imageInput;
+  const inputPng = canRender && (request.includePreviewImage || request.visualReview)
+    ? await tryPng(ctx, projectId, work.document, request.baseRevision) : null;
+  if (!stillCurrent(ctx, job.id, input.configRevision)) return;
+  const providerInput = { config: ready.config, secret: ready.secret, replyLocale: request.replyLocale,
+    prompt: request.prompt, scene, fetchImpl: ctx.aiFetch, signal };
   setPhase(ctx, job.id, "requesting-intent");
-  const resolved = await resolveModelIntent({
-    config: ready.config,
-    secret: ready.secret,
-    prompt: request.prompt,
-    scene,
-    replyLocale: request.replyLocale,
-    previewPng: preview,
-    fetchImpl: ctx.aiFetch,
-    signal,
+  const resolved = await resolveModelIntent({ ...providerInput, previewPng: request.includePreviewImage ? inputPng : null });
+  if (!stillCurrent(ctx, job.id, input.configRevision)) return;
+  if (!resolved.ok) throw new AiCompileError("MODEL_OUTPUT_INVALID", resolved.message);
+  const publish = (makeResult: () => AILayoutJobResult) => immediate(ctx.db, () => {
+    if (!stillCurrent(ctx, job.id, input.configRevision)) return;
+    finish(ctx, job.id, "succeeded", "ready", makeResult(), null);
   });
-  if (!stillCurrent(ctx, job.id, ready.provider.configRevision)) return;
-  if (!resolved.ok) {
-    finish(ctx, job.id, "failed", "failed", null, { code: "MODEL_OUTPUT_INVALID", message: resolved.message });
-    return;
-  }
-  if (!isAIIntent(resolved.intent)) {
-    finish(ctx, job.id, "failed", "failed", null, { code: "MODEL_OUTPUT_INVALID", message: "The model output is not a valid intent." });
-    return;
-  }
-  if (resolved.intent.kind === "clarification") {
-    finish(ctx, job.id, "succeeded", "ready", {
-      kind: "clarification",
-      question: resolved.intent.question,
-      ...(resolved.intent.options ? { options: resolved.intent.options } : {}),
-    }, null);
-    return;
-  }
-  if (resolved.intent.kind === "unsupported") {
-    finish(ctx, job.id, "succeeded", "ready", { kind: "unsupported", reason: resolved.intent.reason }, null);
+  if (resolved.intent.kind !== "proposal") {
+    const result = replyResult(resolved.intent);
+    publish(() => result);
     return;
   }
   setPhase(ctx, job.id, "compiling");
-  let compiled = compileProposal(revision.document, resolved.intent, assetLookup(ctx, projectId));
-  let intent = resolved.intent;
-  const calls = resolved.calls;
-  if (request.visualReview && ready.config.capabilities.imageInput && calls < RESOURCE_LIMITS.aiModelCallBudget) {
-    const reviewPng = tryPng(ctx, projectId, compiled.previewDocument, request.baseRevision);
-    if (reviewPng && stillCurrent(ctx, job.id, ready.provider.configRevision)) {
+  const compile = (intent: Extract<AIIntent, { kind: "proposal" }>) => {
+    const delta = compileProposal(work.document, intent, assets, scope);
+    const commands = [...(work.candidate?.commands ?? []), ...delta.commands];
+    if (commands.length > RESOURCE_LIMITS.maxCommandsPerTransaction) {
+      throw new AiCompileError("AI_CHAIN_LIMIT", "The cumulative draft exceeds 64 commands.", { reason: "command-limit" });
+    }
+    const validationMode = work.candidate?.validationMode === "layout" ? "layout" : delta.validationMode;
+    const previewDocument = validateCandidateResult(root.document, commands, assets, validationMode);
+    if (hashFigureDocument(previewDocument) !== hashFigureDocument(delta.previewDocument)) {
+      throw new AiCompileError("DOCUMENT_INVALID", "Cumulative commands do not reproduce this round's draft.");
+    }
+    return { ...delta, commands, previewDocument, validationMode };
+  };
+  let compiled = compile(resolved.intent);
+  let reviewCompleted = false;
+  if (request.visualReview && inputPng && resolved.calls < RESOURCE_LIMITS.aiModelCallBudget) {
+    const reviewPng = await tryPng(ctx, projectId, compiled.previewDocument, request.baseRevision);
+    if (!stillCurrent(ctx, job.id, input.configRevision)) return;
+    if (reviewPng) {
       setPhase(ctx, job.id, "reviewing");
-      const reviewed = await reviewModelIntent({
-        config: ready.config,
-        secret: ready.secret,
-        scene,
-        replyLocale: request.replyLocale,
-        proposalJson: canonicalJson(intent),
-        previewPng: reviewPng,
-        fetchImpl: ctx.aiFetch,
-        signal,
-      });
-      if (!stillCurrent(ctx, job.id, ready.provider.configRevision)) return;
-      if (!reviewed.ok) {
-        compiled = {
-          ...compiled,
-          diagnostics: [
-            ...compiled.diagnostics,
-            { code: "AI_REVIEW_IGNORED", severity: "info", messageKey: "ai.reviewIgnored", params: {} },
-          ],
-        };
-      } else if (reviewed.intent.kind === "clarification") {
-        finish(ctx, job.id, "succeeded", "ready", {
-          kind: "clarification",
-          question: reviewed.intent.question,
-          ...(reviewed.intent.options ? { options: reviewed.intent.options } : {}),
-        }, null);
-        return;
-      } else if (reviewed.intent.kind === "unsupported") {
-        finish(ctx, job.id, "succeeded", "ready", { kind: "unsupported", reason: reviewed.intent.reason }, null);
-        return;
-      } else {
-        intent = reviewed.intent;
-        compiled = compileProposal(revision.document, intent, assetLookup(ctx, projectId));
+      try {
+        const reviewed = await reviewModelIntent({ ...providerInput, proposalJson: canonicalJson(resolved.intent),
+          candidateScene: buildScene(compiled.previewDocument, sceneInput), previewPng: reviewPng, inputPng });
+        if (!stillCurrent(ctx, job.id, input.configRevision)) return;
+        if (reviewed.ok && reviewed.intent.kind !== "proposal") {
+          const result = replyResult(reviewed.intent);
+          publish(() => result);
+          return;
+        }
+        if (reviewed.ok && reviewed.intent.kind === "proposal") {
+          const adjusted = compile(reviewed.intent);
+          // A changed picture has not been seen by the reviewer.
+          reviewCompleted = hashFigureDocument(adjusted.previewDocument) === hashFigureDocument(compiled.previewDocument);
+          compiled = adjusted;
+        }
+      } catch (error) {
+        if (!stillCurrent(ctx, job.id, input.configRevision)) return;
+        if (signal.aborted && isAbort(error) && !isTimeout(error)) throw error;
+        // A failed optional review preserves the last fully validated draft.
       }
     }
   }
-  if (!stillCurrent(ctx, job.id, ready.provider.configRevision)) return;
-  const candidate = storeCandidate(ctx, projectId, request.baseRevision, compiled);
-  finish(ctx, job.id, "succeeded", "ready", { kind: "candidates", candidates: [candidate] }, null);
+  if (request.visualReview) {
+    compiled.diagnostics.push(reviewCompleted
+      ? { code: "AI_REVIEW_COMPLETED", severity: "info", messageKey: "ai.reviewCompleted", params: {} }
+      : { code: "AI_REVIEW_INCOMPLETE", severity: "warning", messageKey: "ai.reviewIncomplete", params: {} });
+  }
+  publish(() => ({ kind: "candidates", candidates: [storeCandidate(ctx, projectId, request.baseRevision, input.parentCandidateId, job.id, compiled)] }));
+}
+
+function replyResult(intent: Exclude<AIIntent, { kind: "proposal" }>): AILayoutJobResult {
+  return intent.kind === "clarification"
+    ? { kind: "clarification", question: intent.question, ...(intent.options ? { options: intent.options } : {}) }
+    : { kind: "unsupported", reason: intent.reason };
 }
 
 function storeCandidate(
-  ctx: AppContext,
-  projectId: string,
-  baseRevision: number,
-  compiled: ReturnType<typeof compileProposal>,
+  ctx: AppContext, projectId: string, baseRevision: number, parentCandidateId: string | null,
+  sourceJobId: string, compiled: ReturnType<typeof compileProposal>,
 ): Candidate {
-  const id = deterministicUuid({
-    projectId,
-    baseRevision,
-    origin: "ai",
-    summary: compiled.summary,
-    commands: compiled.commands,
-  });
-  const now = ctx.now();
-  insertCandidate(ctx.db, {
-    id,
-    projectId,
-    baseRevision,
-    origin: "ai",
-    validationMode: compiled.validationMode,
-    commands: compiled.commands,
-    resultDocumentHash: hashFigureDocument(compiled.previewDocument),
-    summary: compiled.summary,
-    diagnostics: compiled.diagnostics,
-    score: compiled.score,
-    engineVersion: ENGINE_VERSIONS.layout,
-    fontRegistryVersion: ENGINE_VERSIONS.fontRegistry,
-    createdAt: now,
-  });
-  const candidate: Candidate = {
-    id,
-    projectId,
-    baseRevision,
-    origin: "ai",
-    validationMode: compiled.validationMode,
-    summary: compiled.summary,
-    commands: compiled.commands,
-    previewDocument: compiled.previewDocument,
-    resultDocumentHash: hashFigureDocument(compiled.previewDocument),
-    diagnostics: compiled.diagnostics,
-    engineVersion: ENGINE_VERSIONS.layout,
-    fontRegistryVersion: ENGINE_VERSIONS.fontRegistry,
-  };
-  if (!Check(CandidateSchema, candidate)) {
-    throw new AiCompileError("DOCUMENT_INVALID", "The candidate could not be stored.");
-  }
+  const version = { engineVersion: ENGINE_VERSIONS.layout, fontRegistryVersion: ENGINE_VERSIONS.fontRegistry };
+  const id = deterministicUuid({ projectId, baseRevision, parentCandidateId, sourceJobId, ...version, commands: compiled.commands });
+  const record = { id, projectId, baseRevision, parentCandidateId, sourceJobId, ...version, origin: "ai" as const,
+    validationMode: compiled.validationMode, summary: compiled.summary, commands: compiled.commands,
+    diagnostics: compiled.diagnostics, resultDocumentHash: hashFigureDocument(compiled.previewDocument) };
+  const candidate: Candidate = { ...record, previewDocument: compiled.previewDocument };
+  if (!Check(CandidateSchema, candidate)) throw new AiCompileError("DOCUMENT_INVALID", "The candidate could not be stored.");
+  insertCandidate(ctx.db, { ...record, score: compiled.score, createdAt: ctx.now() });
   return candidate;
 }
 
@@ -537,7 +506,7 @@ function claim(ctx: AppContext, jobId: string): JobDetail | null {
     }
     const provider = readProvider(ctx.db);
     const frozen = configRevisionOf(job);
-    const direct = job.kind === "ai_layout" && isDirectUndo(layoutRequestOf(job)?.prompt ?? "");
+    const direct = job.kind === "ai_layout" && isDirectUndo(requestOf(job)?.prompt ?? "");
     if (!direct && (!provider || !provider.encryptedSecret)) {
       finish(ctx, jobId, "failed", "failed", null, {
         code: "PROVIDER_NOT_CONFIGURED",
@@ -626,6 +595,11 @@ function stillCurrent(ctx: AppContext, jobId: string, seenRevision: number): boo
     });
     return false;
   }
+  const input = frozenInput(job);
+  if (input && !currentEngines(input)) {
+    finish(ctx, jobId, "failed", "failed", null, { code: "CANDIDATE_STALE", message: "The layout or font version changed." });
+    return false;
+  }
   return true;
 }
 
@@ -643,30 +617,33 @@ function stopStaleAiJobs(ctx: AppContext, revision: number): void {
 }
 
 function finish(
-  ctx: AppContext,
-  jobId: string,
-  status: "succeeded" | "failed" | "cancelled",
-  phase: string,
-  result: Job["result"],
-  error: { code: ErrorCode; message: string } | null,
+  ctx: AppContext, jobId: string, status: "succeeded" | "failed" | "cancelled", phase: string,
+  result: Job["result"], error: Job["error"],
 ): void {
-  const job = getJobDetail(ctx.db, jobId);
-  if (!job || job.status === "succeeded" || job.status === "failed" || job.status === "cancelled") return;
-  const now = ctx.now();
-  const safeError = error ? { code: error.code, message: error.message.slice(0, 500) } : null;
-  updateJobState(ctx.db, jobId, {
-    status,
-    phase,
-    result,
-    error: safeError,
-    startedAt: job.startedAt,
-    finishedAt: now,
-  });
-  appendJobEvent(ctx.db, {
-    jobId,
-    event: status === "failed" ? "job.failed" : status === "cancelled" ? "job.cancelled" : "job.completed",
-    payloadJson: { status, phase, progress: null },
-    createdAt: now,
+  immediate(ctx.db, () => {
+    const job = getJobDetail(ctx.db, jobId);
+    if (!job || (job.status !== "queued" && job.status !== "running")) return;
+    if (job.cancelRequested || projectDeleted(ctx, job)) {
+      status = "cancelled";
+      phase = "cancelled";
+      error = null;
+      result = null;
+    } else if (status === "succeeded" && !isDirectUndo(requestOf(job)?.prompt ?? "")) {
+      const provider = readProvider(ctx.db);
+      const frozen = frozenInput(job);
+      if (provider?.configRevision !== configRevisionOf(job) || (frozen && !currentEngines(frozen))) {
+        status = "failed";
+        phase = "failed";
+        error = frozen && !currentEngines(frozen) ? { code: "CANDIDATE_STALE", message: "The layout or font version changed." }
+          : { code: "PROVIDER_CONFIG_CHANGED", message: "The provider changed before publication." };
+        result = null;
+      }
+    }
+    const now = ctx.now();
+    const safeError = error ? { ...error, message: error.message.slice(0, 500) } : null;
+    updateJobState(ctx.db, jobId, { status, phase, result, error: safeError, startedAt: job.startedAt, finishedAt: now });
+    appendJobEvent(ctx.db, { jobId, event: status === "failed" ? "job.failed" : status === "cancelled" ? "job.cancelled" : "job.completed",
+      payloadJson: { status, phase, progress: null }, createdAt: now });
   });
 }
 
@@ -706,17 +683,11 @@ function configRevisionOf(job: JobDetail): number {
   return typeof value === "number" ? value : 0;
 }
 
-function layoutRequestOf(job: JobDetail): AILayoutRequest | null {
-  const input = job.input;
-  if (!input || typeof input !== "object" || !("request" in input)) return null;
-  const request = (input as { request?: unknown }).request;
-  return isAILayoutRequest(request) ? request : null;
-}
 
 function assetLookup(ctx: AppContext, projectId: string): AssetLookup {
   return (assetId) => {
-    const asset = getAsset(ctx.db, assetId);
-    if (!asset || asset.projectId !== projectId || asset.status !== "ready" || !asset.normalized) return null;
+    const asset = getAsset(ctx.db, projectId, assetId);
+    if (!asset || asset.status !== "ready" || !asset.normalized) return null;
     return {
       id: asset.id,
       originalFilename: asset.originalFilename,
@@ -726,20 +697,20 @@ function assetLookup(ctx: AppContext, projectId: string): AssetLookup {
   };
 }
 
-function tryPng(ctx: AppContext, projectId: string, document: FigureDocumentV1, revision: number): Uint8Array | null {
+async function tryPng(ctx: AppContext, projectId: string, document: FigureDocumentV1, revision: number): Promise<Uint8Array | null> {
   try {
-    return renderDocumentPng(ctx, projectId, document, revision, 512);
+    return await renderDocumentPng(ctx, projectId, document, revision, 512);
   } catch {
     return null;
   }
 }
 
-function mapFailure(error: unknown): { code: ErrorCode; message: string } {
+function mapFailure(error: unknown): NonNullable<Job["error"]> {
   if (error instanceof AiCompileError || error instanceof DocumentCommandError) {
-    return { code: error.code, message: error.message };
+    return { code: error.code, message: error.message, details: error.details };
   }
   if (error instanceof AiTransportError) return { code: "REQUEST_INVALID", message: transportMessage(error) };
-  if (error instanceof ApiException) return { code: error.code, message: error.message };
+  if (error instanceof ApiException) return { code: error.code, message: error.message, details: error.details };
   return { code: "DOCUMENT_INVALID", message: "The request could not be completed." };
 }
 

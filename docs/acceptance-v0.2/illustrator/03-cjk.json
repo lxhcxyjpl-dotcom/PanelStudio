@@ -1,0 +1,235 @@
+{
+  "sample": "03-cjk",
+  "version": "30.7.0",
+  "build": "114R",
+  "checks": [
+    {
+      "name": "Artboard dimensions within 0.1 mm",
+      "pass": true,
+      "value": [
+        175,
+        83
+      ]
+    },
+    {
+      "name": "Independent raster objects",
+      "pass": true,
+      "value": [
+        2,
+        0
+      ]
+    },
+    {
+      "name": "Editable gradient paint",
+      "pass": true,
+      "value": 1
+    },
+    {
+      "name": "Native label 图甲",
+      "pass": true,
+      "value": "TextFrame"
+    },
+    {
+      "name": "Font and weight 图甲",
+      "pass": true,
+      "value": "NotoSansSC-Bold"
+    },
+    {
+      "name": "Label size within 0.1 pt 图甲",
+      "pass": true,
+      "value": 0
+    },
+    {
+      "name": "Label baseline within 0.1 mm 图甲",
+      "pass": true,
+      "value": [
+        0,
+        -0.0001
+      ]
+    },
+    {
+      "name": "Independent panel group 图甲",
+      "pass": true,
+      "value": "panel-55ea6c54-a510-4ef7-b439-87f09f7928ea"
+    },
+    {
+      "name": "Crop frame within 0.1 mm 图甲",
+      "pass": true,
+      "value": [
+        12,
+        18,
+        34,
+        17
+      ]
+    },
+    {
+      "name": "Native label (β)",
+      "pass": true,
+      "value": "TextFrame"
+    },
+    {
+      "name": "Font and weight (β)",
+      "pass": true,
+      "value": "NotoSansSC-Bold"
+    },
+    {
+      "name": "Label size within 0.1 pt (β)",
+      "pass": true,
+      "value": 0
+    },
+    {
+      "name": "Label baseline within 0.1 mm (β)",
+      "pass": true,
+      "value": [
+        0,
+        -0.0003
+      ]
+    },
+    {
+      "name": "Independent panel group (β)",
+      "pass": true,
+      "value": "panel-8c27d7d6-92e1-479d-bc71-c23c8bf28799"
+    },
+    {
+      "name": "Crop frame within 0.1 mm (β)",
+      "pass": true,
+      "value": [
+        59,
+        25,
+        34,
+        43.7143
+      ]
+    },
+    {
+      "name": "Native label III",
+      "pass": true,
+      "value": "TextFrame"
+    },
+    {
+      "name": "Font and weight III",
+      "pass": true,
+      "value": "NotoSansSC-Bold"
+    },
+    {
+      "name": "Label size within 0.1 pt III",
+      "pass": true,
+      "value": 0
+    },
+    {
+      "name": "Label baseline within 0.1 mm III",
+      "pass": true,
+      "value": [
+        0.0001,
+        0.0001
+      ]
+    },
+    {
+      "name": "Independent panel group III",
+      "pass": true,
+      "value": "panel-4c88db65-ff99-448b-bd1b-aab381ea2de2"
+    },
+    {
+      "name": "Crop frame within 0.1 mm III",
+      "pass": true,
+      "value": [
+        106,
+        32,
+        34,
+        22.6667
+      ]
+    },
+    {
+      "name": "Independent 1 mm translation 图甲",
+      "pass": true,
+      "value": 1
+    },
+    {
+      "name": "Independent 1 mm translation (β)",
+      "pass": true,
+      "value": 1
+    },
+    {
+      "name": "Independent 1 mm translation III",
+      "pass": true,
+      "value": 1
+    },
+    {
+      "name": "Native AI reopen",
+      "pass": true,
+      "value": 1
+    },
+    {
+      "name": "Edited native label persisted",
+      "pass": true,
+      "value": "X"
+    },
+    {
+      "name": "Edited imported native text persisted",
+      "pass": true,
+      "value": "n=13"
+    },
+    {
+      "name": "Requested label faces survived native reopen",
+      "pass": true,
+      "value": [
+        "NotoSansSC-Bold",
+        "NotoSansSC-Bold",
+        "NotoSansSC-Bold"
+      ]
+    },
+    {
+      "name": "Label sizes survived native reopen within 0.1 pt",
+      "pass": true,
+      "value": 3
+    },
+    {
+      "name": "Edited Bezier handle persisted",
+      "pass": true,
+      "value": [
+        56.1259688542584,
+        174.614187345504
+      ]
+    },
+    {
+      "name": "Rasters persisted after reopen",
+      "pass": true,
+      "value": 2
+    }
+  ],
+  "panels": [
+    {
+      "label": "图甲",
+      "font": "NotoSansSC-Bold",
+      "family": "Noto Sans SC",
+      "sizePt": 11.0000019073486,
+      "baselineMm": [
+        12,
+        16.9999
+      ]
+    },
+    {
+      "label": "(β)",
+      "font": "NotoSansSC-Bold",
+      "family": "Noto Sans SC",
+      "sizePt": 11.0000019073486,
+      "baselineMm": [
+        59,
+        23.9997
+      ]
+    },
+    {
+      "label": "III",
+      "font": "NotoSansSC-Bold",
+      "family": "Noto Sans SC",
+      "sizePt": 11.0000019073486,
+      "baselineMm": [
+        106.0001,
+        31.0001
+      ]
+    }
+  ],
+  "fontRestoration": {
+    "labels": 3,
+    "changed": 3
+  }
+}

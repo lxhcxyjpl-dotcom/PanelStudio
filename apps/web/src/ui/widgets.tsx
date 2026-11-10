@@ -36,7 +36,10 @@ export function NumberField(props: {
   useEffect(() => setText(shown), [shown]);
   function commit() {
     if (props.disabled || props.disabledReason) return;
-    if (text.trim() === "" && props.value === "mixed") return;
+    if (text.trim() === "") {
+      setText(shown);
+      return;
+    }
     const value = Number(text);
     if (!Number.isFinite(value)) {
       setText(shown);
@@ -62,9 +65,9 @@ export function NumberField(props: {
         onChange={(event) => setText(event.target.value)}
         onBlur={commit}
         onKeyDown={(event) => {
-          if (event.key === "Enter") {
+          if (event.key === "Enter" && !event.nativeEvent.isComposing && event.nativeEvent.keyCode !== 229) {
             event.preventDefault();
-            commit();
+            event.currentTarget.blur();
           }
           if (event.key === "Escape") {
             event.preventDefault();
@@ -100,9 +103,9 @@ export function TextField(props: {
           if (text !== props.value) props.onCommit(text);
         }}
         onKeyDown={(event) => {
-          if (event.key === "Enter") {
+          if (event.key === "Enter" && !event.nativeEvent.isComposing && event.nativeEvent.keyCode !== 229) {
             event.preventDefault();
-            if (text !== props.value) props.onCommit(text);
+            event.currentTarget.blur();
           }
           if (event.key === "Escape") {
             event.preventDefault();

@@ -1,3 +1,4 @@
+import { waitForTerminalJob } from "./test-jobs.js";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -90,9 +91,10 @@ describe("phase 3 automatic layout", () => {
       payload: { source: { candidateId: chosen.id }, pixelWidth: 320 },
     });
     expect(preview.statusCode).toBe(202);
-    const job = await app.inject({ method: "GET", url: `/api/v1/jobs/${preview.json().jobId as string}` });
-    expect(job.json().status).toBe("succeeded");
-    const artifactId = job.json().result.artifactId as string;
+    const job = await waitForTerminalJob(app, preview.json().jobId);
+    expect(job.status).toBe("succeeded");
+    if (job.kind !== "preview" || job.status !== "succeeded") throw new Error("Preview did not finish");
+    const artifactId = job.result.artifactId;
     const image = await app.inject({ method: "GET", url: `/api/v1/artifacts/${artifactId}/download` });
     expect(image.statusCode).toBe(200);
     expect(image.headers["content-type"]).toContain("image/png");

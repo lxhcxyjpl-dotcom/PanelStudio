@@ -68,10 +68,11 @@ export {
   LayoutRequestByRowsSchema,
   LayoutRequestDefaultOrderSchema,
   LayoutRequestSchema,
+  SelectionRowLayoutRequestSchema,
   LayoutScoreSchema,
   UnitIdSchema,
 } from "./layout.js";
-export type { LayoutRequest, LayoutScore, UnitId } from "./layout.js";
+export type { LayoutRequest, LayoutScore, UnitId, SelectionRowLayoutRequest } from "./layout.js";
 export {
   CanvasSetCommandSchema,
   DomainCommandSchema,
@@ -99,9 +100,11 @@ export {
 } from "./commands.js";
 export type { DomainCommand, TransactionRequest, TransactionResponse } from "./commands.js";
 export { CandidateSchema } from "./candidate.js";
-export type { Candidate } from "./candidate.js";
+export type { Candidate, CandidateProvenance } from "./candidate.js";
 export {
   AIActionSchema,
+  AIContextSchema,
+  AIEditScopeSchema,
   AIAlignActionSchema,
   AIClarificationSchema,
   AIDistributeActionSchema,
@@ -131,7 +134,7 @@ export {
   StructuredOutputSchema,
   TargetRefSchema,
 } from "./ai.js";
-export type { AIAction, AIIntent, AILayoutRequest, AIProviderConfig, AIProviderSettings, AlignEdge, TargetRef } from "./ai.js";
+export type { AIAction, AIContext, AIEditScope, AIIntent, AILayoutRequest, AIProviderConfig, AIProviderSettings, AlignEdge, TargetRef } from "./ai.js";
 export {
   AssetAcceptedSchema,
   AssetSchema,
@@ -143,6 +146,7 @@ export {
 export type { Asset, NormalizedAsset } from "./assets.js";
 export {
   AILayoutJobResultSchema,
+  AIHistoryTurnSchema,
   AssetImportResultSchema,
   ExportJobResultSchema,
   JobAcceptedSchema,
@@ -156,7 +160,7 @@ export {
   ProjectImportJobResultSchema,
   ProviderTestJobResultSchema,
 } from "./jobs.js";
-export type { AILayoutJobResult, Job, JobResult } from "./jobs.js";
+export type { AIHistoryTurn, AILayoutJobResult, Job, JobResult } from "./jobs.js";
 export { LocalePackSchema, REPRESENTATIVE_MESSAGES } from "./locale.js";
 export type { LocalePack } from "./locale.js";
 export { PromptPresetSchema } from "./preferences.js";
@@ -186,6 +190,7 @@ export {
 } from "./defaults.js";
 export {
   AssetPageSchema,
+  AIHistoryPageSchema,
   CapabilitiesResponseSchema,
   CreateProjectResponseSchema,
   DocumentStateSchema,
@@ -211,6 +216,7 @@ export {
 } from "./api.js";
 export type {
   CapabilitiesResponse,
+  AIHistoryPage,
   ExportRequest,
   HealthResponse,
   PreviewRequest,
@@ -218,6 +224,9 @@ export type {
 } from "./api.js";
 export {
   ArtifactRowSchema,
+  AIFrozenInputSchema,
+  AIHistoryCursorSchema,
+  MAX_AI_TURNS,
   AssetRowSchema,
   CandidateRowSchema,
   IdempotencyRowSchema,
@@ -227,6 +236,7 @@ export {
   ProjectRowSchema,
   ProviderSettingsRowSchema,
 } from "./storage.js";
+export type { AIFrozenInput } from "./storage.js";
 export { buildOpenApiDocument, renderOpenApiDocument, toJsonSchema } from "./openapi.js";
 export {
   isAIIntent,

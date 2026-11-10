@@ -1,12 +1,12 @@
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
-import { useState } from "react";
+import { useEffect, useRef, useState, type DragEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import type { Asset } from "@panelstudio/contracts";
-import { api } from "../api/client";
+import { api, thumbnailUrl } from "../api/client";
 import { formatDiagnostic } from "../i18n/diagnostic";
 import { resolvePanelLabel } from "@panelstudio/core/labels";
-import { groupForPanel } from "../model/document-ui";
+import { clickedSelection, groupForPanel } from "../model/document-ui";
 import { sidebarWidth } from "../model/chrome";
 import {
   downloadOriginal,
@@ -134,6 +134,44 @@ function PanelList({ openPanels, onToggle }: { openPanels: Record<string, boolea
   const { t } = useTranslation();
   const state = useWorkspace();
   const document = baseDocument(state);
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [slot, setSlot] = useState<number | null>(null);
+  const list = useRef<HTMLDivElement>(null);
+  const pointerY = useRef<number | null>(null);
+  useEffect(() => {
+    if (!dragId) return;
+    let frame = 0;
+    const scroll = () => {
+      const node = list.current?.closest(".side-scroll");
+      if (node instanceof HTMLElement && pointerY.current !== null) {
+        const box = node.getBoundingClientRect(), y = pointerY.current;
+        const delta = y < box.top + 32 ? -7 : y > box.bottom - 32 ? 7 : 0;
+        if (delta) node.scrollTop += delta;
+      }
+      frame = requestAnimationFrame(scroll);
+    };
+    frame = requestAnimationFrame(scroll);
+    return () => cancelAnimationFrame(frame);
+  }, [dragId]);
+  function clear() { setDragId(null); setSlot(null); pointerY.current = null; }
+  async function move(id: string, insertion: number) {
+    if (!document) return;
+    const previous = document.panelOrder, from = previous.indexOf(id);
+    if (from < 0) return;
+    const next = previous.filter((panelId) => panelId !== id);
+    const at = Math.max(0, Math.min(next.length, insertion > from ? insertion - 1 : insertion));
+    next.splice(at, 0, id);
+    if (at === from) return;
+    await reorderLabels(next);
+    const current = useWorkspace.getState();
+    if (current.projectId !== state.projectId || current.confirmed?.document.panelOrder[at] !== id) return;
+    list.current?.querySelector<HTMLButtonElement>(`[data-handle-id="${id}"]`)?.focus();
+    patch({ liveMessage: t("panels.reordered", { name: document.panels[id]?.name, position: at + 1, count: next.length }) });
+  }
+  function insertionAt(event: DragEvent<HTMLElement>, index: number) {
+    const rect = event.currentTarget.getBoundingClientRect();
+    return index + Number(event.clientY >= rect.top + rect.height / 2);
+  }
   if (!document || document.panelOrder.length === 0) return <p className="muted section">{t("panels.empty")}</p>;
   return (
     <div
@@ -141,41 +179,56 @@ function PanelList({ openPanels, onToggle }: { openPanels: Record<string, boolea
       role="listbox"
       aria-label={t("panels.tab")}
       data-keys="list"
+      ref={list} onDragEnd={clear}
       onKeyDown={(event) => {
-        const index = document.panelOrder.findIndex((id) => state.selection.kind === "panels" && state.selection.ids[0] === id);
-        if (event.altKey && (event.key === "ArrowUp" || event.key === "ArrowDown") && index >= 0) {
-          event.preventDefault();
-          event.stopPropagation();
-          const next = [...document.panelOrder];
-          const swap = event.key === "ArrowUp" ? index - 1 : index + 1;
-          const current = next[index];
-          const other = next[swap];
-          if (current === undefined || other === undefined) return;
-          next[index] = other;
-          next[swap] = current;
-          void reorderLabels(next);
-        }
+        if (!event.altKey || !["ArrowUp", "ArrowDown"].includes(event.key)) return;
+        const handle = event.target instanceof HTMLElement ? event.target.closest<HTMLElement>("[data-handle-id]") : null;
+        const id = handle?.dataset.handleId ?? (state.selection.kind === "panels" ? state.selection.ids[0] : undefined);
+        if (!id) return;
+        event.preventDefault(); event.stopPropagation();
+        const index = document.panelOrder.indexOf(id);
+        void move(id, index + (event.key === "ArrowUp" ? -1 : 2));
       }}
     >
-      {document.panelOrder.map((panelId) => {
+      {document.panelOrder.map((panelId, index) => {
         const panel = document.panels[panelId];
         if (!panel) return null;
         const label = resolvePanelLabel(document, panelId);
         const selected = (state.selection.kind === "panels" && state.selection.ids.includes(panelId)) || (state.selection.kind === "group" && groupForPanel(document, panelId)?.id === state.selection.groupId);
         const expanded = openPanels[panelId] === true;
         return (
-          <div key={panelId} className="panel-block">
-            <div className="panel-row" role="option" aria-selected={selected} data-testid="panel-row" onClick={() => patch({ selection: { kind: "panels", ids: [panelId] } })}>
+          <div key={panelId} className="panel-block" data-drag-source={dragId === panelId}
+            data-insert={slot === index ? "before" : index === document.panelOrder.length - 1 && slot === index + 1 ? "after" : undefined}
+            onDragOver={(event) => {
+              if (!dragId) return;
+              event.preventDefault(); event.stopPropagation(); event.dataTransfer.dropEffect = "move";
+              pointerY.current = event.clientY;
+              setSlot(insertionAt(event, index));
+            }}
+            onDrop={(event) => {
+              if (!dragId) return;
+              event.preventDefault(); event.stopPropagation();
+              void move(dragId, insertionAt(event, index)); clear();
+            }}>
+            <div className="panel-row" role="option" aria-selected={selected} data-testid="panel-row" onClick={(event) => patch({ selection: clickedSelection(document, state.selection, panelId, event.shiftKey) })}>
               <button
                 type="button"
                 className="drag-handle"
                 data-action="reorder-labels"
+                data-handle-id={panelId} draggable
+                onDragStart={(event) => {
+                  event.dataTransfer.effectAllowed = "move";
+                  event.dataTransfer.setData("application/x-panelstudio-order", panelId);
+                  const row = event.currentTarget.closest(".panel-row");
+                  if (row) event.dataTransfer.setDragImage(row, 12, 16);
+                  setDragId(panelId); setSlot(index);
+                }}
                 aria-label={t("panels.reorder")}
                 title={t("panels.reorder")}
               >
                 ≡
               </button>
-              <span className="row-thumb" />
+              {state.projectId ? <img className="row-thumb" alt="" draggable={false} src={thumbnailUrl(state.projectId, panel.assetId)} /> : null}
               <span className="row-label">{label?.text ?? "–"}</span>
               <span className="row-name">{panel.name}</span>
               <Button

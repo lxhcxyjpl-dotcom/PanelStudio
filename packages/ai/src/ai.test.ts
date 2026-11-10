@@ -79,6 +79,36 @@ describe("provider endpoint", () => {
 });
 
 describe("handbook corpus", () => {
+  it("compiles v0.2 row, label and refinement examples against the supplied working draft", () => {
+    const { document, assets } = figure();
+    document.panels[IDS[2]]!.frameMm.y = 14;
+    const selectedPanelIds = [IDS[1], IDS[2]];
+    const compile = (prompt: string, scope: "document" | "selection", source = document) => {
+      const scene = buildScene(source, { baseRevision: 3, configRevision: 2, selectedPanelIds, scope });
+      const intent = fixtureIntent(prompt, scene);
+      if (!intent || intent.kind !== "proposal") throw new Error(prompt);
+      return compileProposal(source, intent, assets, { scope, selectedPanelIds });
+    };
+    for (const prompt of [
+      "把 B 和 C 排成一行，保持原来的尺寸，其他图不动。",
+      "把选中的两张图设成等宽，并排放在当前区域。",
+      "这个方案可以，再把选中区域的间距缩小一点。",
+    ]) {
+      const result = compile(prompt, "selection");
+      expect(result.validationMode).toBe("layout");
+      expect(result.previewDocument.panels[IDS[0]]).toEqual(document.panels[IDS[0]]);
+      const b = result.previewDocument.panels[IDS[1]]!.frameMm, c = result.previewDocument.panels[IDS[2]]!.frameMm;
+      expect(b.y).toBeCloseTo(c.y);
+      if (prompt.includes("等宽")) expect(b.width).toBeCloseTo(c.width);
+    }
+    const styled = compile("只把 B、C 的编号改成 9 pt 黑色。", "selection").previewDocument;
+    expect(styled.panels[IDS[1]]!.labelOverrides.typography).toEqual({ fontSizePt: 9, color: "#000000" });
+    const lower = compile("保留现在的排版，把所有编号改为小写。", "document", styled).previewDocument;
+    const once = compile("在这个草案上，把 A 的编号向右移动 1 mm。", "document", lower).previewDocument;
+    const twice = compile("在这个草案上，把 A 的编号向右移动 1 mm。", "document", once).previewDocument;
+    expect(twice.panels[IDS[0]]!.labelOverrides.offsetMm!.x).toBeCloseTo(once.panels[IDS[0]]!.labelOverrides.offsetMm!.x + 1);
+    expect(twice.panels[IDS[0]]!.labelOverrides.text).toBeNull();
+  });
   it("recognizes undo without treating it as a model action", () => {
     expect(isDirectUndo(" 撤销 ")).toBe(true);
     expect(isDirectUndo("Undo")).toBe(true);

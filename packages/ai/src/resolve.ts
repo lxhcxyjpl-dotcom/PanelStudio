@@ -56,9 +56,12 @@ export async function reviewModelIntent(input: {
   config: AIProviderConfig;
   secret: string;
   scene: FrozenScene;
+  prompt: string;
+  candidateScene: FrozenScene;
   replyLocale: string;
   proposalJson: string;
   previewPng: Uint8Array;
+  inputPng: Uint8Array;
   fetchImpl?: typeof fetch;
   signal?: AbortSignal;
 }): Promise<{ ok: true; intent: AIIntent } | { ok: false; message: string }> {
@@ -66,10 +69,12 @@ export async function reviewModelIntent(input: {
     { role: "system", content: systemPrompt(input.config, input.replyLocale) },
     {
       role: "user",
-      content: userContent(
-        `Review this proposal against the preview image. Return one AIIntent. Keep it, replace it, ask a clarification, or mark it unsupported. Do not invent actions.\nPROPOSAL:\n${input.proposalJson}\nSCENE:\n${userPrompt("", input.scene).split("SCENE:\n")[1] ?? ""}`,
-        input.previewPng,
-      ),
+      content: [
+        { type: "text", text: `Review this proposal against the user's request, prior turns, and frozen scope. Return one AIIntent.\n${userPrompt(input.prompt, input.scene)}\nPROPOSAL:\n${input.proposalJson}\nCANDIDATE SCENE:\n${JSON.stringify(input.candidateScene)}\nInput draft before this turn:` },
+        { type: "image_url", image_url: { url: pngDataUrl(input.inputPng) } },
+        { type: "text", text: "Candidate after this turn:" },
+        { type: "image_url", image_url: { url: pngDataUrl(input.previewPng) } },
+      ],
     },
   ];
   const content = await postChatCompletion({

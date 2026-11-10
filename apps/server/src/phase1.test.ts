@@ -1,3 +1,4 @@
+import { waitForTerminalJob } from "./test-jobs.js";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -314,11 +315,9 @@ async function exportOf(
 }
 
 async function jobOf(app: ReturnType<typeof createServer>, jobId: string): Promise<Job> {
-  const response = await app.inject({ method: "GET", url: `/api/v1/jobs/${jobId}` });
-  expect(response.statusCode).toBe(200);
-  const body = response.json() as Job;
-  expect(Check(JobSchema, body)).toBe(true);
-  return body;
+  const job = await waitForTerminalJob(app, jobId);
+  expect(Check(JobSchema, job)).toBe(true);
+  return job;
 }
 
 async function download(app: ReturnType<typeof createServer>, url: string): Promise<Buffer> {

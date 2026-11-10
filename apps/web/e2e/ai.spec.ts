@@ -43,7 +43,7 @@ test.describe.serial("phase 5 AI", () => {
           if (mode === "hold") {
             await new Promise<void>((resolve) => waiting.push(resolve));
           }
-          if (response.writableEnded || request.destroyed) return;
+          if (response.writableEnded || response.destroyed) return;
           const content = mode === "invalid" ? "this is not an intent {{{" : JSON.stringify(intentFor(body));
           response.setHeader("content-type", "application/json");
           try {
@@ -118,6 +118,84 @@ test.describe.serial("phase 5 AI", () => {
     expect(await frames(page)).toEqual(original);
   });
 
+  test("refines the same draft three times, compares against the root, applies once and reconnects its history", async ({ page }) => {
+    mode = "fixture";
+    await page.goto("/");
+    await configure(page, port);
+    await importFigures(page, [raster, photo]);
+    await expect(page.getByTestId("panel-row")).toHaveCount(2);
+    const id = await page.evaluate(() => localStorage.getItem("panelstudio.projectId"));
+    const read = async () => (await page.request.get(`/api/v1/projects/${id}/document`)).json();
+    const root = await read();
+    const original = await frames(page);
+    const requests: { context: {kind: string}; baseRevision: number }[] = [];
+    page.on("request", (r) => { if (r.url().endsWith("/ai-layouts")) requests.push(r.postDataJSON()); });
+    await page.locator("[data-action=tab-ai]").click();
+    const prompt = page.getByTestId("ai-prompt");
+    await prompt.fill("把 A 向右移动 2 mm");
+    await page.locator("[data-action=tab-properties]").click();
+    await page.locator("[data-action=tab-ai]").click();
+    await expect(prompt).toHaveValue("把 A 向右移动 2 mm");
+    for (let round = 1; round <= 3; round++) {
+      await page.locator("[data-action=ai-send]").click();
+      await expect(page.locator("[data-action=ai-apply]")).toBeEnabled();
+      await expect(page.getByTestId("ai-change").first()).toContainText(`${round * 2} mm`);
+      expect((await read()).revision).toBe(root.revision);
+    }
+    expect(requests.map((r) => r.context.kind)).toEqual(["revision","candidate","candidate"]);
+    expect(requests.every((r) => r.baseRevision === root.revision)).toBe(true);
+    const preview = await frames(page);
+    await page.locator("[data-action=compare-original]").click();
+    expect(await frames(page)).toEqual(original);
+    await page.locator("[data-action=compare-draft]").click();
+    expect(await frames(page)).toEqual(preview);
+    const applied = page.waitForResponse((r) => r.url().endsWith("/transactions"));
+    await page.locator("[data-action=ai-apply]").click(); expect((await applied).ok()).toBe(true);
+    expect((await read()).revision).toBe(root.revision + 1);
+    const undone = page.waitForResponse((r) => r.url().endsWith("/history/undo"));
+    await page.locator("[data-action=undo]").click(); expect((await undone).ok()).toBe(true);
+    expect((await read()).documentHash).toBe(root.documentHash);
+    await page.reload();
+    await page.locator("[data-action=tab-ai]").click();
+    await expect(page.getByTestId("ai-turn")).toHaveCount(3);
+    await expect(page.locator(".paper")).toHaveAttribute("data-view", "editing");
+    await page.locator("[data-action=open-history-draft]").last().click();
+    await expect(page.locator("[data-action=ai-apply]")).toBeDisabled();
+    await page.locator("[data-action=compare-original]").click();
+    expect(await frames(page)).toEqual(original);
+  });
+
+  test("a deliberately held ten-second AI call leaves manual transactions responsive and returns a read-only result", async ({ page }) => {
+    mode = "hold";
+    try {
+      await page.goto("/");
+      await configure(page, port);
+      await importFigures(page, [raster, photo]);
+      await expect(page.getByTestId("panel-row")).toHaveCount(2);
+      await page.locator("[data-action=tab-ai]").click();
+      await page.getByTestId("ai-prompt").fill("把 A 向右移动 2 mm");
+      await page.locator("[data-action=ai-send]").click();
+      await expect.poll(() => waiting.length).toBe(1);
+      const hold = new Promise<void>((resolve) => setTimeout(resolve, 10_000));
+      const frame = page.locator("[data-panel-id]").first();
+      const rect = await frame.boundingBox();
+      if (!rect) throw Error("Panel A unavailable");
+      const x = rect.x + rect.width / 2, y = rect.y + rect.height / 2;
+      const saved = page.waitForResponse((r) => r.url().endsWith("/transactions"), {timeout: 6_000});
+      await page.mouse.move(x,y); await page.mouse.down(); await page.mouse.move(x+12,y+12,{steps:4}); await page.mouse.up();
+      expect((await saved).ok()).toBe(true);
+      const edited = await frames(page);
+      await hold; release();
+      await expect(page.locator("[data-action=ai-regenerate]")).toBeVisible();
+      await expect(page.locator("[data-action=ai-apply]")).toBeDisabled();
+      expect(await frames(page)).toEqual(edited);
+      await page.locator("[data-action=compare-draft]").click();
+      expect(await frames(page)).not.toEqual(edited);
+      await page.locator("[data-action=ai-manual]").click();
+      expect(await frames(page)).toEqual(edited);
+    } finally { mode = "fixture"; release(); }
+  });
+
   test("leaves the figure unchanged when the model output is invalid", async ({ page }) => {
     mode = "invalid";
     await page.goto("/");
@@ -180,7 +258,7 @@ test.describe.serial("phase 5 AI", () => {
 
     mode = "hold";
     await page.getByTestId("ai-prompt").fill("面板间距改成 3 mm");
-    await page.getByRole("button", { name: "发送" }).click();
+    await page.getByRole("button", { name: "基于当前稿重新生成" }).click();
     await expect(page.getByRole("button", { name: "取消请求" })).toBeVisible();
     await page.getByRole("button", { name: "设置" }).click();
     await page.getByTestId("ai-model").fill("other-fixture-model");

@@ -1,19 +1,21 @@
 import { useEffect, useMemo, useRef, type CSSProperties, type PointerEvent as ReactPointerEvent, type RefObject } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ARTWORK_COLOR_PRESETS, type FigureDocumentV1 } from "@panelstudio/contracts";
+import { ARTWORK_COLOR_PRESETS, type DomainCommand, type FigureDocumentV1 } from "@panelstudio/contracts";
 import { applyCommands } from "@panelstudio/core/apply";
 import { scalePanel, translateSelection } from "@panelstudio/core/arrange";
 import { contentPlacement, type FrameAnchor } from "@panelstudio/core/geometry";
 import { resolvePanelLabel } from "@panelstudio/core/labels";
 import { api, contentUrl } from "../api/client";
 import { i18n } from "../i18n";
-import { geometryLocked, groupForPanel, withCrop } from "../model/document-ui";
+import { clickedSelection, completePanelIds, geometryLocked, panelIdsOf, withCrop } from "../model/document-ui";
 import { PX_PER_MM } from "../model/place";
 import { boundsOf, snapTranslation, type Guide } from "../model/snap";
 import { fitCamera, snapToleranceMm } from "../model/view";
-import { assetLookup, openSample, readyViewport, transact } from "../state/session";
+import { assetLookup, labelMove, openSample, readyViewport, transact } from "../state/session";
 import { patch, useWorkspace } from "../state/store";
-import { baseDocument, candidatesStale, type WorkspaceState } from "../state/types";
+import { errorText } from "../model/feedback";
+import { cancelGesture, trackGesture } from "./gesture";
+import { baseDocument, type WorkspaceState } from "../state/types";
 
 export function CanvasStage() {
   const state = useWorkspace();
@@ -26,7 +28,8 @@ export function CanvasStage() {
   const paperRef = useRef<HTMLDivElement>(null);
   const art = useArt(state);
   const base = baseDocument(state);
-  const previewing = Boolean(state.activeCandidateId) && !candidatesStale(state);
+  const previewing = state.compareMode !== "editing";
+  useEffect(() => () => { cancelGesture(); }, [state.projectId]);
 
   useEffect(() => {
     const node = viewportRef.current;
@@ -96,17 +99,18 @@ export function CanvasStage() {
           beginPan(event);
           return;
         }
-        beginMarquee(event, base);
+        if (!previewing) beginMarquee(event, base);
       }}
     >
       <div
         className="camera"
-        style={{ transform: `translate(${state.camera.panX}px, ${state.camera.panY}px) scale(${state.camera.zoom})` }}
+        style={{ "--inverse-zoom": 1 / state.camera.zoom, transform: `translate(${state.camera.panX}px, ${state.camera.panY}px) scale(${state.camera.zoom})` } as CSSProperties}
       >
         <div
           ref={paperRef}
           className="paper"
           data-canvas-paper="true"
+          data-view={state.compareMode}
           style={{
             width: art.canvas.widthMm * px,
             height: art.canvas.heightMm * px,
@@ -123,6 +127,7 @@ export function CanvasStage() {
                 key={panelId}
                 className="panel-frame"
                 data-panel-id={panelId}
+                data-selected={selected}
                 data-frame={`${panel.frameMm.x},${panel.frameMm.y},${panel.frameMm.width},${panel.frameMm.height}`}
                 style={{
                   transform: `translate(${panel.frameMm.x * px}px, ${panel.frameMm.y * px}px)`,
@@ -132,8 +137,9 @@ export function CanvasStage() {
                 }}
                 onPointerDown={(event) => {
                   event.stopPropagation();
-                  selectPanel(base, panelId, event.shiftKey);
                   if (event.button !== 0) return;
+                  event.preventDefault();
+                  viewportRef.current?.focus({ preventScroll: true });
                   if (state.spacePan) {
                     beginPan(event);
                     return;
@@ -141,15 +147,14 @@ export function CanvasStage() {
                   if (state.crop) return;
                   if (previewing) {
                     const ai = useWorkspace.getState().cards.some((card) => card.candidate.origin === "ai");
-                    patch({ liveMessage: i18n.t(ai ? "ai.previewOnly" : "canvas.previewOnly") });
+                    patch({ selection: clickedSelection(art, state.selection, panelId, event.shiftKey), liveMessage: i18n.t(ai ? "ai.previewOnly" : "canvas.previewOnly") });
                     return;
                   }
-                  if (geometryLocked(base, panelId)) return;
                   beginMove(event, paperRef.current, base, panelId);
                 }}
               >
                 {place ? (
-                  <img
+                  <div className="panel-artwork"><img
                     alt=""
                     draggable={false}
                     src={contentUrl(state.projectId!, panel.assetId)}
@@ -160,7 +165,7 @@ export function CanvasStage() {
                       width: place.width * px,
                       height: place.height * px,
                     }}
-                  />
+                  /></div>
                 ) : null}
                 {selected && state.selection.kind === "panels" && state.selection.ids.length === 1 && !state.crop && !geometryLocked(base, panelId) && !previewing
                   ? (["top-left", "top-right", "bottom-left", "bottom-right"] as const).map((corner) => (
@@ -180,36 +185,37 @@ export function CanvasStage() {
               </div>
             );
           })}
+          <svg className="label-artwork" viewBox={`0 0 ${art.canvas.widthMm} ${art.canvas.heightMm}`} aria-hidden="true">
+            {art.panelOrder.map((id) => {
+              const label = resolvePanelLabel(art, id);
+              return label && label.bounds ? <text key={id} x={label.x} y={label.y} fill={label.color} fontFamily={label.fontFamily}
+                fontSize={label.fontSizeUser} fontWeight={label.fontWeight} xmlSpace="preserve">{label.text}</text> : null;
+            })}
+          </svg>
           {art.panelOrder.map((panelId) => {
             const label = resolvePanelLabel(art, panelId);
-            if (!label) return null;
-            const selected = state.selection.kind === "label" && state.selection.panelId === panelId;
-            return (
-              <button
-                key={`label-${panelId}`}
-                type="button"
-                data-action="select-label"
-                className="label-hit"
-                style={{
-                  left: label.bounds.x * px,
-                  top: label.bounds.y * px,
-                  width: Math.max(label.bounds.width, label.fontSizeUser) * px,
-                  height: label.bounds.height * px,
-                  color: label.color,
-                  fontFamily: label.fontFamily,
-                  fontSize: label.fontSizeUser * px,
-                  fontWeight: label.fontWeight,
-                  outline: selected ? `1px solid ${ARTWORK_COLOR_PRESETS[1]}` : undefined,
-                }}
-                onPointerDown={(event) => {
-                  event.stopPropagation();
-                  patch({ selection: { kind: "label", panelId } });
-                }}
-              >
-                {label.text}
-              </button>
-            );
+            if (!label?.bounds) return null;
+            const box = label.bounds;
+            const selected = !previewing && state.selection.kind === "label" && state.selection.panelId === panelId;
+            const minHit = 18 / state.camera.zoom;
+            return <button key={panelId} type="button" data-action="select-label" data-label-id={panelId}
+              aria-label={i18n.t("labels.select", { label: label.text })} className="label-hit"
+              style={{ left: (box.x + box.width / 2) * px, top: (box.y + box.height / 2) * px,
+                width: Math.max(minHit, box.width * px), height: Math.max(minHit, box.height * px) }}
+              onPointerDown={(event) => {
+                if (event.button !== 0) return;
+                event.preventDefault(); event.stopPropagation();
+                viewportRef.current?.focus({ preventScroll: true });
+                if (state.spacePan) return beginPan(event);
+                if (previewing || state.crop) return;
+                beginLabelMove(event, paperRef.current, base, panelId);
+              }}>
+              {selected ? <span className="label-outline" style={{ width: box.width * px, height: box.height * px }} /> : null}
+            </button>;
           })}
+          {state.marquee ? <div className="marquee" data-testid="marquee" style={{
+            left: state.marquee.x * px, top: state.marquee.y * px, width: state.marquee.width * px, height: state.marquee.height * px,
+          }} /> : null}
           {state.guides.map((guide) => (
             <div
               key={`${guide.axis}-${guide.mm}`}
@@ -312,7 +318,8 @@ function useArt(state: WorkspaceState): FigureDocumentV1 | null {
       if (panel && viewport) return withCrop(base, state.crop.panelId, state.crop.crop, viewport);
     }
     if (state.interaction) return state.interaction;
-    if (state.activeCandidateId && !candidatesStale(state)) {
+    if (state.compareMode === "original" && state.candidateRoot) return state.candidateRoot.document;
+    if (state.activeCandidateId && state.compareMode === "draft") {
       const card = state.cards.find((item) => item.candidate.id === state.activeCandidateId);
       if (card) return card.candidate.previewDocument;
     }
@@ -333,24 +340,6 @@ function isSelected(state: WorkspaceState, document: FigureDocumentV1, panelId: 
   return false;
 }
 
-function selectPanel(document: FigureDocumentV1, panelId: string, shift: boolean): void {
-  const group = groupForPanel(document, panelId);
-  if (shift) {
-    const current = useWorkspace.getState().selection;
-    const ids = new Set(current.kind === "panels" ? current.ids : []);
-    const incoming = group ? group.group.panelIds : [panelId];
-    const remove = incoming.every((id) => ids.has(id));
-    for (const id of incoming) {
-      if (remove) ids.delete(id);
-      else ids.add(id);
-    }
-    patch({ selection: { kind: "panels", ids: [...ids] } });
-    return;
-  }
-  if (group) patch({ selection: { kind: "group", groupId: group.id } });
-  else patch({ selection: { kind: "panels", ids: [panelId] } });
-}
-
 function pointOf(paper: HTMLDivElement, event: { clientX: number; clientY: number }, canvas: FigureDocumentV1["canvas"]) {
   const rect = paper.getBoundingClientRect();
   return {
@@ -359,73 +348,67 @@ function pointOf(paper: HTMLDivElement, event: { clientX: number; clientY: numbe
   };
 }
 
-function beginMove(event: ReactPointerEvent, paper: HTMLDivElement | null, document: FigureDocumentV1, panelId: string): void {
+function beginMove(event: ReactPointerEvent, paper: HTMLDivElement | null, document: FigureDocumentV1, id: string) {
   if (!paper) return;
-  const group = groupForPanel(document, panelId);
-  const ids = group ? [...group.group.panelIds] : [panelId];
-  const frames = ids.flatMap((id) => {
-    const frame = document.panels[id]?.frameMm;
-    return frame ? [frame] : [];
-  });
-  const bounds = boundsOf(frames);
+  const initial = useWorkspace.getState().selection;
+  const selected = clickedSelection(document, initial, id, event.shiftKey, true);
+  const ids = completePanelIds(document, panelIdsOf(selected, document));
+  const bounds = boundsOf(ids.map((panelId) => document.panels[panelId]!.frameMm));
   if (!bounds) return;
-  const others = document.panelOrder.flatMap((id) => (ids.includes(id) ? [] : document.panels[id] ? [document.panels[id].frameMm] : []));
-  const start = pointOf(paper, event, document.canvas);
-  const target = event.currentTarget as HTMLElement;
-  target.setPointerCapture(event.pointerId);
-  let raf = 0;
-  const move = (ev: PointerEvent) => {
-    cancelAnimationFrame(raf);
-    raf = requestAnimationFrame(() => {
-      const point = pointOf(paper, ev, document.canvas);
-      const snapped = snapTranslation({
-        bounds,
-        dx: point.x - start.x,
-        dy: point.y - start.y,
-        canvas: document.canvas,
-        others,
-        toleranceMm: snapToleranceMm(useWorkspace.getState().camera.zoom),
-        enabled: !ev.altKey,
-      });
+  const locked = ids.some((panelId) => geometryLocked(document, panelId) === "lock");
+  const others = document.panelOrder.filter((panelId) => !ids.includes(panelId)).map((panelId) => document.panels[panelId]!.frameMm);
+  const origin = pointOf(paper, event, document.canvas);
+  const make = (pointer: PointerEvent) => {
+    const point = pointOf(paper, pointer, document.canvas);
+    const snap = snapTranslation({ bounds, dx: point.x - origin.x, dy: point.y - origin.y, canvas: document.canvas,
+      others, toleranceMm: snapToleranceMm(useWorkspace.getState().camera.zoom), enabled: !pointer.altKey });
+    return { command: translateSelection(document, ids, snap.dx, snap.dy), guides: snap.guides };
+  };
+  const shift = event.shiftKey;
+  trackGesture(event, {
+    drag(pointer) {
+      if (locked) return patch({ liveMessage: i18n.t("errors.LOCKED_ELEMENT") });
+      patch({ selection: selected });
+      previewCommand(document, () => make(pointer));
+    },
+    finish(pointer, dragged) {
+      patch({ interaction: null, dragging: false, guides: [] });
+      if (!dragged) return patch({ selection: clickedSelection(document, initial, id, shift) });
+      if (locked) return patch({ liveMessage: i18n.t("errors.LOCKED_ELEMENT") });
       try {
-        const command = translateSelection(document, ids, snapped.dx, snapped.dy);
-        const preview = applyCommands(document, [command], assetLookup());
-        patch({ interaction: preview, guides: snapped.guides, guidesFading: false, dragging: true, activeCandidateId: null });
-      } catch (error) {
-        patch({ liveMessage: error instanceof Error ? error.message : i18n.t("errors.generic") });
-      }
-    });
+        const { command, guides } = make(pointer);
+        patch({ selection: selected }); fadeGuides(guides);
+        void transact([command]);
+      } catch (error) { patch({ liveMessage: errorText(error) }); }
+    },
+    cancel() { patch({ selection: initial, interaction: null, dragging: false, guides: [] }); },
+  });
+}
+
+function previewCommand(doc: FigureDocumentV1, build: () => { command: DomainCommand; guides?: Guide[] }) {
+  try {
+    const { command, guides = [] } = build();
+    patch({ interaction: applyCommands(doc, [command], assetLookup()), guides, guidesFading: false, dragging: true });
+  } catch (error) { patch({ liveMessage: errorText(error) }); }
+}
+
+function beginLabelMove(event: ReactPointerEvent, paper: HTMLDivElement | null, document: FigureDocumentV1, id: string) {
+  if (!paper) return;
+  const initial = useWorkspace.getState().selection;
+  const origin = pointOf(paper, event, document.canvas);
+  const make = (pointer: PointerEvent) => {
+    const point = pointOf(paper, pointer, document.canvas);
+    return labelMove(document, id, point.x - origin.x, point.y - origin.y);
   };
-  const finish = (ev: PointerEvent) => {
-    cleanup();
-    const point = pointOf(paper, ev, document.canvas);
-    const snapped = snapTranslation({
-      bounds,
-      dx: point.x - start.x,
-      dy: point.y - start.y,
-      canvas: document.canvas,
-      others,
-      toleranceMm: snapToleranceMm(useWorkspace.getState().camera.zoom),
-      enabled: !ev.altKey,
-    });
-    fadeGuides(snapped.guides);
-    patch({ interaction: null, dragging: false });
-    if (Math.abs(snapped.dx) < 0.0001 && Math.abs(snapped.dy) < 0.0001) return;
-    void transact([translateSelection(document, ids, snapped.dx, snapped.dy)]);
-  };
-  const cancel = () => {
-    cleanup();
-    patch({ interaction: null, guides: [], dragging: false });
-  };
-  const cleanup = () => {
-    cancelAnimationFrame(raf);
-    target.removeEventListener("pointermove", move);
-    target.removeEventListener("pointerup", finish);
-    target.removeEventListener("pointercancel", cancel);
-  };
-  target.addEventListener("pointermove", move);
-  target.addEventListener("pointerup", finish);
-  target.addEventListener("pointercancel", cancel);
+  patch({ selection: { kind: "label", panelId: id } });
+  trackGesture(event, {
+    drag(pointer) { previewCommand(document, () => ({ command: make(pointer) })); },
+    finish(pointer, dragged) {
+      patch({ interaction: null, dragging: false });
+      if (dragged) void transact([make(pointer)]);
+    },
+    cancel() { patch({ selection: initial, interaction: null, dragging: false }); },
+  });
 }
 
 function beginScale(
@@ -564,43 +547,29 @@ function beginPan(event: ReactPointerEvent): void {
 function beginMarquee(event: ReactPointerEvent, document: FigureDocumentV1): void {
   if (event.button !== 0) return;
   const paper = (event.currentTarget as HTMLElement).querySelector(".paper");
-  if (!(paper instanceof HTMLDivElement)) {
-    if (!event.shiftKey) patch({ selection: { kind: "none" } });
-    return;
-  }
-  const start = pointOf(paper, event, document.canvas);
-  const target = event.currentTarget as HTMLElement;
-  target.setPointerCapture(event.pointerId);
-  let moved = false;
-  const move = (ev: PointerEvent) => {
-    const point = pointOf(paper, ev, document.canvas);
-    if (Math.hypot(point.x - start.x, point.y - start.y) > 0.4) moved = true;
-  };
-  const end = (ev: PointerEvent) => {
-    target.removeEventListener("pointermove", move);
-    target.removeEventListener("pointerup", end);
-    target.removeEventListener("pointercancel", end);
-    if (!moved) {
-      if (!ev.shiftKey) patch({ selection: { kind: "none" } });
-      return;
-    }
-    const point = pointOf(paper, ev, document.canvas);
-    const rect = {
-      x: Math.min(start.x, point.x),
-      y: Math.min(start.y, point.y),
-      width: Math.abs(point.x - start.x),
-      height: Math.abs(point.y - start.y),
-    };
-    const ids = document.panelOrder.filter((id) => {
-      const frame = document.panels[id]?.frameMm;
-      if (!frame) return false;
-      return frame.x < rect.x + rect.width && frame.x + frame.width > rect.x && frame.y < rect.y + rect.height && frame.y + frame.height > rect.y;
+  if (!(paper instanceof HTMLDivElement)) return;
+  const initial = useWorkspace.getState().selection;
+  const origin = pointOf(paper, event, document.canvas);
+  const extend = event.shiftKey;
+  const existing = extend ? completePanelIds(document, panelIdsOf(initial, document)) : [];
+  const update = (pointer: PointerEvent, preview: boolean) => {
+    const point = pointOf(paper, pointer, document.canvas);
+    const rect = { x: Math.min(point.x, origin.x), y: Math.min(point.y, origin.y), width: Math.abs(point.x - origin.x), height: Math.abs(point.y - origin.y) };
+    const hits = document.panelOrder.filter((id) => {
+      const f = document.panels[id]!.frameMm;
+      return f.x < rect.x + rect.width && f.x + f.width > rect.x && f.y < rect.y + rect.height && f.y + f.height > rect.y;
     });
-    patch({ selection: ids.length > 0 ? { kind: "panels", ids } : { kind: "none" } });
+    const ids = completePanelIds(document, [...existing, ...hits]);
+    patch({ marquee: preview ? rect : null, dragging: preview, selection: ids.length ? { kind: "panels", ids } : { kind: "none" } });
   };
-  target.addEventListener("pointermove", move);
-  target.addEventListener("pointerup", end);
-  target.addEventListener("pointercancel", end);
+  trackGesture(event, {
+    drag(pointer) { update(pointer, true); },
+    finish(pointer, dragged) {
+      if (dragged) update(pointer, false);
+      else if (!extend) patch({ selection: { kind: "none" } });
+    },
+    cancel() { patch({ marquee: null, dragging: false, selection: initial }); },
+  });
 }
 
 function fadeGuides(guides: Guide[]): void {

@@ -1,5 +1,5 @@
-import Type from "typebox";
-import { AIProviderConfigSchema } from "./ai.js";
+import Type, { type Static } from "typebox";
+import { AILayoutRequestSchema, AIProviderConfigSchema } from "./ai.js";
 import { AssetSchema } from "./assets.js";
 import { DomainCommandSchema } from "./commands.js";
 import { DiagnosticSchema } from "./diagnostics.js";
@@ -17,6 +17,24 @@ import {
 import { LayoutScoreSchema } from "./layout.js";
 import { JobErrorSchema, JobEventDataSchema, JobEventNameSchema, JobResultSchema } from "./jobs.js";
 import { nullable, object } from "./schema.js";
+
+export const MAX_AI_TURNS = 10;
+export const AIFrozenInputSchema = object({
+  request: AILayoutRequestSchema,
+  configRevision: RevisionSchema,
+  parentCandidateId: nullable(UuidSchema),
+  rootHash: DocumentHashSchema,
+  sourceHash: DocumentHashSchema,
+  engineVersion: NonEmptyStringSchema,
+  fontRegistryVersion: NonEmptyStringSchema,
+  previousTurns: Type.Array(object({
+    prompt: Type.String(), response: Type.String(), options: Type.Optional(Type.Array(Type.String())),
+  }), { maxItems: MAX_AI_TURNS - 1 }),
+});
+export type AIFrozenInput = Static<typeof AIFrozenInputSchema>;
+export const AIHistoryCursorSchema = object({
+  projectId: UuidSchema, baseRevision: nullable(RevisionSchema), createdAt: DateTimeSchema, id: UuidSchema,
+});
 
 export const ProjectRowSchema = object(
   {
@@ -60,6 +78,8 @@ export const CandidateRowSchema = object(
     id: UuidSchema,
     projectId: UuidSchema,
     baseRevision: RevisionSchema,
+    parentCandidateId: nullable(UuidSchema),
+    sourceJobId: nullable(UuidSchema),
     origin: Type.Union([Type.Literal("layout"), Type.Literal("ai")]),
     validationMode: Type.Union([Type.Literal("edit"), Type.Literal("layout")]),
     commandsJson: Type.Array(DomainCommandSchema),

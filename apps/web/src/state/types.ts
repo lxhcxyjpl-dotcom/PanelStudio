@@ -1,4 +1,4 @@
-import type { Candidate, Diagnostic, DomainCommand, FigureDocumentV1 } from "@panelstudio/contracts";
+import { ENGINE_VERSIONS, type AIHistoryTurn, type AIEditScope, type Candidate, type Diagnostic, type DomainCommand, type FigureDocumentV1 } from "@panelstudio/contracts";
 import type { Guide } from "../model/snap";
 import type { Camera } from "../model/view";
 import type { LocaleName, MotionPreference, ThemeName } from "../prefs";
@@ -63,13 +63,26 @@ export type HistoryRetry = {
 
 export type AiStatus =
   | { phase: "idle" }
-  | { phase: "running"; jobId: string; label: string }
+  | { phase: "running"; jobId: string | null; label: string; prompt: string; frozen: FrozenScope; baseRevision: number }
   | { phase: "clarification"; question: string; options: string[] }
   | { phase: "unsupported"; reason: string }
   | { phase: "failed"; code: string; message: string }
   | { phase: "cancelled" };
 
+export type FrozenScope = { scope: AIEditScope; selectedPanelIds: string[] };
+export type AwaitingAnswer = FrozenScope & { jobId: string; baseRevision: number; question: string; options: string[] };
+
 export type WorkspaceState = {
+  compareMode: "editing" | "original" | "draft";
+  candidateRoot: { revision: number; document: FigureDocumentV1 } | null;
+  aiHistory: AIHistoryTurn[];
+  historyCursor: string | null;
+  aiScope: AIEditScope;
+  scopeChanged: boolean;
+  frozenScope: FrozenScope | null;
+  awaitingAnswer: AwaitingAnswer | null;
+  aiPrompt: string;
+  marquee: { x: number; y: number; width: number; height: number } | null;
   theme: ThemeName;
   locale: LocaleName;
   motion: MotionPreference;
@@ -120,5 +133,7 @@ export function baseDocument(state: WorkspaceState): FigureDocumentV1 | null {
 export function candidatesStale(state: WorkspaceState): boolean {
   const base = state.cards[0]?.candidate.baseRevision;
   if (base === undefined || !state.confirmed) return false;
-  return base !== state.confirmed.revision || state.draft !== null;
+  return base !== state.confirmed.revision || state.draft !== null || state.cards.some(({ candidate }) =>
+    candidate.engineVersion !== ENGINE_VERSIONS.layout || candidate.fontRegistryVersion !== ENGINE_VERSIONS.fontRegistry);
+
 }
