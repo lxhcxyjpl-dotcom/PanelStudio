@@ -15,8 +15,9 @@ export type ServerOptions = {
 };
 
 /**
- * Phase 1 server: asset import, panel and label transactions, SVG export,
- * and project packages. Later-phase routes stay in the OpenAPI contract.
+ * Phase 2 server: phase 1 import and export, plus the edit kernel.
+ * Domain commands, undo, redo, and project files survive a process restart.
+ * Layout, AI, previews, and the workspace UI stay later phases.
  */
 export function createServer(options: ServerOptions = {}) {
   registerAjvFormats();

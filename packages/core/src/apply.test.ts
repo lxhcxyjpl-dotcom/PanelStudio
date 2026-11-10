@@ -70,19 +70,22 @@ describe("phase 1 commands", () => {
     }
   });
 
-  it("does not apply edit-kernel commands", () => {
+  it("moves a panel without renumbering or changing the crop", () => {
     const document = applyCommands(
       createDefaultFigureDocument(),
       [add(PANEL, { x: 10, y: 12, width: 40, height: 20 })],
       () => asset,
     );
-    expect(() =>
-      applyCommands(
-        document,
-        [{ type: "panel.setFrames", items: [{ panelId: PANEL, frameMm: { x: 12, y: 12, width: 40, height: 20 } }] }],
-        () => asset,
-      ),
-    ).toThrow(/phase 1/u);
+    const next = applyCommands(
+      document,
+      [{ type: "panel.setFrames", items: [{ panelId: PANEL, frameMm: { x: 14, y: 12, width: 40, height: 20 } }] }],
+      () => asset,
+    );
+    expect(document.panels[PANEL]?.frameMm.x).toBe(10);
+    expect(next.panels[PANEL]?.frameMm).toEqual({ x: 14, y: 12, width: 40, height: 20 });
+    expect(next.panels[PANEL]?.cropNormalized).toEqual({ x: 0, y: 0, width: 1, height: 1 });
+    expect(next.panelOrder).toEqual([PANEL]);
+    expect(next.stackOrder).toEqual([PANEL]);
   });
 
   it("numbers a second panel B without clearing the first", () => {

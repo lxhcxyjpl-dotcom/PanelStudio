@@ -5,9 +5,9 @@ export const SCHEMA_VERSION = 1 as const;
 
 /**
  * Application version reported by health.
- * Phase 1 is the import, label, save, and editable-SVG path on the phase 0 contract.
+ * Phase 2 is the edit kernel on the phase 0 contract and the phase 1 import path.
  */
-export const APP_VERSION = "0.1.0-phase1" as const;
+export const APP_VERSION = "0.1.0-phase2" as const;
 
 /**
  * The layout compiler is still phase 3, so it stays at 0.0.0.
