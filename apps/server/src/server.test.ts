@@ -15,7 +15,7 @@ describe("server wiring", () => {
     for (const directory of directories.splice(0)) rmSync(directory, { recursive: true, force: true });
   });
 
-  it("serves health for the phase 1 build", async () => {
+  it("serves health for the phase 2 build", async () => {
     const dataDir = mkdtempSync(path.join(tmpdir(), "panelstudio-"));
     directories.push(dataDir);
     const app = createServer({ dataDir });

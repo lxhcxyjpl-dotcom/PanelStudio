@@ -6,6 +6,7 @@ import {
   NORMALIZATION_VERSION,
   RESOURCE_LIMITS,
   isExportRequest,
+  isHistoryRequest,
   isTransactionRequest,
   createDefaultFigureDocument,
   pngPixelsFromMm,
@@ -295,47 +296,69 @@ export function commitTransaction(
       }
       throw error;
     }
-    const changed = canonicalJson(next) !== canonicalJson(current.document);
-    const now = ctx.now();
-    let revision = project.currentRevision;
-    let undoStack = project.undoStack;
-    let redoStack = project.redoStack;
-    if (changed) {
-      revision += 1;
-      undoStack = [...project.undoStack, project.currentRevision];
-      redoStack = [];
-      insertRevision(ctx.db, {
-        projectId,
-        revision,
-        baseRevision: request.baseRevision,
-        kind: "transaction",
-        document: next,
-        documentHash: hashFigureDocument(next),
-        commandsJson: request.commands,
-        transactionId: randomUUID(),
-        targetRevision: null,
-        engineVersion: ENGINE_VERSIONS.svg,
-        createdAt: now,
-      });
-      updateProjectHead(ctx.db, {
-        id: projectId,
-        currentRevision: revision,
-        updatedAt: now,
-        undoStack,
-        redoStack,
+    const saved = saveRevision(ctx, project, current.document, next, {
+      baseRevision: request.baseRevision,
+      kind: "transaction",
+      commandsJson: request.commands,
+      targetRevision: null,
+      undoStack: [...project.undoStack, project.currentRevision],
+      redoStack: [],
+    });
+    const response = transactionBody(projectId, saved);
+    remember(ctx, `transaction:${projectId}`, key, requestHash, 200, response);
+    return { status: 200, body: response };
+  });
+}
+
+export function commitHistory(
+  ctx: AppContext,
+  projectId: string,
+  direction: "undo" | "redo",
+  body: unknown,
+  key: string,
+  requestHash: string,
+): Response {
+  if (!isHistoryRequest(body)) {
+    throw new ApiException("REQUEST_INVALID", "The history request is invalid.");
+  }
+  return immediate(ctx.db, () => {
+    const replay = takeReplay(ctx, `history:${projectId}`, key, requestHash);
+    if (replay) return replay;
+    const project = requireProject(ctx, projectId);
+    assertMutable(project);
+    if (project.currentRevision !== body.baseRevision) {
+      throw new ApiException("REVISION_CONFLICT", "The document has changed.", {
+        expectedRevision: body.baseRevision,
+        actualRevision: project.currentRevision,
       });
     }
-    const document = changed ? next : current.document;
-    const response = {
-      projectId,
-      revision,
-      changed,
-      document,
-      documentHash: hashFigureDocument(document),
-      diagnostics: [] as Diagnostic[],
-      history: { canUndo: undoStack.length > 0, canRedo: redoStack.length > 0 },
-    };
-    remember(ctx, `transaction:${projectId}`, key, requestHash, 200, response);
+    const source = direction === "undo" ? project.undoStack : project.redoStack;
+    if (source.length === 0) {
+      throw new ApiException(
+        "REQUEST_INVALID",
+        direction === "undo" ? "There is nothing to undo." : "There is nothing to redo.",
+      );
+    }
+    const targetRevision = source[source.length - 1];
+    if (targetRevision === undefined) {
+      throw new ApiException(
+        "REQUEST_INVALID",
+        direction === "undo" ? "There is nothing to undo." : "There is nothing to redo.",
+      );
+    }
+    const target = requireRevision(ctx, projectId, targetRevision);
+    const current = requireRevision(ctx, projectId, project.currentRevision);
+    const nextSource = source.slice(0, -1);
+    const saved = saveRevision(ctx, project, current.document, target.document, {
+      baseRevision: body.baseRevision,
+      kind: direction,
+      commandsJson: [],
+      targetRevision,
+      undoStack: direction === "undo" ? nextSource : [...project.undoStack, project.currentRevision],
+      redoStack: direction === "redo" ? nextSource : [...project.redoStack, project.currentRevision],
+    });
+    const response = transactionBody(projectId, saved);
+    remember(ctx, `history:${projectId}`, key, requestHash, 200, response);
     return { status: 200, body: response };
   });
 }
@@ -871,6 +894,87 @@ function requireAsset(ctx: AppContext, projectId: string, assetId: string): Asse
 
 function assertMutable(project: ProjectRecord): void {
   if (project.deletedAt) throw new ApiException("PROJECT_DELETED", "The project is deleted.");
+}
+
+function saveRevision(
+  ctx: AppContext,
+  project: ProjectRecord,
+  current: FigureDocumentV1,
+  next: FigureDocumentV1,
+  change: {
+    baseRevision: number;
+    kind: string;
+    commandsJson: unknown;
+    targetRevision: number | null;
+    undoStack: number[];
+    redoStack: number[];
+  },
+): {
+  revision: number;
+  changed: boolean;
+  document: FigureDocumentV1;
+  documentHash: string;
+  history: { canUndo: boolean; canRedo: boolean };
+} {
+  const changed = canonicalJson(next) !== canonicalJson(current);
+  let revision = project.currentRevision;
+  let undoStack = project.undoStack;
+  let redoStack = project.redoStack;
+  const document = changed ? next : current;
+  if (changed) {
+    revision += 1;
+    undoStack = change.undoStack;
+    redoStack = change.redoStack;
+    const now = ctx.now();
+    insertRevision(ctx.db, {
+      projectId: project.id,
+      revision,
+      baseRevision: change.baseRevision,
+      kind: change.kind,
+      document,
+      documentHash: hashFigureDocument(document),
+      commandsJson: change.commandsJson,
+      transactionId: randomUUID(),
+      targetRevision: change.targetRevision,
+      engineVersion: ENGINE_VERSIONS.svg,
+      createdAt: now,
+    });
+    updateProjectHead(ctx.db, {
+      id: project.id,
+      currentRevision: revision,
+      updatedAt: now,
+      undoStack,
+      redoStack,
+    });
+  }
+  return {
+    revision,
+    changed,
+    document,
+    documentHash: hashFigureDocument(document),
+    history: { canUndo: undoStack.length > 0, canRedo: redoStack.length > 0 },
+  };
+}
+
+function transactionBody(
+  projectId: string,
+  saved: {
+    revision: number;
+    changed: boolean;
+    document: FigureDocumentV1;
+    documentHash: string;
+    history: { canUndo: boolean; canRedo: boolean };
+  },
+) {
+  return {
+    projectId,
+    revision: saved.revision,
+    changed: saved.changed,
+    document: saved.document,
+    documentHash: saved.documentHash,
+    diagnostics: [] as Diagnostic[],
+    history: saved.history,
+  };
 }
 
 function historyOf(project: ProjectRecord) {

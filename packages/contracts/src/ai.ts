@@ -242,6 +242,7 @@ export const AIIntentSchema = Type.Union([
   AIUnsupportedSchema,
 ]);
 
+export type AlignEdge = Static<typeof AlignEdgeSchema>;
 export type AIProviderConfig = Static<typeof AIProviderConfigSchema>;
 export type AILayoutRequest = Static<typeof AILayoutRequestSchema>;
 export type AIAction = Static<typeof AIActionSchema>;

@@ -131,7 +131,7 @@ export {
   StructuredOutputSchema,
   TargetRefSchema,
 } from "./ai.js";
-export type { AIAction, AIIntent, AILayoutRequest, AIProviderConfig, TargetRef } from "./ai.js";
+export type { AIAction, AIIntent, AILayoutRequest, AIProviderConfig, AlignEdge, TargetRef } from "./ai.js";
 export {
   AssetAcceptedSchema,
   AssetSchema,
@@ -231,6 +231,7 @@ export { buildOpenApiDocument, renderOpenApiDocument, toJsonSchema } from "./ope
 export {
   isExportRequest,
   isFigureDocument,
+  isHistoryRequest,
   isProjectManifest,
   isTransactionRequest,
 } from "./guards.js";

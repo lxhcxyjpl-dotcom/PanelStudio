@@ -10,6 +10,7 @@ import type { FastifyInstance } from "fastify";
 import { canonicalJson } from "@panelstudio/core";
 import { ApiException, requireIdempotencyKey, sendError } from "./http.js";
 import {
+  commitHistory,
   commitTransaction,
   createProject,
   exportFigure,
@@ -122,6 +123,18 @@ export function registerRoutes(app: FastifyInstance, ctx: AppContext): void {
   app.post("/api/v1/projects/:projectId/transactions", async (request, reply) => {
     const key = requireIdempotencyKey(request);
     const result = commitTransaction(ctx, projectIdOf(request.params), request.body, key, hashJson(request.body));
+    return reply.status(result.status).send(result.body);
+  });
+
+  app.post("/api/v1/projects/:projectId/history/undo", async (request, reply) => {
+    const key = requireIdempotencyKey(request);
+    const result = commitHistory(ctx, projectIdOf(request.params), "undo", request.body, key, hashJson(request.body));
+    return reply.status(result.status).send(result.body);
+  });
+
+  app.post("/api/v1/projects/:projectId/history/redo", async (request, reply) => {
+    const key = requireIdempotencyKey(request);
+    const result = commitHistory(ctx, projectIdOf(request.params), "redo", request.body, key, hashJson(request.body));
     return reply.status(result.status).send(result.body);
   });
 

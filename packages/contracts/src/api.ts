@@ -133,6 +133,8 @@ export const HistoryRequestSchema = object({
   baseRevision: RevisionSchema,
 });
 
+export type HistoryRequest = Static<typeof HistoryRequestSchema>;
+
 export const MaxCandidatesSchema = Type.Union(
   [Type.Literal(1), Type.Literal(2), Type.Literal(3)],
   { default: 3, description: "1, 2, or 3. Omitted means 3." },
