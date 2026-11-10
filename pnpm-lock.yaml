@@ -8,6 +8,9 @@ importers:
 
   .:
     devDependencies:
+      '@playwright/test':
+        specifier: 1.65.0
+        version: 1.65.0
       playwright:
         specifier: 1.65.0
         version: 1.65.0
@@ -78,6 +81,9 @@ importers:
       '@panelstudio/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@panelstudio/core':
+        specifier: workspace:*
+        version: link:../../packages/core
       '@panelstudio/ui':
         specifier: workspace:*
         version: link:../../packages/ui
@@ -127,6 +133,9 @@ importers:
       vite:
         specifier: 8.3.7
         version: 8.3.7(@types/node@22.20.5)
+      vitest:
+        specifier: 5.1.0
+        version: 5.1.0(@types/node@22.20.5)(vite@8.3.7(@types/node@22.20.5))
 
   packages/ai:
     dependencies:
@@ -465,6 +474,11 @@ packages:
 
   '@pinojs/redact@0.4.0':
     resolution: {integrity: sha512-k2ENnmBugE/rzQfEcdWHcCY+/FM3VLzH9cYEsbdsoqrvzAKRhUZeRNhAZvB8OitQJ1TBed3yqWtdjzS6wJKBwg==}
+
+  '@playwright/test@1.65.0':
+    resolution: {integrity: sha512-iGURLGuKDLakSEl7Pgfv8h7f+XLT+V861Wfhz0zlEl5nyFuKUopdkFBPKqTllTUp06aOwPuH8iuUEb3yp3MpbQ==}
+    engines: {node: '>=20'}
+    hasBin: true
 
   '@radix-ui/primitive@1.2.0':
     resolution: {integrity: sha512-KABY+VMIRPJL+Vyzv/335FEhXXD/xDv8BMb1kl48/aXJZMH0LtHCTx5ga5RnxaEP3nZHtmTLf1P9vanmFX46bw==}
@@ -1889,6 +1903,10 @@ snapshots:
   '@oxc-project/types@0.156.0': {}
 
   '@pinojs/redact@0.4.0': {}
+
+  '@playwright/test@1.65.0':
+    dependencies:
+      playwright: 1.65.0
 
   '@radix-ui/primitive@1.2.0': {}
 

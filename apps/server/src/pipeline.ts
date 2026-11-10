@@ -57,8 +57,10 @@ import {
   insertProject,
   insertRevision,
   listAssets,
+  markAssetRemoved,
   publicAsset,
   publicJob,
+  renameProject,
   sumOriginalBytes,
   touchProject,
   updateProjectHead,
@@ -122,6 +124,42 @@ export function createProject(ctx: AppContext, title: unknown, key: string, requ
 
 export function readProject(ctx: AppContext, projectId: string) {
   return projectView(requireProject(ctx, projectId));
+}
+
+/**
+ * Handbook project rename. It updates the project row only.
+ * The document, revision, and undo stacks stay where they are.
+ */
+export function renameProjectTitle(ctx: AppContext, projectId: string, title: unknown) {
+  if (!isTitle(title)) throw new ApiException("REQUEST_INVALID", "The project title is invalid.");
+  return immediate(ctx.db, () => {
+    const project = requireProject(ctx, projectId);
+    assertMutable(project);
+    if (project.title !== title) renameProject(ctx.db, projectId, title, ctx.now());
+    const next = requireProject(ctx, projectId);
+    return projectView(next);
+  });
+}
+
+/**
+ * Soft-remove a library asset the current document does not reference.
+ * Bytes stay so older revisions can still open the original.
+ */
+export function removeUnusedAsset(ctx: AppContext, projectId: string, assetId: string) {
+  return immediate(ctx.db, () => {
+    const project = requireProject(ctx, projectId);
+    assertMutable(project);
+    const asset = requireAsset(ctx, projectId, assetId);
+    const document = requireRevision(ctx, projectId, project.currentRevision).document;
+    const used = Object.values(document.panels).some((panel) => panel.assetId === assetId);
+    if (used) {
+      throw new ApiException("ASSET_IN_USE", "The asset is used by the current document.", {
+        assetIds: [assetId],
+      });
+    }
+    if (!asset.removedFromLibraryAt) markAssetRemoved(ctx.db, assetId, ctx.now());
+    return publicAsset(requireAsset(ctx, projectId, assetId));
+  });
 }
 
 export function readDocument(ctx: AppContext, projectId: string) {
