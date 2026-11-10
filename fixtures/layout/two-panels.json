@@ -1,0 +1,9 @@
+{
+  "id": "two-panels",
+  "expect": "candidates",
+  "family": "rows",
+  "panels": [
+    { "id": 1, "aspect": [2, 1], "frame": [10, 20, 40, 20] },
+    { "id": 2, "aspect": [2, 1], "frame": [70, 20, 40, 20] }
+  ]
+}

@@ -5,17 +5,17 @@ export const SCHEMA_VERSION = 1 as const;
 
 /**
  * Application version reported by health.
- * Phase 2 is the edit kernel on the phase 0 contract and the phase 1 import path.
+ * Phase 3 adds the automatic layout engine on the phase 0 contract.
  */
-export const APP_VERSION = "0.1.0-phase2" as const;
+export const APP_VERSION = "0.1.0-phase3" as const;
 
 /**
- * The layout compiler is still phase 3, so it stays at 0.0.0.
+ * Layout scoring is recorded with this engine version.
  * The SVG compiler shipped in phase 1. The font registry version identifies the
  * bundled family list. Font files are still not vendored.
  */
 export const ENGINE_VERSIONS = {
-  layout: "0.0.0",
+  layout: "0.1.0",
   svg: "0.1.0",
   fontRegistry: "1",
 } as const;

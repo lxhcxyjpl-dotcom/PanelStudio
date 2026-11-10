@@ -1,0 +1,17 @@
+{
+  "id": "unsatisfiable-constraints",
+  "expect": "conflict",
+  "family": "auto",
+  "constraints": [
+    { "id": "44444444-4444-4444-8444-444444444441", "kind": "row", "panels": [1, 2] },
+    { "id": "44444444-4444-4444-8444-444444444442", "kind": "equalWidth", "panels": [1, 2] }
+  ],
+  "conflictConstraints": [
+    "44444444-4444-4444-8444-444444444441",
+    "44444444-4444-4444-8444-444444444442"
+  ],
+  "panels": [
+    { "id": 1, "aspect": [2, 1], "frame": [10, 20, 40, 20] },
+    { "id": 2, "aspect": [1, 1], "frame": [70, 20, 36, 36] }
+  ]
+}

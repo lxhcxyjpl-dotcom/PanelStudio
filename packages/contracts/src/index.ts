@@ -232,6 +232,9 @@ export {
   isExportRequest,
   isFigureDocument,
   isHistoryRequest,
+  isLayoutCandidatesRequest,
+  isPreviewRequest,
   isProjectManifest,
   isTransactionRequest,
 } from "./guards.js";
+export type { LayoutCandidatesRequest } from "./guards.js";

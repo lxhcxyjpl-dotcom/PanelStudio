@@ -15,9 +15,9 @@ export type ServerOptions = {
 };
 
 /**
- * Phase 2 server: phase 1 import and export, plus the edit kernel.
- * Domain commands, undo, redo, and project files survive a process restart.
- * Layout, AI, previews, and the workspace UI stay later phases.
+ * Phase 3 server: phase 1 import and export, the phase 2 edit kernel,
+ * and automatic layout candidates. AI and the workspace UI stay later phases.
+ * Domain commands, undo, redo, candidates, and project files survive a restart.
  */
 export function createServer(options: ServerOptions = {}) {
   registerAjvFormats();

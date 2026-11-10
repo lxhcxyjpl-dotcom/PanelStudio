@@ -12,6 +12,8 @@ import { ApiException, requireIdempotencyKey, sendError } from "./http.js";
 import {
   commitHistory,
   commitTransaction,
+  createLayoutCandidates,
+  createPreview,
   createProject,
   exportFigure,
   importAsset,
@@ -20,6 +22,7 @@ import {
   readAsset,
   readAssetBytes,
   readAssets,
+  readCandidate,
   readDocument,
   readJob,
   readProject,
@@ -135,6 +138,28 @@ export function registerRoutes(app: FastifyInstance, ctx: AppContext): void {
   app.post("/api/v1/projects/:projectId/history/redo", async (request, reply) => {
     const key = requireIdempotencyKey(request);
     const result = commitHistory(ctx, projectIdOf(request.params), "redo", request.body, key, hashJson(request.body));
+    return reply.status(result.status).send(result.body);
+  });
+
+  app.post("/api/v1/projects/:projectId/layout-candidates", async (request, reply) => {
+    const key = requireIdempotencyKey(request);
+    const result = createLayoutCandidates(
+      ctx,
+      projectIdOf(request.params),
+      request.body,
+      key,
+      hashJson(request.body),
+    );
+    return reply.status(result.status).send(result.body);
+  });
+
+  app.get("/api/v1/projects/:projectId/candidates/:candidateId", async (request) => {
+    return readCandidate(ctx, projectIdOf(request.params), idOf(request.params, "candidateId"));
+  });
+
+  app.post("/api/v1/projects/:projectId/previews", async (request, reply) => {
+    const key = requireIdempotencyKey(request);
+    const result = createPreview(ctx, projectIdOf(request.params), request.body, key, hashJson(request.body));
     return reply.status(result.status).send(result.body);
   });
 
