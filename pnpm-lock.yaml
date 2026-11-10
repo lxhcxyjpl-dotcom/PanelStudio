@@ -17,12 +17,21 @@ importers:
 
   apps/server:
     dependencies:
+      '@fastify/multipart':
+        specifier: 9.4.0
+        version: 9.4.0
       '@fastify/type-provider-typebox':
         specifier: 6.3.0
         version: 6.3.0(ajv-formats@3.0.1(ajv@8.20.0))(typebox@1.4.6)
       '@panelstudio/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@panelstudio/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@panelstudio/svg':
+        specifier: workspace:*
+        version: link:../../packages/svg
       '@resvg/resvg-js':
         specifier: 2.6.2
         version: 2.6.2
@@ -35,6 +44,9 @@ importers:
       fastify:
         specifier: 5.12.8
         version: 5.12.8
+      fflate:
+        specifier: 0.8.3
+        version: 0.8.3
       sharp:
         specifier: 0.35.5
         version: 0.35.5(@types/node@22.20.5)
@@ -148,9 +160,18 @@ importers:
         specifier: workspace:*
         version: link:../contracts
     devDependencies:
+      '@types/node':
+        specifier: 22.20.5
+        version: 22.20.5
       typescript:
         specifier: 7.0.2
         version: 7.0.2
+      vite:
+        specifier: 8.3.7
+        version: 8.3.7(@types/node@22.20.5)
+      vitest:
+        specifier: 5.1.0
+        version: 5.1.0(@types/node@22.20.5)(vite@8.3.7(@types/node@22.20.5))
 
   packages/layout:
     dependencies:
@@ -167,10 +188,22 @@ importers:
       '@panelstudio/contracts':
         specifier: workspace:*
         version: link:../contracts
+      '@xmldom/xmldom':
+        specifier: 0.9.12
+        version: 0.9.12
     devDependencies:
+      '@types/node':
+        specifier: 22.20.5
+        version: 22.20.5
       typescript:
         specifier: 7.0.2
         version: 7.0.2
+      vite:
+        specifier: 8.3.7
+        version: 8.3.7(@types/node@22.20.5)
+      vitest:
+        specifier: 5.1.0
+        version: 5.1.0(@types/node@22.20.5)(vite@8.3.7(@types/node@22.20.5))
 
   packages/ui:
     devDependencies:
@@ -195,6 +228,9 @@ packages:
   '@fastify/ajv-compiler@4.0.7':
     resolution: {integrity: sha512-VP0yIfwlc1ohj733keYDqyHm1VWeP9VQxYomunhr90jkC4aNNibbkrRiaNgPgqj1ORxUenILR4qzA/ppYBNAtQ==}
 
+  '@fastify/busboy@3.2.5':
+    resolution: {integrity: sha512-y8MTAeBlEQUNVnskmZQwpseZN3EgCksQNOULlfxWY6o6VEqh01+oExMgbM7gN6YLQ8pNDYeweNPKJRt8jQm2ZQ==}
+
   '@fastify/deepmerge@3.2.4':
     resolution: {integrity: sha512-kc8GQq5gX9RRhw0rov3DMrN8wS8yRlxJRdDzsYwwdBV/wazuVgc/1K7CKL90tlvu3RlHan6Y0R0aE3nJtBz2eQ==}
 
@@ -209,6 +245,9 @@ packages:
 
   '@fastify/merge-json-schemas@0.2.2':
     resolution: {integrity: sha512-d/gx9sRbUCVgGRGzma46wLcwiY8noTqO2Nmjg/vbTARxHRE5bdh5PIL8s97Lt1X7ScRWRW52eVYxwIoPwIdVUA==}
+
+  '@fastify/multipart@9.4.0':
+    resolution: {integrity: sha512-Z404bzZeLSXTBmp/trCBuoVFX28pM7rhv849Q5TsbTFZHuk1lc4QjQITTPK92DKVpXmNtJXeHSSc7GYvqFpxAQ==}
 
   '@fastify/proxy-addr@5.1.2':
     resolution: {integrity: sha512-uqB4QsgVoro0XDC+DIftIMGXHdBPn+lK6Ek3xXAIxPMCJfqxnbtyEoMCm2KPUVOuIosd7Cyw9HawEqMFM/UA+g==}
@@ -1094,6 +1133,10 @@ packages:
   '@vitest/spy@5.1.0':
     resolution: {integrity: sha512-2DPO5OMHWKrBngC+fCmTQqemNF0gidRhp3lxbBmRhW+M1XJrfgPpqNqWVevXtn2f2ufD5ZaR1B6B641aAlcX5A==}
 
+  '@xmldom/xmldom@0.9.12':
+    resolution: {integrity: sha512-5AXjrcMClTryPe9LgZrygpB1lj7s0S9E0+W+AHaVKAVyHanafK86iPSvG5xHVSp/jC+VH1UXu0TAEmY279xH7A==}
+    engines: {node: '>=14.6'}
+
   abstract-logging@2.0.1:
     resolution: {integrity: sha512-2BjRTZxTPvheOvGbBslFSYOUkr+SjPtOnrLP33f+VIWLzezQpZcqVg7ja3L4dBXmzzgwT+a029jRx5PCi3JuiA==}
 
@@ -1177,6 +1220,9 @@ packages:
   fast-uri@4.2.3:
     resolution: {integrity: sha512-I1PXwP5eAhlNlcdpjt9CgB59op2ZvZfxw+BkqGFVIUOgNpCVTcTqp3HhTX7brxj5vsip+nSY4nTvff+eIA76hg==}
 
+  fastify-plugin@5.1.0:
+    resolution: {integrity: sha512-FAIDA8eovSt5qcDgcBvDuX/v0Cjz0ohGhENZ/wpc3y+oZCY2afZ9Baqql3g/lC+OHRnciQol4ww7tuthOb9idw==}
+
   fastify@5.12.8:
     resolution: {integrity: sha512-moP8exb2sCHLUbJkwp+I6C0padhy4D8lp0SdmzY7HhSdZuqm7O/u3o2aq7u8okaQ//33QDzj3G/u+FsSdB8Qzw==}
 
@@ -1191,6 +1237,9 @@ packages:
     peerDependenciesMeta:
       picomatch:
         optional: true
+
+  fflate@0.8.3:
+    resolution: {integrity: sha512-tbZNuJrLwGUp3zshBtdy4W+ORxZuIh8a5ilyIEQDC5rY1f3U20JMry0Ll3WBzU58EZKsEuJFXhb5gwv8CsPvgA==}
 
   find-my-way@9.10.0:
     resolution: {integrity: sha512-eru+uCPQ2g+nLBkf84MHP/KyNNMar0BDy0j+i8Fb72GF9/YHBZ58q7FODUtfVV7XU9nfRUHXSmaM8NmZcIbZ4Q==}
@@ -1656,6 +1705,8 @@ snapshots:
       ajv-formats: 3.0.1(ajv@8.20.0)
       fast-uri: 4.2.3
 
+  '@fastify/busboy@3.2.5': {}
+
   '@fastify/deepmerge@3.2.4': {}
 
   '@fastify/error@4.2.1': {}
@@ -1669,6 +1720,14 @@ snapshots:
   '@fastify/merge-json-schemas@0.2.2':
     dependencies:
       dequal: 2.0.3
+
+  '@fastify/multipart@9.4.0':
+    dependencies:
+      '@fastify/busboy': 3.2.5
+      '@fastify/deepmerge': 3.2.4
+      '@fastify/error': 4.2.1
+      fastify-plugin: 5.1.0
+      secure-json-parse: 4.1.1
 
   '@fastify/proxy-addr@5.1.2':
     dependencies:
@@ -2345,6 +2404,8 @@ snapshots:
 
   '@vitest/spy@5.1.0': {}
 
+  '@xmldom/xmldom@0.9.12': {}
+
   abstract-logging@2.0.1: {}
 
   ajv-formats@3.0.1(ajv@8.20.0):
@@ -2416,6 +2477,8 @@ snapshots:
 
   fast-uri@4.2.3: {}
 
+  fastify-plugin@5.1.0: {}
+
   fastify@5.12.8:
     dependencies:
       '@fastify/ajv-compiler': 4.0.7
@@ -2441,6 +2504,8 @@ snapshots:
   fdir@6.5.0(picomatch@4.0.7):
     optionalDependencies:
       picomatch: 4.0.7
+
+  fflate@0.8.3: {}
 
   find-my-way@9.10.0:
     dependencies:
