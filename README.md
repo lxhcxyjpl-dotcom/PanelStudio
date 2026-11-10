@@ -13,7 +13,9 @@ PanelStudio is a local or self-hosted editor for multi-panel scientific figures.
 3. Drag individual labels, rigid groups or selected panels. Reorder the panel list to change lettering. Arrange two or three selected units into a row, preserving their sizes or using a common width or height.
 4. Export editable SVG. The editor uses the bundled Noto faces to measure label ink and keeps text, supported vectors and raster images editable in their respective forms.
 
-![Refining a six-panel draft](docs/acceptance-v0.2/workspace/03-refined.png)
+![Six-panel project in the studio workspace](docs/screenshots/studio-workspace.webp)
+
+Import images, open a project file, or resume a recent project from the start screen. Choose **PanelStudio → Back to workspace home** to return there. The editorial image on the start screen is AI-generated. [Start screen](docs/screenshots/studio-home.webp) · [Reference & preferences](docs/screenshots/studio-reference.webp)
 
 [Reproducible project](examples/refinement-six/) · [Recorded walkthrough](docs/demo/v0.2-refinement.webm) · [Illustrator acceptance](docs/illustrator-compatibility.md)
 

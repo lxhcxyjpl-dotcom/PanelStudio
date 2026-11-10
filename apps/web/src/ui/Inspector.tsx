@@ -27,7 +27,7 @@ import { patch, useWorkspace } from "../state/store";
 import { baseDocument } from "../state/types";
 import { AiPanel } from "./AiPanel";
 import { LocalRow } from "./LocalRow";
-import { Button, NumberField, SelectField, TextField } from "./widgets";
+import { Button, Icon, NumberField, SelectField, TextField } from "./widgets";
 
 export function Inspector() {
   const { t } = useTranslation();
@@ -37,7 +37,7 @@ export function Inspector() {
   const document = baseDocument(state);
   return (
     <aside
-      className="sidebar right-sidebar"
+      className="sidebar right-sidebar" id="studio-inspector"
       data-testid="right-sidebar"
       data-open={state.rightOpen ? "true" : "false"}
       style={{ width }}
@@ -45,12 +45,14 @@ export function Inspector() {
     >
       <div className="tabs" role="tablist">
         <button type="button" data-action="tab-properties" role="tab" aria-selected={tab === "properties"} onClick={() => { setTab("properties"); continueEditing(); }}>
-          {t("inspector.tab")}
+          <Icon name="sliders" />{t("inspector.tab")}
         </button>
         <button type="button" data-action="tab-ai" role="tab" aria-selected={tab === "ai"} onClick={() => setTab("ai")}>
-          {t("ai.tab")}
+          <Icon name="layout" />{t("ai.tab")}
         </button>
       </div>
+      <Button action="close-inspector" className="drawer-close" variant="quiet" aria-label={t("a11y.close")}
+        onClick={() => patch({rightOpen:false})}><Icon name="close" /></Button>
       <div className="side-scroll">
         {tab === "ai" ? <AiPanel /> : document ? <Properties document={document} /> : <p className="muted section">{t("app.noProject")}</p>}
       </div>
@@ -78,48 +80,59 @@ function CanvasFields({ document }: { document: FigureDocumentV1 }) {
   const ungrouped = document.panelOrder.filter((id) => !Object.values(document.groups).some((group) => group.panelIds.includes(id)));
   return (
     <>
-      <section className="section">
+      <section className="section canvas-fields">
         <h2>{t("inspector.canvas")}</h2>
-        <div className="preset-row">
+        <div className="preset-row width-presets">
           {CANVAS_WIDTH_PRESETS_MM.map((width) => (
-            <Button key={width} action={`width-${width}`} onClick={() => void transact([{ type: "canvas.set", canvas: { ...canvas, widthMm: width } }])}>
+            <Button key={width} action={`width-${width}`} aria-pressed={canvas.widthMm === width} onClick={() => void transact([{ type: "canvas.set", canvas: { ...canvas, widthMm: width } }])}>
               {width} mm
             </Button>
           ))}
         </div>
-        <NumberField label={t("inspector.width") + " (mm)"} value={canvas.widthMm} min={0.1} onCommit={(widthMm) => void transact([{ type: "canvas.set", canvas: { ...canvas, widthMm } }])} />
-        <NumberField label={t("inspector.height") + " (mm)"} value={canvas.heightMm} min={0.1} onCommit={(heightMm) => void transact([{ type: "canvas.set", canvas: { ...canvas, heightMm } }])} />
+        <div className="field-pair">
+          <NumberField label={t("inspector.width") + " (mm)"} value={canvas.widthMm} min={0.1} onCommit={(widthMm) => void transact([{ type: "canvas.set", canvas: { ...canvas, widthMm } }])} />
+          <NumberField label={t("inspector.height") + " (mm)"} value={canvas.heightMm} min={0.1} onCommit={(heightMm) => void transact([{ type: "canvas.set", canvas: { ...canvas, heightMm } }])} />
+        </div>
         <SelectField
           label={t("inspector.heightMode")}
           value={canvas.heightMode}
           options={[{ value: "auto", label: t("inspector.auto") }, { value: "fixed", label: t("inspector.fixed") }]}
           onChange={(heightMode) => void transact([{ type: "canvas.set", canvas: { ...canvas, heightMode: heightMode === "fixed" ? "fixed" : "auto" } }])}
         />
-        <NumberField label={t("inspector.top") + " (mm)"} value={canvas.marginsMm.top} onCommit={(top) => void transact([{ type: "canvas.set", canvas: { ...canvas, marginsMm: { ...canvas.marginsMm, top } } }])} />
-        <NumberField label={t("inspector.right") + " (mm)"} value={canvas.marginsMm.right} onCommit={(right) => void transact([{ type: "canvas.set", canvas: { ...canvas, marginsMm: { ...canvas.marginsMm, right } } }])} />
-        <NumberField label={t("inspector.bottom") + " (mm)"} value={canvas.marginsMm.bottom} onCommit={(bottom) => void transact([{ type: "canvas.set", canvas: { ...canvas, marginsMm: { ...canvas.marginsMm, bottom } } }])} />
-        <NumberField label={t("inspector.left") + " (mm)"} value={canvas.marginsMm.left} onCommit={(left) => void transact([{ type: "canvas.set", canvas: { ...canvas, marginsMm: { ...canvas.marginsMm, left } } }])} />
-        <label className="field">
+        <fieldset className="margin-fields"><legend>{t("inspector.margins")} (mm)</legend>
+          <NumberField label={t("inspector.top")} value={canvas.marginsMm.top} onCommit={(top) => void transact([{ type: "canvas.set", canvas: { ...canvas, marginsMm: { ...canvas.marginsMm, top } } }])} />
+          <NumberField label={t("inspector.right")} value={canvas.marginsMm.right} onCommit={(right) => void transact([{ type: "canvas.set", canvas: { ...canvas, marginsMm: { ...canvas.marginsMm, right } } }])} />
+          <NumberField label={t("inspector.bottom")} value={canvas.marginsMm.bottom} onCommit={(bottom) => void transact([{ type: "canvas.set", canvas: { ...canvas, marginsMm: { ...canvas.marginsMm, bottom } } }])} />
+          <NumberField label={t("inspector.left")} value={canvas.marginsMm.left} onCommit={(left) => void transact([{ type: "canvas.set", canvas: { ...canvas, marginsMm: { ...canvas.marginsMm, left } } }])} />
+        </fieldset>
+        <label className="field canvas-background">
           <span>{t("inspector.background")}</span>
           <input value={canvas.background} disabled title={t("inspector.backgroundLocked")} readOnly />
         </label>
       </section>
-      <section className="section">
+      <section className="section canvas-fields">
         <h2>{t("inspector.gutter")}</h2>
-        <NumberField label={t("inspector.gutterX") + " (mm)"} value={settings.gutterMm.horizontal} onCommit={(horizontal) => void transact([{ type: "layout.setSettings", layoutSettings: { ...settings, gutterMm: { ...settings.gutterMm, horizontal } } }])} />
-        <NumberField label={t("inspector.gutterY") + " (mm)"} value={settings.gutterMm.vertical} onCommit={(vertical) => void transact([{ type: "layout.setSettings", layoutSettings: { ...settings, gutterMm: { ...settings.gutterMm, vertical } } }])} />
+        <div className="field-pair">
+          <NumberField label={t("inspector.gutterX") + " (mm)"} value={settings.gutterMm.horizontal} onCommit={(horizontal) => void transact([{ type: "layout.setSettings", layoutSettings: { ...settings, gutterMm: { ...settings.gutterMm, horizontal } } }])} />
+          <NumberField label={t("inspector.gutterY") + " (mm)"} value={settings.gutterMm.vertical} onCommit={(vertical) => void transact([{ type: "layout.setSettings", layoutSettings: { ...settings, gutterMm: { ...settings.gutterMm, vertical } } }])} />
+        </div>
         <SelectField
           label={t("inspector.primary")}
           value={settings.primaryPanelId ?? ""}
           options={[{ value: "", label: t("inspector.none") }, ...ungrouped.map((id) => ({ value: id, label: document.panels[id]?.name ?? id }))]}
           onChange={(value) => void transact([{ type: "layout.setSettings", layoutSettings: { ...settings, primaryPanelId: value || null } }])}
         />
-        <NumberField testId="min-width" label={t("inspector.minSize") + " (mm)"} value={settings.minPanelSizeMm.width} min={0.1} onCommit={(width) => void transact([{ type: "layout.setSettings", layoutSettings: { ...settings, minPanelSizeMm: { ...settings.minPanelSizeMm, width } } }])} />
-        <NumberField label={t("inspector.preferredHeight") + " (mm)"} value={settings.preferredHeightMm} min={0.1} onCommit={(preferredHeightMm) => void transact([{ type: "layout.setSettings", layoutSettings: { ...settings, preferredHeightMm } }])} />
-        <NumberField label={t("inspector.maxHeight") + " (mm)"} value={settings.maxAutoHeightMm} min={0.1} onCommit={(maxAutoHeightMm) => void transact([{ type: "layout.setSettings", layoutSettings: { ...settings, maxAutoHeightMm } }])} />
-        <NumberField label={t("inspector.ppi")} value={settings.targetRasterPpi} min={1} onCommit={(targetRasterPpi) => void transact([{ type: "layout.setSettings", layoutSettings: { ...settings, targetRasterPpi } }])} />
+        <details className="field-group advanced-fields">
+          <summary>{t("inspector.limits")}</summary>
+          <div className="field-pair">
+            <NumberField testId="min-width" label={t("inspector.minSize") + " (mm)"} value={settings.minPanelSizeMm.width} min={0.1} onCommit={(width) => void transact([{ type: "layout.setSettings", layoutSettings: { ...settings, minPanelSizeMm: { ...settings.minPanelSizeMm, width } } }])} />
+            <NumberField label={t("inspector.preferredHeight") + " (mm)"} value={settings.preferredHeightMm} min={0.1} onCommit={(preferredHeightMm) => void transact([{ type: "layout.setSettings", layoutSettings: { ...settings, preferredHeightMm } }])} />
+            <NumberField label={t("inspector.maxHeight") + " (mm)"} value={settings.maxAutoHeightMm} min={0.1} onCommit={(maxAutoHeightMm) => void transact([{ type: "layout.setSettings", layoutSettings: { ...settings, maxAutoHeightMm } }])} />
+            <NumberField label={t("inspector.ppi")} value={settings.targetRasterPpi} min={1} onCommit={(targetRasterPpi) => void transact([{ type: "layout.setSettings", layoutSettings: { ...settings, targetRasterPpi } }])} />
+          </div>
+        </details>
       </section>
-      <section className="section">
+      <section className="section canvas-fields">
         <h2>{t("inspector.labels")}</h2>
         <LabelStyleFields style={style} />
       </section>

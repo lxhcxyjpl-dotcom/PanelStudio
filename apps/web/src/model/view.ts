@@ -10,8 +10,9 @@ export function clampZoom(zoom: number): number {
 export function fitCamera(viewport: { width: number; height: number }, canvasMm: { width: number; height: number }): Camera {
   const paperW = canvasMm.width * PX_PER_MM;
   const paperH = canvasMm.height * PX_PER_MM;
-  const availableW = Math.max(1, viewport.width - 80);
-  const availableH = Math.max(1, viewport.height - 80);
+  const inset = viewport.width < 520 ? 16 : 40;
+  const availableW = Math.max(1, viewport.width - inset * 2);
+  const availableH = Math.max(1, viewport.height - inset * 2);
   const zoom = clampZoom(Math.min(availableW / paperW, availableH / paperH));
   return {
     zoom,

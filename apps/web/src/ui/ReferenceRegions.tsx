@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import type { ReferenceSlot } from "@panelstudio/contracts";
 import type { NamedUnit } from "../model/guided-preferences";
 import type { ReferenceImage, Region } from "../model/reference-image";
-import { Button } from "./widgets";
+import { Button, Icon } from "./widgets";
 
 type Point = { x: number; y: number };
 const clamp = (v: number) => Math.min(1, Math.max(0, v));
@@ -15,6 +15,7 @@ export function ReferenceRegions({ source, units, slots, change }: {
 }) {
   const { t } = useTranslation();
   const [edit, setEdit] = useState<number | null>(null);
+  const [review, setReview] = useState(slots.length !== units.length);
   const [draft, setDraft] = useState<Region | null>(null);
   const start = useRef<{ point: Point; pointer: number } | null>(null);
   function point(event: PointerEvent<HTMLDivElement>): Point {
@@ -32,11 +33,12 @@ export function ReferenceRegions({ source, units, slots, change }: {
     } else if (slots.length < 16) {
       const id = units.find((u) => !slots.some((s) => s.unitId === u.id))?.id ?? "";
       change([...slots, { ...r, unitId: id }]);
+      setReview(true);
     }
   }
   function overlay(r: Region) { return { left: r.x * 100 + "%", top: r.y * 100 + "%", width: r.width * 100 + "%", height: r.height * 100 + "%" }; }
   return <>
-    <div className="guide-sheet" data-testid="reference-sheet" aria-label={t("layout.reference")} style={{ width: "min(100%, " + source.aspect * 320 + "px)", aspectRatio: source.aspect }}
+    <div className="guide-sheet" data-testid="reference-sheet" aria-label={t("layout.reference")} style={{ width: "min(100%, " + source.aspect * (review ? 320 : 240) + "px)", aspectRatio: source.aspect }}
       onPointerDown={(e) => {
         if (e.button !== 0 || start.current) return;
         start.current = { point: point(e), pointer: e.pointerId }; e.currentTarget.setPointerCapture(e.pointerId);
@@ -55,13 +57,16 @@ export function ReferenceRegions({ source, units, slots, change }: {
     </div>
     <small>{t(edit === null ? "layout.drawRegions" : "layout.redraw", { index: (edit ?? 0) + 1 })}</small>
     <div className="guide-region-heading">
-      <strong>{t("layout.regionCount", { count: slots.length, target: units.length })}</strong>
+      <Button action="review-regions" variant="quiet" aria-expanded={review} aria-controls="reference-mappings"
+        title={t("layout.reviewMappings")} onClick={() => { setReview(!review); setEdit(null); }}>
+        <Icon name="chevron" /><strong>{t("layout.regionCount", { count: slots.length, target: units.length })}</strong>
+      </Button>
       <Button action="add-reference-region" variant="quiet" disabled={slots.length >= 16} onClick={() => {
         const id = units.find((u) => !slots.some((s) => s.unitId === u.id))?.id ?? "";
-        change([...slots, { x: 0.1, y: 0.1, width: 0.3, height: 0.3, unitId: id }]); setEdit(slots.length);
+        change([...slots, { x: 0.1, y: 0.1, width: 0.3, height: 0.3, unitId: id }]); setEdit(slots.length); setReview(true);
       }}>{t("layout.addRegion")}</Button>
     </div>
-    <ol className="guide-regions">{slots.map((s, i) => <li key={i}>
+    <ol className="guide-regions" id="reference-mappings" hidden={!review}>{slots.map((s, i) => <li key={i}>
       <div><label><span>{i + 1}</span><select aria-label={t("layout.slotFor", { index: i + 1 })} value={s.unitId} onChange={(e) => assign(i, e.target.value)}>
         <option value="">{t("layout.unassigned")}</option>{units.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}</select></label>
         <Button variant="quiet" action="edit-region" aria-pressed={edit === i} onClick={() => setEdit(edit === i ? null : i)}>{t("layout.editRegion")}</Button>

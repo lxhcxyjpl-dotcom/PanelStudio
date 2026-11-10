@@ -16,7 +16,7 @@ import {
   retrySave,
 } from "../state/session";
 import { patch, useWorkspace } from "../state/store";
-import { Button } from "./widgets";
+import { Button, Icon } from "./widgets";
 
 export function Dialogs() {
   const dialog = useWorkspace((state) => state.dialog);
@@ -40,11 +40,13 @@ export function Shell(props: { open: boolean; title: string; children: ReactNode
       <Dialog.Portal>
         <Dialog.Overlay className="scrim" />
         <Dialog.Content className={"dialog " + (props.className ?? "")} aria-describedby={undefined}>
-          <Dialog.Title>{props.title}</Dialog.Title>
+          <div className="dialog-heading">
+            <Dialog.Title>{props.title}</Dialog.Title>
+            <Dialog.Close asChild>
+              <Button action="close-dialog" variant="quiet" aria-label={t("a11y.close")} title={t("a11y.close")}><Icon name="close" /></Button>
+            </Dialog.Close>
+          </div>
           {props.children}
-          <Dialog.Close asChild>
-            <Button action="close-dialog">{t("a11y.close")}</Button>
-          </Dialog.Close>
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>

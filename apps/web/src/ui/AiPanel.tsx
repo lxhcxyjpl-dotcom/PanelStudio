@@ -109,6 +109,7 @@ export function AiPanel() {
       </div>
     </div> : null}
     {stale ? <p className="ai-warning">{t("ai.stale")}</p> : null}
+    <div className="ai-composer">
     <label className="field"><span>{clarification && !stale ? t("ai.answer") : t("ai.prompt")}</span>
       <textarea ref={input} data-testid="ai-prompt" rows={3} maxLength={4000} value={prompt}
         onChange={(e) => setPrompt(e.target.value)}
@@ -120,6 +121,7 @@ export function AiPanel() {
     </> : configured ? <p className="muted">{t("ai.textOnly")}</p> : null}
     {running ? <Button action="ai-cancel" onClick={() => void cancelAiPrompt()}>{t("ai.cancel")}</Button> :
       <Button variant="primary" action={stale ? "ai-regenerate" : "ai-send"} disabledReason={reason} onClick={() => send(stale)}>{t(stale ? "ai.regenerate" : state.aiStatus.phase === "failed" ? "ai.retry" : "ai.send")}</Button>}
+    </div>
     <div className="ai-examples"><h2>{t("ai.examplesShort")}</h2>
       {examples.slice(0, 3).map((key) => <Button key={key} action="fill-example" variant="quiet" onClick={() => setPrompt(t(`example.${key}`))}>{t(`example.${key}`)}</Button>)}
       <details><summary>{t("ai.more")}</summary>

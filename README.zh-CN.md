@@ -13,7 +13,9 @@ PanelStudio 是一个本地或自部署的科研多面板排版编辑器。导�
 3. 应用草案后，直接移动编号、拖动整组或多选对象，或在面板列表中调整编号顺序。选中两个或三个完整单元，可在指定区域内按原尺寸、等宽或等高排成一行。
 4. 导出可编辑 SVG。图块、支持的原生路径和文字、栅格素材保持独立。编号的屏幕预览和布局使用内置 Noto 字体的实际度量。
 
-![六图连续精修](docs/acceptance-v0.2/workspace/03-refined.png)
+![新版工作台中的六面板工程](docs/screenshots/studio-workspace.webp)
+
+首页可导入图片、打开工程包，或继续最近编辑的项目。编辑时可从左上角 **PanelStudio → 返回工作台首页** 切回。首页的科研印样场景为生成式插图。[首页实机截图](docs/screenshots/studio-home.webp) · [参考图与偏好窗口](docs/screenshots/studio-reference.webp)
 
 [可复现的六图工程](examples/refinement-six/) · [实机界面录像](docs/demo/v0.2-refinement.webm) · [本机 Illustrator 验收记录](docs/illustrator-compatibility.md)
 

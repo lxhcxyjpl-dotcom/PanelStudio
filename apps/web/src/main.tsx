@@ -7,6 +7,7 @@ import { initializeLabelFonts } from "@panelstudio/core/labels";
 import "@panelstudio/ui/tokens.css";
 import "./i18n";
 import "./styles.css";
+import "./studio.css";
 import { queryClient } from "./state/query";
 import { readPrefs } from "./prefs";
 

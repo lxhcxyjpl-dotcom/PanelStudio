@@ -38,11 +38,20 @@ import { GuidedDialog } from "./GuidedDialog";
 import { Inspector } from "./Inspector";
 import { LeftSidebar } from "./LeftSidebar";
 import { Toolbar } from "./Toolbar";
+import { StartScreen } from "./StartScreen";
 import { Button } from "./widgets";
 
 export function Workspace() {
   const { t } = useTranslation();
   const state = useWorkspace();
+  const drawerSide = state.confirmed && (state.mode === "drawer" || state.mode === "phone")
+    ? state.leftOpen ? "assets" : state.rightOpen ? "inspector" : null : null;
+  useEffect(() => {
+    if (!drawerSide) return;
+    const trigger = document.querySelector<HTMLButtonElement>('[data-action="drawer-' + drawerSide + '"]');
+    document.getElementById("studio-" + drawerSide)?.querySelector<HTMLButtonElement>('[role="tab"][aria-selected="true"]')?.focus({preventScroll:true});
+    return () => { if (trigger?.isConnected && trigger.getClientRects().length) trigger.focus({preventScroll:true}); };
+  }, [drawerSide]);
   useEffect(() => {
     void boot();
     const onResize = () => patch({ mode: workspaceMode(window.innerWidth) });
@@ -83,6 +92,10 @@ export function Workspace() {
       if (event.isComposing || event.key === "Process") return;
       const current = useWorkspace.getState();
       if (current.dialog || event.defaultPrevented) return;
+      if (event.key === "Escape" && (current.leftOpen || current.rightOpen) &&
+        (current.mode === "drawer" || current.mode === "phone")) {
+        patch({ leftOpen: false, rightOpen: false }); return;
+      }
       if (event.key === " " && !isTyping(event.target) && !event.repeat) {
         patch({ spacePan: true });
         event.preventDefault();
@@ -195,28 +208,32 @@ export function Workspace() {
   const right = sidebarWidth("right", state.mode, state.rightWidth);
   const stale = candidatesStale(state);
   return (
-    <div className="app" data-testid="workspace">
-      <Toolbar />
-      <div className="workspace">
-        <LeftSidebar />
-        {state.mode === "full" ? <Divider side="left" width={left} /> : <div className="divider" />}
-        <div className="canvas-column">
-          <Banners />
-          <CanvasStage />
-          <CandidateDock />
+    <div className="app" data-testid="workspace" data-editor={Boolean(state.confirmed)}>
+      <Toolbar inert={Boolean(drawerSide)} />
+      <div className={"workspace" + (state.confirmed ? "" : " home-workspace")}>
+        <div className="editor-panes" hidden={!state.confirmed}>
+          <LeftSidebar />
+          {state.mode === "full" ? <Divider side="left" width={left} /> : <div className="divider" />}
+          <div className="canvas-column" inert={Boolean(drawerSide)}>
+            {state.confirmed && <><Banners /><CanvasStage /></>}
+            <CandidateDock />
+          </div>
+          {state.mode === "full" ? <Divider side="right" width={right} /> : <div className="divider" />}
+          <Inspector />
+          {drawerSide &&
+            <button className="drawer-backdrop" type="button" tabIndex={-1} data-action="close-drawer" aria-label={t("a11y.close")}
+              onClick={() => patch({ leftOpen: false, rightOpen: false })} />}
         </div>
-        {state.mode === "full" ? <Divider side="right" width={right} /> : <div className="divider" />}
-        <Inspector />
+        {!state.confirmed && <><Banners />{state.booting ? <p className="start-loading" role="status">{t("app.opening")}</p> : <StartScreen />}</>}
         {state.draggingFiles ? <div className="drop-overlay">{t("assets.drop")}</div> : null}
       </div>
-      <footer className="bottombar">
-        <span>{t("status.zoom", { zoom: Math.round(state.camera.zoom * 100) })}</span>
+      {state.confirmed && <footer className="bottombar">
         <span>{t("status.panels", { count: state.confirmed?.document.panelOrder.length ?? 0 })}</span>
         <span className="font-status" data-testid="font-status" title={t("status.fontsReady", { families: BUNDLED_FONTS.map((font) => font.family).join(", ") })}>
-          {t("status.fontsReady", { families: BUNDLED_FONTS.map((font) => font.family).join(", ") })}
+          {t("status.typeReady")} · Noto Sans / Noto Sans SC
         </span>
         {stale ? <span>{state.cards.some((card) => card.candidate.origin === "ai") ? t("ai.stale") : t("layout.stale")}</span> : null}
-      </footer>
+      </footer>}
       <div className="sr-only" aria-live="polite" data-testid="live">{state.liveMessage}</div>
       <Dialogs />
       {state.confirmed && <GuidedDialog key={state.projectId} document={state.confirmed.document} open={state.dialog === "guided"} />}

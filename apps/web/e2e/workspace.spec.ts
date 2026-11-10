@@ -25,7 +25,7 @@ test.beforeEach(async ({ page }) => {
 
 test("imports, lays out, accepts, and exports through the real API", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "从图片开始一张图" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "创建科研组图" })).toBeVisible();
   const layoutCalls: string[] = [];
   page.on("request", (request) => {
     if (request.url().includes("/layout-candidates")) layoutCalls.push(request.postData() ?? "");
@@ -88,7 +88,7 @@ test("completes undo, layout, and export from the keyboard", async ({ page }) =>
 
 test("shows empty history, import failure, save failure, conflict, stale candidate, and font warning", async ({ page }) => {
   await page.goto("/");
-  await page.getByTestId("canvas").focus();
+  await page.locator("[data-action=empty-import]").focus();
   await page.keyboard.press("Control+Z");
   await expect(page.getByTestId("live")).toContainText("没有可撤销的操作");
   await page.getByTestId("import-input").setInputFiles([raster, script]);
@@ -134,6 +134,7 @@ test("reports a real layout conflict and restores the project after reload", asy
   await importFigures(page, [raster, photo]);
   await expect(page.getByTestId("panel-row")).toHaveCount(2);
   const minWidth = page.getByTestId("min-width");
+  await page.getByText("排版约束", { exact: true }).click();
   await minWidth.fill("200");
   await minWidth.press("Enter");
   await expect(page.getByTestId("save-status")).toHaveText("已保存");
@@ -151,27 +152,29 @@ test("reports a real layout conflict and restores the project after reload", asy
 
 test("switches theme tokens and English copy", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByTestId("toolbar").getByRole("button", { name: "导入图片" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "导入图片" })).toBeVisible();
   const light = await token(page, "--ui-background");
-  expect(light).toBe("#F5F5F7");
+  expect(light).toBe("#FAF9F5");
   const surface = await page.locator(".toolbar").evaluate((node) => getComputedStyle(node).backgroundColor);
-  expect(surface).toBe("rgb(255, 255, 255)");
+  expect(surface).toBe("rgb(250, 249, 245)");
   await page.getByRole("button", { name: "设置" }).click();
   await page.getByLabel("主题").selectOption("dark");
-  await expect.poll(() => token(page, "--ui-background")).toBe("#18181A");
+  await expect.poll(() => token(page, "--ui-background")).toBe("#22221F");
   const darkSurface = await page.locator(".toolbar").evaluate((node) => getComputedStyle(node).backgroundColor);
-  expect(darkSurface).toBe("rgb(34, 34, 37)");
+  expect(darkSurface).toBe("rgb(38, 38, 34)");
   await page.getByLabel("语言").selectOption("en-US");
   await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
   await page.getByRole("button", { name: "Close" }).click();
-  await expect(page.getByTestId("toolbar").getByRole("button", { name: "Import images" })).toBeVisible();
-  await expect(page.getByTestId("toolbar").getByRole("button", { name: "Auto layout" })).toBeVisible();
-  await expect(page.getByText("No project yet").first()).toBeVisible();
+  await expect(page.getByRole("button", { name: "Import images" })).toBeVisible();
+  await expect(page.getByTestId("save-status")).toHaveText("No project yet");
+  await page.getByTestId("import-input").setInputFiles([raster, photo]);
+  await expect(page.getByTestId("toolbar").getByRole("button", { name: "Auto layout" })).toBeEnabled();
   await shot(page, "phase4-dark-english");
 });
 
 test("keeps three columns at 1440, 1280, and 1024", async ({ page }) => {
   await page.goto("/");
+  await importFigures(page, [raster, photo]);
   for (const [width, left, right] of [
     [1440, 240, 304],
     [1280, 240, 304],
@@ -202,6 +205,43 @@ test("zeroes spatial motion when reduced motion is on", async ({ page }) => {
   const opacity = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--dur-opacity").trim());
   expect(spatial).toBe("0ms");
   expect(opacity).toBe("80ms");
+});
+
+test("opens a recent figure and uses both sidebars and the reference form on a phone", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/");
+  const pageWidth = () => page.evaluate(() => document.documentElement.scrollWidth);
+  await expect(page.getByRole("heading", { name: "创建科研组图" })).toBeVisible();
+  await expect.poll(pageWidth).toBe(390);
+  await page.getByTestId("import-input").setInputFiles([raster, photo]);
+  await expect(page.locator(".panel-frame")).toHaveCount(2);
+  const title = "Mobile studio " + Date.now();
+  const name = page.locator("input.project-name");
+  await name.fill(title);
+  const saved = page.waitForResponse(r => r.request().method() === "PATCH" && r.url().includes("/projects/"));
+  await name.press("Enter"); await saved;
+  await page.getByRole("button", { name: "项目菜单" }).click();
+  await page.getByRole("menuitem", { name: "返回工作台首页" }).click();
+  await page.getByRole("button", { name: new RegExp(title) }).click();
+  await expect(name).toHaveValue(title);
+  await expect.poll(pageWidth).toBe(390);
+  await page.locator("[data-action=drawer-assets]").click();
+  await page.locator("[data-action=asset-menu]").first().click();
+  await expect(page.getByRole("menuitem", { name: "查看素材信息" })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await page.locator("[data-action=close-assets]").click();
+  await page.locator("[data-action=drawer-inspector]").click();
+  await expect(page.getByLabel("宽度 (mm)", { exact: true })).toBeVisible();
+  await page.locator("[data-action=close-inspector]").click();
+  await expect(page.locator("[data-action=drawer-inspector]")).toBeFocused();
+  await page.locator("[data-action=guided-layout]").click();
+  const submit = page.locator("[data-action=generate-guided]");
+  await expect(submit).toBeInViewport();
+  await page.getByTestId("guide-words").fill("间距 4 mm");
+  await expect(submit).toBeEnabled();
+  await submit.click();
+  await expect(page.getByTestId("candidate-card").first()).toBeVisible();
+  await expect.poll(pageWidth).toBe(390);
 });
 
 async function shot(page: Page, name: string): Promise<void> {

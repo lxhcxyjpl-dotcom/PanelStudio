@@ -71,13 +71,13 @@ test.describe.serial("phase 5 AI", () => {
       if (request.url().includes("/ai-layouts")) aiCalls.push(request.url());
     });
     await page.goto("/");
+    await importFigures(page, [raster, photo]);
     await page.getByRole("tab", { name: "AI 布局" }).click();
     await expect(page.getByTestId("ai-status")).toContainText("AI 尚未配置");
     await page.getByRole("button", { name: "把 A 向右移动 2 mm" }).click();
     await expect(page.getByTestId("ai-prompt")).toHaveValue("把 A 向右移动 2 mm");
     await expect(page.getByRole("button", { name: "发送" })).toBeDisabled();
     await page.getByRole("tab", { name: "属性" }).click();
-    await importFigures(page, [raster, photo]);
     await expect(page.getByTestId("panel-row")).toHaveCount(2);
     await page.getByTestId("layout-button").click();
     await expect(page.getByTestId("candidate-card").first()).toBeVisible();

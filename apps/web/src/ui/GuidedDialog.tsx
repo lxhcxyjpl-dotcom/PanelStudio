@@ -7,7 +7,7 @@ import { requestLayout } from "../state/session";
 import { patch, useWorkspace } from "../state/store";
 import { Shell } from "./Dialogs";
 import { ReferenceRegions } from "./ReferenceRegions";
-import { Button } from "./widgets";
+import { Button, Icon } from "./widgets";
 
 type Choices = Partial<Record<"gap" | "shape" | "focus" | "first" | "second" | "axis", string>>;
 function choicesOf(p: GuidedPreferences) {
@@ -81,9 +81,12 @@ export function GuidedDialog({ document, open }: { document: FigureDocumentV1; o
           e.preventDefault(); e.stopPropagation();
           if (!busy && e.dataTransfer.files[0]) void load(e.dataTransfer.files[0]);
         }}>
-        <h3>{t("layout.reference")}</h3>
+        <h3 className="guide-section-heading"><Icon name="reference" />{t("layout.reference")}</h3>
         <p>{t("layout.referenceHint")}</p>
-        <label className="guide-file">{ref ? ref.name : t("layout.chooseImage")}
+        <label className={"guide-file" + (ref ? " has-reference" : "")}>
+          <Icon name={ref ? "image" : "import"} />
+          <span>{ref ? ref.name : t("layout.dropReference")}</span>
+          <small>{ref ? t("layout.changeReference") : "PNG · JPEG · WebP · SVG"}</small>
           <input data-testid="reference-file" aria-label={t("layout.chooseImage")} type="file" accept=".png,.jpg,.jpeg,.webp,.svg"
             onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) void load(f); }} /></label>
         {reading && <p role="status">{t("layout.readReference")}</p>}
@@ -102,7 +105,7 @@ export function GuidedDialog({ document, open }: { document: FigureDocumentV1; o
         }}>{t("layout.removeReference")}</Button>}
       </section>
       <section className="guide-section">
-        <label className="field"><span className="guide-title">{t("layout.taste")}</span>
+        <label className="field"><span className="guide-title guide-section-heading"><Icon name="sliders" />{t("layout.taste")}</span>
           <textarea data-testid="guide-words" maxLength={600} value={words} placeholder={t("layout.tasteExample")}
             onChange={(e) => describe(e.target.value)} /></label>
         <small>{t("layout.preferencesHint")}</small>

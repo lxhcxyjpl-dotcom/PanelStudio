@@ -33,6 +33,7 @@ import photoUrl from "../../../../fixtures/mixed/photo.jpg";
 import vectorUrl from "../../../../fixtures/mixed/panel-vector.svg";
 
 let chain: Promise<void> = Promise.resolve();
+const activeImports = new Set<Promise<void>>();
 let bootStarted = false;
 let nudgeTimer = 0;
 let nudge: { ids: string[]; dx: number; dy: number; kind: "panels" | "label"; projectId: string; epoch: number } | null = null;
@@ -232,6 +233,22 @@ export async function deleteCurrentProject(): Promise<void> {
   await api.deleteProject(projectId);
   await clearRecovery(projectId);
   if (useWorkspace.getState().projectId !== projectId) return;
+  showStart(i18n.t("toolbar.projectDeleted"));
+}
+
+export async function returnToStart(): Promise<void> {
+  const epoch = projectEpoch();
+  await Promise.allSettled([...activeImports]);
+  if (epoch !== projectEpoch()) return;
+  if (nudge) await flushNudge();
+  await chain;
+  if (epoch !== projectEpoch()) return;
+  const state = useWorkspace.getState();
+  if (state.draft) return patch({ dialog: "recovery", liveMessage: i18n.t("save.failed") });
+  showStart(i18n.t("toolbar.home"));
+}
+
+function showStart(message: string): void {
   resetCandidateSession(null);
   writeProjectId(null);
   patch({
@@ -259,7 +276,9 @@ export async function deleteCurrentProject(): Promise<void> {
     historyRetry: null,
     serverSnapshot: null,
     aiStatus: { phase: "idle" },
-    liveMessage: i18n.t("toolbar.projectDeleted"),
+    leftOpen: false,
+    rightOpen: false,
+    liveMessage: message,
   });
 }
 
@@ -274,14 +293,22 @@ export async function restoreListedProject(projectId: string): Promise<void> {
   patch({ liveMessage: i18n.t("toolbar.projectRestored") });
 }
 
-export async function renameTitle(title: string): Promise<void> {
-  const { projectId } = useWorkspace.getState();
-  if (!projectId) return;
-  const project = await api.renameProject(projectId, title);
-  patch({ title: project.title, liveMessage: i18n.t("save.saved") });
+export function renameTitle(title: string): Promise<void> {
+  return later(async () => {
+    const { projectId } = useWorkspace.getState();
+    if (!projectId) return;
+    const project = await api.renameProject(projectId, title);
+    if (useWorkspace.getState().projectId === projectId) patch({ title: project.title, liveMessage: i18n.t("save.saved") });
+  });
 }
 
-export async function importFiles(files: File[]): Promise<void> {
+export function importFiles(files: File[]): Promise<void> {
+  const pending = importAndPlace(files);
+  activeImports.add(pending);
+  return pending.finally(() => activeImports.delete(pending));
+}
+
+async function importAndPlace(files: File[]): Promise<void> {
   if (files.length === 0) return;
   const projectId = await ensureProject();
   const ready: string[] = [];

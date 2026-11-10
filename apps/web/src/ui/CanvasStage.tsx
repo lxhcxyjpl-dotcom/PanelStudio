@@ -15,6 +15,7 @@ import { assetLookup, labelMove, openSample, readyViewport, transact } from "../
 import { patch, useWorkspace } from "../state/store";
 import { errorText } from "../model/feedback";
 import { cancelGesture, trackGesture } from "./gesture";
+import { CanvasTools } from "./CanvasTools";
 import { baseDocument, type WorkspaceState } from "../state/types";
 
 export function CanvasStage() {
@@ -44,9 +45,10 @@ export function CanvasStage() {
 
   useEffect(() => {
     if (!art || !state.projectId || state.fittedProjectId === state.projectId) return;
-    if (state.viewport.width < 40) return;
+    const node = viewportRef.current;
+    if (!node || node.clientWidth < 40 || node.clientHeight < 40) return;
     patch({
-      camera: fitCamera(state.viewport, { width: art.canvas.widthMm, height: art.canvas.heightMm }),
+      camera: fitCamera({width:node.clientWidth, height:node.clientHeight}, { width: art.canvas.widthMm, height: art.canvas.heightMm }),
       fittedProjectId: state.projectId,
     });
   }, [art, state.fittedProjectId, state.projectId, state.viewport]);
@@ -84,7 +86,8 @@ export function CanvasStage() {
   }
 
   const px = PX_PER_MM;
-  return (
+  return <>
+    <CanvasTools art={art} />
     <div
       ref={viewportRef}
       className="canvas-viewport"
@@ -229,7 +232,7 @@ export function CanvasStage() {
       </div>
       {state.projectId && art.panelOrder.length === 0 ? <EmptyCanvas overlay /> : null}
     </div>
-  );
+  </>;
 }
 
 function EmptyCanvas({ overlay = false }: { overlay?: boolean }) {

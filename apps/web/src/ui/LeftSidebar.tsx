@@ -33,9 +33,11 @@ export function LeftSidebar() {
   });
   const document = baseDocument(state);
   const visible = (assets.data?.items ?? []).filter((asset) => !asset.removedFromLibraryAt);
+  const completed = state.imports.filter((row) => row.status === "ready").length;
+  const pending = state.imports.filter((row) => row.status !== "ready");
   return (
     <aside
-      className="sidebar left-sidebar"
+      className="sidebar left-sidebar" id="studio-assets"
       data-testid="left-sidebar"
       data-open={state.leftOpen ? "true" : "false"}
       style={{ width }}
@@ -43,26 +45,26 @@ export function LeftSidebar() {
     >
       <div className="tabs" role="tablist">
         <button type="button" data-action="tab-assets" role="tab" aria-selected={tab === "assets"} onClick={() => setTab("assets")}>
-          {t("assets.tab")}
+          <Icon name="image" />{t("assets.tab")}
         </button>
         <button type="button" data-action="tab-panels" role="tab" aria-selected={tab === "panels"} onClick={() => setTab("panels")}>
-          {t("panels.tab")}
+          <Icon name="layers" />{t("panels.tab")}
         </button>
       </div>
+      <Button action="close-assets" className="drawer-close" variant="quiet" aria-label={t("a11y.close")}
+        onClick={() => patch({leftOpen:false})}><Icon name="close" /></Button>
       <div className="side-scroll">
         {tab === "assets" ? (
-          <section className="section">
-            {state.imports.length > 0 ? (
+          <section className="section asset-library">
+            <div className="library-title"><h2>{t("assets.available")}</h2><span>{visible.length}</span></div>
+            {completed > 0 && <p className="import-summary" role="status"><Icon name="check" />{t("assets.importedCount",{count:completed})}</p>}
+            {pending.length > 0 ? (
               <ul className="import-log">
-                {state.imports.map((row) => (
+                {pending.map((row) => (
                   <li key={row.id} data-status={row.status}>
                     <strong>{row.filename}</strong>
                     <span>
-                      {row.status === "importing"
-                        ? t("assets.importing", { name: row.filename })
-                        : row.status === "ready"
-                          ? t("assets.imported", { name: row.filename })
-                          : row.message}
+                      {row.status === "importing" ? t("assets.importing", { name: row.filename }) : row.message}
                     </span>
                     {row.code === "SVG_UNSUPPORTED_FEATURE" ? (
                       <Button action="svg-help" onClick={() => patch({ dialog: "svg" })}>
@@ -106,26 +108,25 @@ function AssetCard({ asset, count }: { asset: Asset; count: number }) {
       </div>
       <div className="asset-copy">
         <strong title={asset.originalFilename}>{asset.originalFilename}</strong>
-        <span>{format}</span>
-        <span>{t("assets.original")} {size}</span>
-        <span>{asset.status === "ready" ? t("assets.ready") : asset.status === "failed" ? t("assets.failed") : t("assets.processing")}</span>
-        <span>{t("assets.used", { count })}</span>
-        {asset.diagnostics.length > 0 ? <span className="marker">{asset.diagnostics.map((item) => formatDiagnostic(t, item)).join(" ")}</span> : null}
+        <span>{format} · {size}</span>
+        <span className="asset-status">{asset.status === "ready" ? t("assets.used", {count}) : t(asset.status === "failed" ? "assets.failed" : "assets.processing")}</span>
       </div>
-      <div className="asset-actions">
-        <Button action="add-asset" disabledReason={asset.status === "ready" ? undefined : t("assets.processing")} onClick={() => void offerAssets([asset.id])}>
-          {t("assets.add")}
-        </Button>
-        <Button action="download-original" onClick={() => void downloadOriginal(asset.id)}>
-          {t("assets.download")}
-        </Button>
-        <Button action="asset-info" onClick={() => patch({ dialog: "asset", assetInfoId: asset.id })}>
-          {t("assets.info")}
-        </Button>
-        <Button action="remove-asset" disabledReason={count > 0 ? t("assets.removeReasonUsed") : undefined} onClick={() => void removeAsset(asset.id)}>
-          {t("assets.remove")}
-        </Button>
+      <div className="asset-tools">
+        <Button action="add-asset" variant="quiet" aria-label={t("assets.add")} title={t("assets.add")}
+          disabledReason={asset.status === "ready" ? undefined : t("assets.processing")} onClick={() => void offerAssets([asset.id])}><Icon name="plus" /></Button>
+        <DropdownMenu.Root>
+          <DropdownMenu.Trigger asChild><Button action="asset-menu" variant="quiet" aria-label={t("assets.actions",{name:asset.originalFilename})} title={t("toolbar.more")}><Icon name="more" /></Button></DropdownMenu.Trigger>
+          <DropdownMenu.Portal>
+            <DropdownMenu.Content className="menu" align="end" sideOffset={4}>
+              <DropdownMenu.Item className="menu-item" data-action="asset-info" onSelect={() => patch({dialog:"asset",assetInfoId:asset.id})}>{t("assets.info")}</DropdownMenu.Item>
+              <DropdownMenu.Item className="menu-item" data-action="download-original" onSelect={() => void downloadOriginal(asset.id)}>{t("assets.download")}</DropdownMenu.Item>
+              <DropdownMenu.Item className="menu-item" data-action="remove-asset" disabled={count > 0} title={count > 0 ? t("assets.removeReasonUsed") : undefined}
+                onSelect={() => void removeAsset(asset.id)}>{t("assets.remove")}</DropdownMenu.Item>
+            </DropdownMenu.Content>
+          </DropdownMenu.Portal>
+        </DropdownMenu.Root>
       </div>
+      {asset.diagnostics.length > 0 && <span className="asset-diagnostic">{asset.diagnostics.map((item) => formatDiagnostic(t, item)).join(" ")}</span>}
     </article>
   );
 }
@@ -255,7 +256,7 @@ function PanelList({ openPanels, onToggle }: { openPanels: Record<string, boolea
               <DropdownMenu.Root>
                 <DropdownMenu.Trigger asChild>
                   <Button action="stack-menu" aria-label={t("panels.stack")} onClick={(event) => event.stopPropagation()}>
-                    <Icon name="chevron" />
+                    <Icon name="more" />
                   </Button>
                 </DropdownMenu.Trigger>
                 <DropdownMenu.Portal>

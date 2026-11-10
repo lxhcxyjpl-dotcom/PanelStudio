@@ -1,5 +1,5 @@
 export const uiFontFamily =
-  'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans SC", sans-serif';
+  '"Segoe UI", -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif';
 
 export const uiType = {
   projectTitle: { fontSizePx: 14, lineHeightPx: 20, fontWeight: 600 },
