@@ -1,7 +1,15 @@
 import { mkdirSync } from "node:fs";
 import path from "node:path";
 import Database from "better-sqlite3";
-import type { Asset, Diagnostic, FigureDocumentV1, Job, NormalizedAsset } from "@panelstudio/contracts";
+import type {
+  Asset,
+  Diagnostic,
+  DomainCommand,
+  FigureDocumentV1,
+  Job,
+  LayoutScore,
+  NormalizedAsset,
+} from "@panelstudio/contracts";
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS projects (
@@ -175,6 +183,22 @@ export type IdempotencyRecord = {
   requestHash: string;
   httpStatus: number;
   responseJson: string;
+};
+
+export type CandidateRecord = {
+  id: string;
+  projectId: string;
+  baseRevision: number;
+  origin: "layout" | "ai";
+  validationMode: "edit" | "layout";
+  commands: DomainCommand[];
+  resultDocumentHash: string;
+  summary: string;
+  diagnostics: Diagnostic[];
+  score: LayoutScore;
+  engineVersion: string;
+  fontRegistryVersion: string;
+  createdAt: string;
 };
 
 type ProjectRow = {
@@ -490,6 +514,69 @@ export function insertArtifact(db: Database.Database, artifact: ArtifactRecord):
 export function getArtifact(db: Database.Database, id: string): ArtifactRecord | null {
   const row = db.prepare(`SELECT * FROM artifacts WHERE id = ?`).get(id) as ArtifactRecord | undefined;
   return row ?? null;
+}
+
+export function insertCandidate(db: Database.Database, candidate: CandidateRecord): void {
+  db.prepare(
+    `INSERT INTO candidates (
+      id, projectId, baseRevision, origin, validationMode, commandsJson, resultDocumentHash,
+      summary, diagnosticsJson, scoreJson, engineVersion, fontRegistryVersion, createdAt
+    ) VALUES (
+      @id, @projectId, @baseRevision, @origin, @validationMode, @commandsJson, @resultDocumentHash,
+      @summary, @diagnosticsJson, @scoreJson, @engineVersion, @fontRegistryVersion, @createdAt
+    )
+    ON CONFLICT(id) DO NOTHING`,
+  ).run({
+    id: candidate.id,
+    projectId: candidate.projectId,
+    baseRevision: candidate.baseRevision,
+    origin: candidate.origin,
+    validationMode: candidate.validationMode,
+    commandsJson: JSON.stringify(candidate.commands),
+    resultDocumentHash: candidate.resultDocumentHash,
+    summary: candidate.summary,
+    diagnosticsJson: JSON.stringify(candidate.diagnostics),
+    scoreJson: JSON.stringify(candidate.score),
+    engineVersion: candidate.engineVersion,
+    fontRegistryVersion: candidate.fontRegistryVersion,
+    createdAt: candidate.createdAt,
+  });
+}
+
+export function getCandidate(db: Database.Database, id: string): CandidateRecord | null {
+  const row = db.prepare(`SELECT * FROM candidates WHERE id = ?`).get(id) as
+    | {
+        id: string;
+        projectId: string;
+        baseRevision: number;
+        origin: "layout" | "ai";
+        validationMode: "edit" | "layout";
+        commandsJson: string;
+        resultDocumentHash: string;
+        summary: string;
+        diagnosticsJson: string;
+        scoreJson: string;
+        engineVersion: string;
+        fontRegistryVersion: string;
+        createdAt: string;
+      }
+    | undefined;
+  if (!row) return null;
+  return {
+    id: row.id,
+    projectId: row.projectId,
+    baseRevision: row.baseRevision,
+    origin: row.origin,
+    validationMode: row.validationMode,
+    commands: JSON.parse(row.commandsJson) as DomainCommand[],
+    resultDocumentHash: row.resultDocumentHash,
+    summary: row.summary,
+    diagnostics: JSON.parse(row.diagnosticsJson) as Diagnostic[],
+    score: JSON.parse(row.scoreJson) as LayoutScore,
+    engineVersion: row.engineVersion,
+    fontRegistryVersion: row.fontRegistryVersion,
+    createdAt: row.createdAt,
+  };
 }
 
 export function getIdempotency(

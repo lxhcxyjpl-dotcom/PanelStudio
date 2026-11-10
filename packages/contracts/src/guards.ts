@@ -1,6 +1,14 @@
 import { Check } from "typebox/value";
-import { ExportRequestSchema, HistoryRequestSchema, type ExportRequest } from "./api.js";
-import type { HistoryRequest } from "./api.js";
+import {
+  ExportRequestSchema,
+  HistoryRequestSchema,
+  LayoutCandidatesRequestSchema,
+  PreviewRequestSchema,
+  type ExportRequest,
+  type HistoryRequest,
+  type PreviewRequest,
+} from "./api.js";
+import type { Static } from "typebox";
 import { TransactionRequestSchema, type TransactionRequest } from "./commands.js";
 import { FigureDocumentSchema, type FigureDocumentV1 } from "./document.js";
 import { ProjectManifestSchema, type ProjectManifest } from "./project-package.js";
@@ -23,4 +31,14 @@ export function isExportRequest(value: unknown): value is ExportRequest {
 
 export function isProjectManifest(value: unknown): value is ProjectManifest {
   return Check(ProjectManifestSchema, value);
+}
+
+export type LayoutCandidatesRequest = Static<typeof LayoutCandidatesRequestSchema>;
+
+export function isLayoutCandidatesRequest(value: unknown): value is LayoutCandidatesRequest {
+  return Check(LayoutCandidatesRequestSchema, value);
+}
+
+export function isPreviewRequest(value: unknown): value is PreviewRequest {
+  return Check(PreviewRequestSchema, value);
 }

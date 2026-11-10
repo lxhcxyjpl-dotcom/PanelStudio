@@ -10,3 +10,5 @@ Phase 1 mixed set:
 - `expected/mixed-panels.svg` — sample editable export of the mixed set. Illustrator still has to be checked by a person.
 
 Handbook section 21.2 lists further goldens for later phases. Those are not all present yet.
+
+Phase 3 layout cases live in `layout/`. Each file is a compact panel list the layout tests expand into a `FigureDocumentV1`; it is not a second document model. The set covers 2–8 panels, a locked panel, a rigid group, a hero primary, and an unsatisfiable hard-constraint pair.

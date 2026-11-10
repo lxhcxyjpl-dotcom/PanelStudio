@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import path from "node:path";
 import {
   APP_VERSION,
@@ -7,18 +7,24 @@ import {
   RESOURCE_LIMITS,
   isExportRequest,
   isHistoryRequest,
+  isLayoutCandidatesRequest,
+  isPreviewRequest,
   isTransactionRequest,
   createDefaultFigureDocument,
   pngPixelsFromMm,
+  type Candidate,
   type Diagnostic,
   type DomainCommand,
   type ErrorCode,
   type ExportRequest,
   type FigureDocumentV1,
   type Job,
+  type LayoutCandidatesRequest,
   type NormalizedAsset,
+  type PreviewRequest,
   type TransactionRequest,
 } from "@panelstudio/contracts";
+import { solveLayout } from "@panelstudio/layout";
 import {
   DocumentCommandError,
   applyCommands,
@@ -36,6 +42,7 @@ import {
   countAssets,
   getArtifact,
   getAsset,
+  getCandidate,
   getIdempotency,
   getJob,
   getProject,
@@ -43,6 +50,7 @@ import {
   immediate,
   insertArtifact,
   insertAsset,
+  insertCandidate,
   insertIdempotency,
   insertJob,
   insertJobEvent,
@@ -276,7 +284,7 @@ export function commitTransaction(
     const project = requireProject(ctx, projectId);
     assertMutable(project);
     if ("candidateId" in request) {
-      throw new ApiException("NOT_FOUND", "Candidate was not found.");
+      return acceptCandidate(ctx, project, request.baseRevision, request.candidateId, key, requestHash);
     }
     if (project.currentRevision !== request.baseRevision) {
       throw new ApiException("REVISION_CONFLICT", "The document has changed.", {
@@ -308,6 +316,325 @@ export function commitTransaction(
     remember(ctx, `transaction:${projectId}`, key, requestHash, 200, response);
     return { status: 200, body: response };
   });
+}
+
+function acceptCandidate(
+  ctx: AppContext,
+  project: ProjectRecord,
+  baseRevision: number,
+  candidateId: string,
+  key: string,
+  requestHash: string,
+): Response {
+  const candidate = getCandidate(ctx.db, candidateId);
+  if (!candidate || candidate.projectId !== project.id) {
+    throw new ApiException("NOT_FOUND", "Candidate was not found.");
+  }
+  if (project.currentRevision !== baseRevision) {
+    throw new ApiException("REVISION_CONFLICT", "The document has changed.", {
+      expectedRevision: baseRevision,
+      actualRevision: project.currentRevision,
+    });
+  }
+  if (
+    candidate.baseRevision !== project.currentRevision ||
+    candidate.engineVersion !== ENGINE_VERSIONS.layout ||
+    candidate.fontRegistryVersion !== ENGINE_VERSIONS.fontRegistry
+  ) {
+    throw new ApiException("CANDIDATE_STALE", "The candidate does not match this document.", {
+      expectedRevision: candidate.baseRevision,
+      actualRevision: project.currentRevision,
+    });
+  }
+  const current = requireRevision(ctx, project.id, project.currentRevision);
+  let next: FigureDocumentV1;
+  try {
+    next = applyCommands(current.document, candidate.commands, (assetId) => readyFacts(ctx, project.id, assetId));
+  } catch (error) {
+    if (error instanceof DocumentCommandError) {
+      throw new ApiException(error.code, error.message, error.details);
+    }
+    throw error;
+  }
+  if (hashFigureDocument(next) !== candidate.resultDocumentHash) {
+    throw new ApiException("CANDIDATE_STALE", "The candidate does not match this document.", {
+      expectedRevision: candidate.baseRevision,
+      actualRevision: project.currentRevision,
+    });
+  }
+  const saved = saveRevision(ctx, project, current.document, next, {
+    baseRevision,
+    kind: "transaction",
+    commandsJson: candidate.commands,
+    targetRevision: null,
+    undoStack: [...project.undoStack, project.currentRevision],
+    redoStack: [],
+  });
+  const response = transactionBody(project.id, saved, candidate.diagnostics);
+  remember(ctx, `transaction:${project.id}`, key, requestHash, 200, response);
+  return { status: 200, body: response };
+}
+
+export function createLayoutCandidates(
+  ctx: AppContext,
+  projectId: string,
+  body: unknown,
+  key: string,
+  requestHash: string,
+): Response {
+  if (!isLayoutCandidatesRequest(body)) {
+    throw new ApiException("REQUEST_INVALID", "The layout request is invalid.");
+  }
+  const request = body as LayoutCandidatesRequest;
+  return immediate(ctx.db, () => {
+    const replay = takeReplay(ctx, `layout:${projectId}`, key, requestHash);
+    if (replay) return replay;
+    const project = requireProject(ctx, projectId);
+    assertMutable(project);
+    if (project.currentRevision !== request.baseRevision) {
+      throw new ApiException("REVISION_CONFLICT", "The document has changed.", {
+        expectedRevision: request.baseRevision,
+        actualRevision: project.currentRevision,
+      });
+    }
+    const current = requireRevision(ctx, projectId, project.currentRevision);
+    const solved = solveLayout({
+      document: current.document,
+      request: request.request,
+      assets: assetFactsForDocument(ctx, projectId, current.document),
+      ...(request.maxCandidates ? { maxCandidates: request.maxCandidates } : {}),
+    });
+    if (!solved.ok) {
+      throw new ApiException(solved.code, solved.message, solved.details);
+    }
+    const now = ctx.now();
+    const candidates = solved.candidates.map((candidate) => {
+      const id = deterministicUuid({
+        projectId,
+        baseRevision: request.baseRevision,
+        engineVersion: ENGINE_VERSIONS.layout,
+        fontRegistryVersion: ENGINE_VERSIONS.fontRegistry,
+        summary: candidate.summary,
+        commands: candidate.commands,
+        score: candidate.score,
+      });
+      const record = {
+        id,
+        projectId,
+        baseRevision: request.baseRevision,
+        origin: "layout" as const,
+        validationMode: "layout" as const,
+        commands: candidate.commands,
+        resultDocumentHash: hashFigureDocument(candidate.previewDocument),
+        summary: candidate.summary,
+        diagnostics: candidate.diagnostics,
+        score: candidate.score,
+        engineVersion: ENGINE_VERSIONS.layout,
+        fontRegistryVersion: ENGINE_VERSIONS.fontRegistry,
+        createdAt: now,
+      };
+      insertCandidate(ctx.db, record);
+      return publicCandidate(record, candidate.previewDocument);
+    });
+    const response = { candidates };
+    remember(ctx, `layout:${projectId}`, key, requestHash, 200, response);
+    return { status: 200, body: response };
+  });
+}
+
+export function readCandidate(ctx: AppContext, projectId: string, candidateId: string): Candidate {
+  requireProject(ctx, projectId);
+  const candidate = getCandidate(ctx.db, candidateId);
+  if (!candidate || candidate.projectId !== projectId) {
+    throw new ApiException("NOT_FOUND", "Candidate was not found.");
+  }
+  const revision = getRevision(ctx.db, projectId, candidate.baseRevision);
+  if (!revision) throw new ApiException("CANDIDATE_STALE", "The candidate does not match this document.");
+  let preview: FigureDocumentV1;
+  try {
+    preview = applyCommands(revision.document, candidate.commands, (assetId) => readyFacts(ctx, projectId, assetId));
+  } catch (error) {
+    if (error instanceof DocumentCommandError) {
+      throw new ApiException("CANDIDATE_STALE", "The candidate does not match this document.", error.details);
+    }
+    throw error;
+  }
+  if (hashFigureDocument(preview) !== candidate.resultDocumentHash) {
+    throw new ApiException("CANDIDATE_STALE", "The candidate does not match this document.");
+  }
+  return publicCandidate(candidate, preview);
+}
+
+export function createPreview(
+  ctx: AppContext,
+  projectId: string,
+  body: unknown,
+  key: string,
+  requestHash: string,
+): Response {
+  if (!isPreviewRequest(body)) throw new ApiException("REQUEST_INVALID", "The preview request is invalid.");
+  const request = body as PreviewRequest;
+  const replay = takeReplay(ctx, `preview:${projectId}`, key, requestHash);
+  if (replay) return replay;
+  const project = requireProject(ctx, projectId);
+  assertMutable(project);
+  const source = previewSource(ctx, projectId, request);
+  const pixelHeight = Math.max(1, Math.round((request.pixelWidth * source.document.canvas.heightMm) / source.document.canvas.widthMm));
+  if (
+    request.pixelWidth > RESOURCE_LIMITS.maxPngOutputEdgePx ||
+    pixelHeight > RESOURCE_LIMITS.maxPngOutputEdgePx ||
+    request.pixelWidth * pixelHeight > RESOURCE_LIMITS.maxPngOutputPixels
+  ) {
+    throw new ApiException("EXPORT_TOO_LARGE", "The preview exceeds the output limit.");
+  }
+  const jobId = randomUUID();
+  const now = ctx.now();
+  try {
+    const compiled = compileDocument(ctx, projectId, source.document, source.revision, false);
+    const png = rasterizeSvg(compiled.svg, request.pixelWidth);
+    const stored = ctx.blobs.put(png);
+    const artifactId = randomUUID();
+    return immediate(ctx.db, () => {
+      const again = takeReplay(ctx, `preview:${projectId}`, key, requestHash);
+      if (again) return again;
+      insertArtifact(ctx.db, {
+        id: artifactId,
+        projectId,
+        revision: source.revision,
+        candidateId: source.candidateId,
+        kind: "preview",
+        mediaType: "image/png",
+        filename: "preview.png",
+        byteLength: png.byteLength,
+        sha256: stored.sha256,
+        blobPath: stored.relativePath,
+        rendererVersion: "resvg-js@2.6.2",
+        createdAt: now,
+      });
+      writeJob(ctx, {
+        id: jobId,
+        projectId,
+        kind: "preview",
+        status: "succeeded",
+        phase: "ready",
+        createdAt: now,
+        startedAt: now,
+        finishedAt: now,
+        result: { artifactId },
+        error: null,
+        inputJson: request,
+      });
+      const response = { jobId };
+      remember(ctx, `preview:${projectId}`, key, requestHash, 202, response);
+      return { status: 202, body: response };
+    });
+  } catch (error) {
+    const failed = failureOf(error);
+    return immediate(ctx.db, () => {
+      const again = takeReplay(ctx, `preview:${projectId}`, key, requestHash);
+      if (again) return again;
+      writeJob(ctx, {
+        id: jobId,
+        projectId,
+        kind: "preview",
+        status: "failed",
+        phase: "failed",
+        createdAt: now,
+        startedAt: now,
+        finishedAt: now,
+        result: null,
+        error: { code: failed.code, message: failed.message },
+        inputJson: request,
+      });
+      const response = { jobId };
+      remember(ctx, `preview:${projectId}`, key, requestHash, 202, response);
+      return { status: 202, body: response };
+    });
+  }
+}
+
+function previewSource(
+  ctx: AppContext,
+  projectId: string,
+  request: PreviewRequest,
+): { document: FigureDocumentV1; revision: number; candidateId: string | null } {
+  if ("candidateId" in request.source) {
+    const candidate = getCandidate(ctx.db, request.source.candidateId);
+    if (!candidate || candidate.projectId !== projectId) {
+      throw new ApiException("NOT_FOUND", "Candidate was not found.");
+    }
+    const revision = getRevision(ctx.db, projectId, candidate.baseRevision);
+    if (!revision) throw new ApiException("CANDIDATE_STALE", "The candidate does not match this document.");
+    let document: FigureDocumentV1;
+    try {
+      document = applyCommands(revision.document, candidate.commands, (assetId) => readyFacts(ctx, projectId, assetId));
+    } catch (error) {
+      if (error instanceof DocumentCommandError) {
+        throw new ApiException("CANDIDATE_STALE", "The candidate does not match this document.", error.details);
+      }
+      throw error;
+    }
+    return { document, revision: candidate.baseRevision, candidateId: candidate.id };
+  }
+  const revision = getRevision(ctx.db, projectId, request.source.revision);
+  if (!revision) throw new ApiException("NOT_FOUND", "That revision was not found.");
+  return { document: revision.document, revision: revision.revision, candidateId: null };
+}
+
+function assetFactsForDocument(
+  ctx: AppContext,
+  projectId: string,
+  document: FigureDocumentV1,
+): Record<string, { viewport: { width: number; height: number }; rasterPixelSize: { width: number; height: number } | null }> {
+  const assets: Record<string, { viewport: { width: number; height: number }; rasterPixelSize: { width: number; height: number } | null }> = {};
+  for (const panel of Object.values(document.panels)) {
+    if (assets[panel.assetId]) continue;
+    const facts = readyFacts(ctx, projectId, panel.assetId);
+    if (!facts) continue;
+    assets[panel.assetId] = { viewport: facts.viewport, rasterPixelSize: facts.rasterPixelSize };
+  }
+  return assets;
+}
+
+function publicCandidate(
+  candidate: {
+    id: string;
+    projectId: string;
+    baseRevision: number;
+    origin: "layout" | "ai";
+    validationMode: "edit" | "layout";
+    commands: DomainCommand[];
+    resultDocumentHash: string;
+    summary: string;
+    diagnostics: Diagnostic[];
+    engineVersion: string;
+    fontRegistryVersion: string;
+  },
+  previewDocument: FigureDocumentV1,
+): Candidate {
+  return {
+    id: candidate.id,
+    projectId: candidate.projectId,
+    baseRevision: candidate.baseRevision,
+    origin: candidate.origin,
+    validationMode: candidate.validationMode,
+    summary: candidate.summary,
+    commands: candidate.commands,
+    previewDocument,
+    resultDocumentHash: candidate.resultDocumentHash,
+    diagnostics: candidate.diagnostics,
+    engineVersion: candidate.engineVersion,
+    fontRegistryVersion: candidate.fontRegistryVersion,
+  };
+}
+
+function deterministicUuid(material: unknown): string {
+  const hash = createHash("sha256").update(canonicalJson(material)).digest();
+  const bytes = Buffer.from(hash.subarray(0, 16));
+  bytes[6] = ((bytes[6] ?? 0) & 0x0f) | 0x50;
+  bytes[8] = ((bytes[8] ?? 0) & 0x3f) | 0x80;
+  const hex = bytes.toString("hex");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
 export function commitHistory(
@@ -965,6 +1292,7 @@ function transactionBody(
     documentHash: string;
     history: { canUndo: boolean; canRedo: boolean };
   },
+  diagnostics: Diagnostic[] = [],
 ) {
   return {
     projectId,
@@ -972,7 +1300,7 @@ function transactionBody(
     changed: saved.changed,
     document: saved.document,
     documentHash: saved.documentHash,
-    diagnostics: [] as Diagnostic[],
+    diagnostics,
     history: saved.history,
   };
 }

@@ -1,0 +1,12 @@
+{
+  "id": "five-panels",
+  "expect": "candidates",
+  "family": "auto",
+  "panels": [
+    { "id": 1, "aspect": [2, 1], "frame": [8, 12, 40, 20] },
+    { "id": 2, "aspect": [2, 1], "frame": [58, 12, 40, 20] },
+    { "id": 3, "aspect": [2, 1], "frame": [108, 12, 40, 20] },
+    { "id": 4, "aspect": [2, 1], "frame": [8, 44, 40, 20] },
+    { "id": 5, "aspect": [2, 1], "frame": [58, 44, 40, 20] }
+  ]
+}

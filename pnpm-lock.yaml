@@ -29,6 +29,9 @@ importers:
       '@panelstudio/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@panelstudio/layout':
+        specifier: workspace:*
+        version: link:../../packages/layout
       '@panelstudio/svg':
         specifier: workspace:*
         version: link:../../packages/svg
@@ -178,10 +181,22 @@ importers:
       '@panelstudio/contracts':
         specifier: workspace:*
         version: link:../contracts
+      '@panelstudio/core':
+        specifier: workspace:*
+        version: link:../core
     devDependencies:
+      '@types/node':
+        specifier: 22.20.5
+        version: 22.20.5
       typescript:
         specifier: 7.0.2
         version: 7.0.2
+      vite:
+        specifier: 8.3.7
+        version: 8.3.7(@types/node@22.20.5)
+      vitest:
+        specifier: 5.1.0
+        version: 5.1.0(@types/node@22.20.5)(vite@8.3.7(@types/node@22.20.5))
 
   packages/svg:
     dependencies:

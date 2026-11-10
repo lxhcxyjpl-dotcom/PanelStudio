@@ -16,6 +16,7 @@
     "@fastify/type-provider-typebox": "6.3.0",
     "@panelstudio/contracts": "workspace:*",
     "@panelstudio/core": "workspace:*",
+    "@panelstudio/layout": "workspace:*",
     "@panelstudio/svg": "workspace:*",
     "@resvg/resvg-js": "2.6.2",
     "ajv-formats": "3.0.1",

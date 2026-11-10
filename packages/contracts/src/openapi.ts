@@ -700,7 +700,7 @@ export function buildOpenApiDocument(): Record<string, unknown> {
       version: APP_VERSION,
       license: { name: "MIT" },
       description:
-        "HTTP contract for PanelStudio v0.1. Normative handbook: docs/PanelStudio-spec-v0.1.md. Phase 0 published this contract. Phase 1 implements asset import, panel and label commands, document revisions, SVG and project-package export, and project import. Phase 2 implements the edit kernel: frames, crops, labels, groups, locks, stack order, the remaining document commands, undo, redo, and restart restore. Later-phase routes stay in this contract and are not all implemented. All paths are under /api/v1. The service listens on loopback and is deployed same-origin. Authentication, when required, is an external reverse proxy. The response model does not contain provider secrets.",
+        "HTTP contract for PanelStudio v0.1. Normative handbook: docs/PanelStudio-spec-v0.1.md. Phase 0 published this contract. Phase 1 implements asset import, panel and label commands, document revisions, SVG and project-package export, and project import. Phase 2 implements the edit kernel: frames, crops, labels, groups, locks, stack order, the remaining document commands, undo, redo, and restart restore. Phase 3 implements automatic layout candidates, candidate reads, preview renders, and accepting a candidate through the transaction path. Later-phase routes stay in this contract and are not all implemented. All paths are under /api/v1. The service listens on loopback and is deployed same-origin. Authentication, when required, is an external reverse proxy. The response model does not contain provider secrets.",
     },
     servers: [
       {
