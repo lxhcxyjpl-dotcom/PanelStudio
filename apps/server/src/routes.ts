@@ -9,6 +9,7 @@ import multipart from "@fastify/multipart";
 import type { FastifyInstance } from "fastify";
 import { canonicalJson } from "@panelstudio/core";
 import {
+  abortProjectJobs,
   cancelAiJob,
   deleteProviderSecret,
   enqueueAiLayout,
@@ -29,9 +30,12 @@ import {
   createLayoutCandidates,
   createPreview,
   createProject,
+  deleteProject,
   exportFigure,
   importAsset,
   importProjectPackage,
+  listProjects,
+  listRevisions,
   readArtifact,
   readAsset,
   readAssetBytes,
@@ -40,9 +44,12 @@ import {
   readDocument,
   readJob,
   readProject,
+  readRevision,
   removeUnusedAsset,
   renameProjectTitle,
+  restoreProject,
   type AppContext,
+  type ListPage,
 } from "./pipeline.js";
 
 export function registerRoutes(app: FastifyInstance, ctx: AppContext): void {
@@ -91,6 +98,10 @@ export function registerRoutes(app: FastifyInstance, ctx: AppContext): void {
 
   app.get("/api/v1/fonts/bundle", async (_request, reply) => sendBytes(reply, fontBundle()));
 
+  app.get("/api/v1/projects", async (request) => {
+    return listProjects(ctx, { ...pageQuery(request.query), includeDeleted: includeDeletedOf(request.query) });
+  });
+
   app.post("/api/v1/projects", async (request, reply) => {
     const key = requireIdempotencyKey(request);
     const result = createProject(ctx, titleOf(request.body), key, hashJson(request.body));
@@ -105,6 +116,19 @@ export function registerRoutes(app: FastifyInstance, ctx: AppContext): void {
     return renameProjectTitle(ctx, projectIdOf(request.params), titleOf(request.body));
   });
 
+  app.delete("/api/v1/projects/:projectId", async (request) => {
+    const projectId = projectIdOf(request.params);
+    const project = deleteProject(ctx, projectId);
+    abortProjectJobs(ctx, projectId);
+    return project;
+  });
+
+  app.post("/api/v1/projects/:projectId/restore", async (request, reply) => {
+    const key = requireIdempotencyKey(request);
+    const result = restoreProject(ctx, projectIdOf(request.params), key, hashJson(request.body));
+    return reply.status(result.status).send(result.body);
+  });
+
   app.delete("/api/v1/projects/:projectId/assets/:assetId", async (request) => {
     const params = assetParams(request.params);
     return removeUnusedAsset(ctx, params.projectId, params.assetId);
@@ -114,8 +138,16 @@ export function registerRoutes(app: FastifyInstance, ctx: AppContext): void {
     return readDocument(ctx, projectIdOf(request.params));
   });
 
+  app.get("/api/v1/projects/:projectId/revisions", async (request) => {
+    return listRevisions(ctx, projectIdOf(request.params), pageQuery(request.query));
+  });
+
+  app.get("/api/v1/projects/:projectId/revisions/:revision", async (request) => {
+    return readRevision(ctx, projectIdOf(request.params), idOf(request.params, "revision"));
+  });
+
   app.get("/api/v1/projects/:projectId/assets", async (request) => {
-    return readAssets(ctx, projectIdOf(request.params));
+    return readAssets(ctx, projectIdOf(request.params), pageQuery(request.query));
   });
 
   app.get("/api/v1/projects/:projectId/assets/:assetId", async (request) => {
@@ -286,6 +318,47 @@ export function registerRoutes(app: FastifyInstance, ctx: AppContext): void {
   app.get("/api/v1/artifacts/:artifactId/download", async (request, reply) => {
     return sendBytes(reply, readArtifact(ctx, idOf(request.params, "artifactId")));
   });
+}
+
+function pageQuery(query: unknown): ListPage {
+  const record = queryRecord(query);
+  let cursor: string | null = null;
+  if ("cursor" in record && record.cursor !== undefined) {
+    const value = oneQuery(record.cursor);
+    if (typeof value !== "string" || value.length === 0) {
+      throw new ApiException("REQUEST_INVALID", "The cursor is invalid.");
+    }
+    cursor = value;
+  }
+  let limit: number | null = null;
+  if ("limit" in record && record.limit !== undefined) {
+    const value = oneQuery(record.limit);
+    const parsed = typeof value === "number" ? value : typeof value === "string" ? Number(value) : Number.NaN;
+    if (!Number.isInteger(parsed) || parsed < 1 || parsed > 100) {
+      throw new ApiException("REQUEST_INVALID", "The page limit must be an integer from 1 to 100.");
+    }
+    limit = parsed;
+  }
+  return { cursor, limit };
+}
+
+function includeDeletedOf(query: unknown): boolean {
+  const record = queryRecord(query);
+  if (!("includeDeleted" in record) || record.includeDeleted === undefined) return false;
+  const value = oneQuery(record.includeDeleted);
+  if (value === true || value === "true") return true;
+  if (value === false || value === "false") return false;
+  throw new ApiException("REQUEST_INVALID", "includeDeleted must be true or false.");
+}
+
+function queryRecord(query: unknown): Record<string, unknown> {
+  if (!query || typeof query !== "object" || Array.isArray(query)) return {};
+  return query as Record<string, unknown>;
+}
+
+function oneQuery(value: unknown): unknown {
+  if (Array.isArray(value)) throw new ApiException("REQUEST_INVALID", "The query parameter is invalid.");
+  return value;
 }
 
 function titleOf(body: unknown): unknown {

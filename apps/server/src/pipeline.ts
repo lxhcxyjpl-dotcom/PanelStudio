@@ -39,6 +39,7 @@ import {
 import { compileFigureSvg, normalizeSvg, SvgImportError, type ExportPanel } from "@panelstudio/svg";
 import type { BlobStore } from "./blobs.js";
 import {
+  cancelOpenJobsForProject,
   countAssets,
   getArtifact,
   getAsset,
@@ -60,12 +61,17 @@ import {
   markAssetRemoved,
   publicAsset,
   publicJob,
+  queryAssets,
+  queryProjects,
+  queryRevisions,
   renameProject,
+  setProjectDeleted,
   sumOriginalBytes,
   touchProject,
   updateProjectHead,
   type AssetRecord,
   type JobRecord,
+  type KeyCursor,
   type ProjectRecord,
 } from "./db.js";
 import { buildProjectPackage, readProjectPackage, type PackagedAsset } from "./figure-package.js";
@@ -126,8 +132,55 @@ export function createProject(ctx: AppContext, title: unknown, key: string, requ
   });
 }
 
+export type ListPage = { cursor: string | null; limit: number | null };
+
+/**
+ * Project summaries. Omitting limit returns every matching row and a null cursor.
+ * includeDeleted defaults to false at the route. Deleted projects stay readable.
+ */
+export function listProjects(
+  ctx: AppContext,
+  page: ListPage & { includeDeleted: boolean },
+) {
+  const after = page.cursor ? keyCursor(page.cursor) : null;
+  const result = queryProjects(ctx.db, { includeDeleted: page.includeDeleted, after, limit: page.limit });
+  const last = result.items.at(-1);
+  return {
+    items: result.items.map(projectView),
+    nextCursor: result.hasMore && last ? encodeCursor({ createdAt: last.createdAt, id: last.id }) : null,
+  };
+}
+
 export function readProject(ctx: AppContext, projectId: string) {
   return projectView(requireProject(ctx, projectId));
+}
+
+/**
+ * Soft-delete. Bytes, revisions, and history stacks stay on disk.
+ * A deleted project rejects later edits. Unfinished jobs are cancelled.
+ * Deleting an already deleted project returns that row unchanged.
+ */
+export function deleteProject(ctx: AppContext, projectId: string) {
+  return immediate(ctx.db, () => {
+    const project = requireProject(ctx, projectId);
+    const now = ctx.now();
+    if (!project.deletedAt) setProjectDeleted(ctx.db, projectId, now, now);
+    cancelOpenJobsForProject(ctx.db, projectId, now);
+    return projectView(requireProject(ctx, projectId));
+  });
+}
+
+/** Clears deletedAt. The document, revisions, and undo stacks are the ones already stored. */
+export function restoreProject(ctx: AppContext, projectId: string, key: string, requestHash: string): Response {
+  return immediate(ctx.db, () => {
+    const replay = takeReplay(ctx, `project-restore:${projectId}`, key, requestHash);
+    if (replay) return replay;
+    const project = requireProject(ctx, projectId);
+    if (project.deletedAt) setProjectDeleted(ctx.db, projectId, null, ctx.now());
+    const body = projectView(requireProject(ctx, projectId));
+    remember(ctx, `project-restore:${projectId}`, key, requestHash, 200, body);
+    return { status: 200, body };
+  });
 }
 
 /**
@@ -178,9 +231,47 @@ export function readDocument(ctx: AppContext, projectId: string) {
   };
 }
 
-export function readAssets(ctx: AppContext, projectId: string) {
+export function readAssets(ctx: AppContext, projectId: string, page: ListPage) {
   requireProject(ctx, projectId);
-  return { items: listAssets(ctx.db, projectId).map(publicAsset), nextCursor: null };
+  const after = page.cursor ? keyCursor(page.cursor) : null;
+  const result = queryAssets(ctx.db, projectId, after, page.limit);
+  const last = result.items.at(-1);
+  return {
+    items: result.items.map(publicAsset),
+    nextCursor: result.hasMore && last ? encodeCursor({ createdAt: last.createdAt, id: last.id }) : null,
+  };
+}
+
+export function listRevisions(ctx: AppContext, projectId: string, page: ListPage) {
+  requireProject(ctx, projectId);
+  const after = page.cursor ? revisionCursor(page.cursor) : null;
+  const result = queryRevisions(ctx.db, projectId, after, page.limit);
+  const last = result.items.at(-1);
+  return {
+    items: result.items.map((row) => ({
+      projectId: row.projectId,
+      revision: row.revision,
+      baseRevision: row.baseRevision,
+      kind: row.kind,
+      documentHash: row.documentHash,
+      createdAt: row.createdAt,
+    })),
+    nextCursor: result.hasMore && last ? encodeCursor({ revision: last.revision }) : null,
+  };
+}
+
+export function readRevision(ctx: AppContext, projectId: string, revisionRaw: string) {
+  requireProject(ctx, projectId);
+  const record = requireRevision(ctx, projectId, revisionNumber(revisionRaw));
+  return {
+    projectId: record.projectId,
+    revision: record.revision,
+    baseRevision: record.baseRevision,
+    kind: record.kind,
+    document: record.document,
+    documentHash: record.documentHash,
+    createdAt: record.createdAt,
+  };
 }
 
 export function readAsset(ctx: AppContext, projectId: string, assetId: string) {
@@ -1364,6 +1455,54 @@ function transactionBody(
 
 function historyOf(project: ProjectRecord) {
   return { canUndo: project.undoStack.length > 0, canRedo: project.redoStack.length > 0 };
+}
+
+function encodeCursor(value: KeyCursor | { revision: number }): string {
+  return Buffer.from(JSON.stringify(value), "utf8").toString("base64url");
+}
+
+function decodeCursor(cursor: string): unknown {
+  try {
+    const text = Buffer.from(cursor, "base64url").toString("utf8");
+    if (!text.startsWith("{")) throw new Error("cursor");
+    return JSON.parse(text) as unknown;
+  } catch {
+    throw new ApiException("REQUEST_INVALID", "The cursor is invalid.");
+  }
+}
+
+function keyCursor(cursor: string): KeyCursor {
+  const value = decodeCursor(cursor);
+  if (!value || typeof value !== "object") throw new ApiException("REQUEST_INVALID", "The cursor is invalid.");
+  const createdAt = "createdAt" in value ? value.createdAt : undefined;
+  const id = "id" in value ? value.id : undefined;
+  if (typeof createdAt !== "string" || createdAt.length === 0 || typeof id !== "string" || id.length === 0) {
+    throw new ApiException("REQUEST_INVALID", "The cursor is invalid.");
+  }
+  return { createdAt, id };
+}
+
+function revisionCursor(cursor: string): number {
+  const value = decodeCursor(cursor);
+  if (!value || typeof value !== "object" || !("revision" in value)) {
+    throw new ApiException("REQUEST_INVALID", "The cursor is invalid.");
+  }
+  const revision = value.revision;
+  if (typeof revision !== "number" || !Number.isSafeInteger(revision) || revision < 0) {
+    throw new ApiException("REQUEST_INVALID", "The cursor is invalid.");
+  }
+  return revision;
+}
+
+function revisionNumber(raw: string): number {
+  if (!/^(0|[1-9][0-9]*)$/.test(raw)) {
+    throw new ApiException("REQUEST_INVALID", "The revision is invalid.");
+  }
+  const revision = Number(raw);
+  if (!Number.isSafeInteger(revision)) {
+    throw new ApiException("REQUEST_INVALID", "The revision is invalid.");
+  }
+  return revision;
 }
 
 function projectView(project: ProjectRecord) {

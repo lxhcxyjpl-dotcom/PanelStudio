@@ -249,6 +249,14 @@ export function jobIsOpen(ctx: AppContext, jobId: string): boolean {
   return job?.status === "queued" || job?.status === "running";
 }
 
+/** Stop a provider call that is still in flight after its project was soft-deleted. */
+export function abortProjectJobs(ctx: AppContext, projectId: string): void {
+  for (const [jobId, controller] of inflight) {
+    const job = getJobDetail(ctx.db, jobId);
+    if (job?.projectId === projectId) controller.abort();
+  }
+}
+
 export function scheduleAiJobs(ctx: AppContext): void {
   if (ctx.deferAiJobs) return;
   let tail = tails.get(ctx.db) ?? Promise.resolve();
@@ -357,6 +365,15 @@ async function runLayout(ctx: AppContext, job: JobDetail, signal: AbortSignal): 
   const projectId = job.projectId;
   if (!request || !projectId) {
     finish(ctx, job.id, "failed", "failed", null, { code: "REQUEST_INVALID", message: "The AI request is invalid." });
+    return;
+  }
+  const project = getProject(ctx.db, projectId);
+  if (!project) {
+    finish(ctx, job.id, "failed", "failed", null, { code: "NOT_FOUND", message: "The project was not found." });
+    return;
+  }
+  if (project.deletedAt) {
+    finish(ctx, job.id, "cancelled", "cancelled", null, null);
     return;
   }
   if (isDirectUndo(request.prompt)) {
@@ -514,7 +531,7 @@ function claim(ctx: AppContext, jobId: string): JobDetail | null {
   return immediate(ctx.db, () => {
     const job = getJobDetail(ctx.db, jobId);
     if (!job || job.status !== "queued") return null;
-    if (job.cancelRequested) {
+    if (job.cancelRequested || projectDeleted(ctx, job)) {
       finish(ctx, jobId, "cancelled", "cancelled", null, null);
       return null;
     }
@@ -585,10 +602,15 @@ function openProvider(ctx: AppContext, job: JobDetail): { provider: ProviderReco
   return { provider, config: provider.config, secret };
 }
 
+function projectDeleted(ctx: AppContext, job: { projectId: string | null }): boolean {
+  if (!job.projectId) return false;
+  return Boolean(getProject(ctx.db, job.projectId)?.deletedAt);
+}
+
 function stillCurrent(ctx: AppContext, jobId: string, seenRevision: number): boolean {
   const job = getJobDetail(ctx.db, jobId);
   if (!job || job.status !== "running") return false;
-  if (job.cancelRequested) {
+  if (job.cancelRequested || projectDeleted(ctx, job)) {
     finish(ctx, jobId, "cancelled", "cancelled", null, null);
     return false;
   }

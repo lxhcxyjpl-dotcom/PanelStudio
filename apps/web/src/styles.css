@@ -633,6 +633,22 @@ html[data-reduce-transparency="true"] .scrim {
   background: var(--ui-surfaceHover);
 }
 
+.menu-item[data-disabled] {
+  color: var(--ui-textDisabled);
+}
+
+.menu-scroll {
+  max-height: 320px;
+  overflow: auto;
+}
+
+.menu-project {
+  max-width: 280px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .dialog {
   position: fixed;
   z-index: 40;

@@ -211,6 +211,67 @@ export function reloadFromServer(): Promise<void> {
   return loadProject(projectId);
 }
 
+export function openListedProject(projectId: string): Promise<void> {
+  const state = useWorkspace.getState();
+  if (state.draft && state.projectId && state.projectId !== projectId) {
+    patch({ dialog: "recovery", liveMessage: i18n.t("save.conflict") });
+    return Promise.resolve();
+  }
+  if (state.projectId === projectId) return reloadFromServer();
+  return loadProject(projectId);
+}
+
+export async function deleteCurrentProject(): Promise<void> {
+  const state = useWorkspace.getState();
+  if (!state.projectId) return;
+  if (state.draft) {
+    patch({ dialog: "recovery", liveMessage: i18n.t("save.failed") });
+    return;
+  }
+  const projectId = state.projectId;
+  await api.deleteProject(projectId);
+  await clearRecovery(projectId);
+  writeProjectId(null);
+  patch({
+    projectId: null,
+    confirmed: null,
+    title: "",
+    draft: null,
+    optimistic: null,
+    interaction: null,
+    crop: null,
+    guides: [],
+    guidesFading: false,
+    selection: { kind: "none" },
+    cards: [],
+    activeCandidateId: null,
+    layoutState: "idle",
+    layoutMessage: null,
+    imports: [],
+    dialog: null,
+    assetInfoId: null,
+    quota: null,
+    exportState: null,
+    saveState: "idle",
+    fittedProjectId: null,
+    historyRetry: null,
+    serverSnapshot: null,
+    aiStatus: { phase: "idle" },
+    liveMessage: i18n.t("toolbar.projectDeleted"),
+  });
+}
+
+export async function restoreListedProject(projectId: string): Promise<void> {
+  const state = useWorkspace.getState();
+  if (state.draft && state.projectId && state.projectId !== projectId) {
+    patch({ dialog: "recovery", liveMessage: i18n.t("save.conflict") });
+    return;
+  }
+  await api.restoreProject(projectId, newKey());
+  await loadProject(projectId);
+  patch({ liveMessage: i18n.t("toolbar.projectRestored") });
+}
+
 export async function renameTitle(title: string): Promise<void> {
   const { projectId } = useWorkspace.getState();
   if (!projectId) return;
