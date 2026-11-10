@@ -14,6 +14,7 @@
   "dependencies": {
     "@fastify/multipart": "9.4.0",
     "@fastify/type-provider-typebox": "6.3.0",
+    "@panelstudio/ai": "workspace:*",
     "@panelstudio/contracts": "workspace:*",
     "@panelstudio/core": "workspace:*",
     "@panelstudio/layout": "workspace:*",

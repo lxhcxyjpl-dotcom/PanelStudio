@@ -5,9 +5,10 @@ export const SCHEMA_VERSION = 1 as const;
 
 /**
  * Application version reported by health.
- * Phase 3 adds the automatic layout engine on the phase 0 contract.
+ * Phase 5 wires provider settings and AI layout jobs. Layout and SVG engines
+ * stay at their phase 3 and phase 1 versions.
  */
-export const APP_VERSION = "0.1.0-phase3" as const;
+export const APP_VERSION = "0.1.0-phase5" as const;
 
 /**
  * Layout scoring is recorded with this engine version.

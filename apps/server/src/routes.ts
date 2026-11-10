@@ -8,6 +8,19 @@ import {
 import multipart from "@fastify/multipart";
 import type { FastifyInstance } from "fastify";
 import { canonicalJson } from "@panelstudio/core";
+import {
+  cancelAiJob,
+  deleteProviderSecret,
+  enqueueAiLayout,
+  enqueueProviderTest,
+  jobEvents,
+  jobIsOpen,
+  providerSettings,
+  saveProviderConfig,
+  saveProviderSecret,
+  SSE_HEARTBEAT_INTERVAL_MS,
+} from "./ai-jobs.js";
+import { listJobEvents } from "./db.js";
 import { ApiException, requireIdempotencyKey, sendError } from "./http.js";
 import {
   commitHistory,
@@ -189,6 +202,82 @@ export function registerRoutes(app: FastifyInstance, ctx: AppContext): void {
 
   app.get("/api/v1/jobs/:jobId", async (request) => readJob(ctx, idOf(request.params, "jobId")));
 
+  app.get("/api/v1/jobs/:jobId/events", async (request, reply) => {
+    const jobId = idOf(request.params, "jobId");
+    jobEvents(ctx, jobId, -1);
+    const after = eventCursor(request.headers["last-event-id"], request.query);
+    reply.hijack();
+    const raw = reply.raw;
+    raw.writeHead(200, {
+      "content-type": "text/event-stream",
+      "cache-control": "no-cache",
+      connection: "keep-alive",
+    });
+    let cursor = after;
+    let lastWrite = Date.now();
+    const pump = (): boolean => {
+      const events = listJobEvents(ctx.db, jobId, cursor);
+      for (const event of events) {
+        raw.write(`id: ${event.seq}\nevent: ${event.event}\ndata: ${JSON.stringify(event.payloadJson)}\n\n`);
+        cursor = event.seq;
+        lastWrite = Date.now();
+      }
+      if (!jobIsOpen(ctx, jobId) && listJobEvents(ctx.db, jobId, cursor).length === 0) {
+        raw.end();
+        return true;
+      }
+      if (Date.now() - lastWrite >= SSE_HEARTBEAT_INTERVAL_MS) {
+        raw.write(": heartbeat\n\n");
+        lastWrite = Date.now();
+      }
+      return false;
+    };
+    if (!pump()) {
+      const timer = setInterval(() => {
+        if (pump()) clearInterval(timer);
+      }, 250);
+      raw.on("close", () => clearInterval(timer));
+    }
+  });
+
+  app.post("/api/v1/jobs/:jobId/cancel", async (request, reply) => {
+    const key = requireIdempotencyKey(request);
+    const result = cancelAiJob(ctx, idOf(request.params, "jobId"), key, hashJson(request.body));
+    return reply.status(result.status).send(result.body);
+  });
+
+  app.get("/api/v1/settings/ai-provider", async () => providerSettings(ctx));
+
+  app.put("/api/v1/settings/ai-provider", async (request, reply) => {
+    const key = requireIdempotencyKey(request);
+    const result = saveProviderConfig(ctx, request.body, key, hashJson(request.body));
+    return reply.status(result.status).send(result.body);
+  });
+
+  app.put("/api/v1/settings/ai-provider/secret", async (request, reply) => {
+    const key = requireIdempotencyKey(request);
+    const result = saveProviderSecret(ctx, request.body, key, hashJson(request.body));
+    return reply.status(result.status).send(result.body);
+  });
+
+  app.delete("/api/v1/settings/ai-provider/secret", async (request, reply) => {
+    const key = requireIdempotencyKey(request);
+    const result = deleteProviderSecret(ctx, key, hashJson(request.body ?? null));
+    return reply.status(result.status).send(result.body);
+  });
+
+  app.post("/api/v1/settings/ai-provider/test", async (request, reply) => {
+    const key = requireIdempotencyKey(request);
+    const result = enqueueProviderTest(ctx, key, hashJson(request.body ?? null));
+    return reply.status(result.status).send(result.body);
+  });
+
+  app.post("/api/v1/projects/:projectId/ai-layouts", async (request, reply) => {
+    const key = requireIdempotencyKey(request);
+    const result = enqueueAiLayout(ctx, projectIdOf(request.params), request.body, key, hashJson(request.body));
+    return reply.status(result.status).send(result.body);
+  });
+
   app.get("/api/v1/artifacts/:artifactId/download", async (request, reply) => {
     return sendBytes(reply, readArtifact(ctx, idOf(request.params, "artifactId")));
   });
@@ -216,6 +305,14 @@ function idOf(params: unknown, name: string): string {
 
 function assetParams(params: unknown): { projectId: string; assetId: string } {
   return { projectId: projectIdOf(params), assetId: idOf(params, "assetId") };
+}
+
+function eventCursor(header: string | string[] | undefined, query: unknown): number {
+  const fromHeader = Array.isArray(header) ? header[0] : header;
+  const fromQuery = query && typeof query === "object" && "after" in query ? (query as { after?: unknown }).after : undefined;
+  const raw = fromHeader ?? fromQuery;
+  const value = typeof raw === "string" ? Number(raw) : typeof raw === "number" ? raw : -1;
+  return Number.isInteger(value) && value >= 0 ? value : -1;
 }
 
 function hashJson(body: unknown): string {

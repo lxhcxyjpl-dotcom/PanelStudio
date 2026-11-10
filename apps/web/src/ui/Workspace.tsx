@@ -201,7 +201,7 @@ export function Workspace() {
         <span className="font-warning" title={t("status.fontMissing", { families: BUNDLED_FONTS.map((font) => font.family).join(", ") })}>
           FONT_MISSING
         </span>
-        {stale ? <span>{t("layout.stale")}</span> : null}
+        {stale ? <span>{state.cards.some((card) => card.candidate.origin === "ai") ? t("ai.stale") : t("layout.stale")}</span> : null}
       </footer>
       <div className="sr-only" aria-live="polite" data-testid="live">{state.liveMessage}</div>
       <Dialogs />
@@ -227,8 +227,10 @@ function Banners() {
       {state.layoutState === "loading" ? <p className="banner">{t("layout.loading")}</p> : null}
       {candidatesStale(state) ? (
         <p className="banner">
-          {t("layout.stale")}
-          <Button action="regenerate-layout" onClick={() => void requestLayout()}>{t("layout.regenerate")}</Button>
+          {state.cards.some((card) => card.candidate.origin === "ai") ? t("ai.stale") : t("layout.stale")}
+          {state.cards.some((card) => card.candidate.origin === "ai") ? null : (
+            <Button action="regenerate-layout" onClick={() => void requestLayout()}>{t("layout.regenerate")}</Button>
+          )}
         </p>
       ) : null}
       <p className="banner quiet">{t("status.fontMissing", { families })}</p>
@@ -239,6 +241,7 @@ function Banners() {
 function CandidateDock() {
   const { t, i18n } = useTranslation();
   const state = useWorkspace();
+  if (state.cards.some((card) => card.candidate.origin === "ai")) return null;
   if (state.cards.length === 0 && state.layoutState === "idle") return null;
   const stale = candidatesStale(state);
   const applyReason = !state.activeCandidateId ? t("layout.pick") : stale ? t("layout.stale") : undefined;

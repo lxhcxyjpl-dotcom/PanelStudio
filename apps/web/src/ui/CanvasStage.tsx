@@ -123,6 +123,7 @@ export function CanvasStage() {
                 key={panelId}
                 className="panel-frame"
                 data-panel-id={panelId}
+                data-frame={`${panel.frameMm.x},${panel.frameMm.y},${panel.frameMm.width},${panel.frameMm.height}`}
                 style={{
                   transform: `translate(${panel.frameMm.x * px}px, ${panel.frameMm.y * px}px)`,
                   width: panel.frameMm.width * px,
@@ -139,7 +140,8 @@ export function CanvasStage() {
                   }
                   if (state.crop) return;
                   if (previewing) {
-                    patch({ liveMessage: i18n.t("canvas.previewOnly") });
+                    const ai = useWorkspace.getState().cards.some((card) => card.candidate.origin === "ai");
+                    patch({ liveMessage: i18n.t(ai ? "ai.previewOnly" : "canvas.previewOnly") });
                     return;
                   }
                   if (geometryLocked(base, panelId)) return;

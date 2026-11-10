@@ -151,6 +151,7 @@ export async function loadProject(projectId: string, fromBoot = false): Promise<
     selection: { kind: "none" },
     cards: [],
     activeCandidateId: null,
+    aiStatus: { phase: "idle" },
     saveState: "saved",
     booting: false,
     fittedProjectId: null,
@@ -586,6 +587,7 @@ async function requestLayoutNow(): Promise<void> {
       activeCandidateId: cards[0]?.candidate.id ?? null,
       layoutState: "idle",
       layoutMessage: null,
+      aiStatus: { phase: "idle" },
       liveMessage: i18n.t("layout.preview"),
     });
     void loadPreviews(state.projectId, cards.map((card) => card.candidate.id));
@@ -641,7 +643,15 @@ export function continueEditing(): void {
 
 export function dismissCandidates(): void {
   revokePreviews(useWorkspace.getState().cards.map((card) => card.previewUrl));
-  patch({ cards: [], activeCandidateId: null, layoutState: "idle", layoutMessage: null, liveMessage: i18n.t("layout.cancel") });
+  const ai = useWorkspace.getState().cards.some((card) => card.candidate.origin === "ai");
+  patch({
+    cards: [],
+    activeCandidateId: null,
+    layoutState: "idle",
+    layoutMessage: null,
+    aiStatus: { phase: "idle" },
+    liveMessage: i18n.t(ai ? "ai.discarded" : "layout.cancel"),
+  });
 }
 
 function candidatesBlocked(): boolean {
@@ -679,7 +689,8 @@ export function acceptCandidate(): Promise<void> {
         cards: [],
         activeCandidateId: null,
         saveState: "saved",
-        liveMessage: i18n.t("layout.apply"),
+        aiStatus: { phase: "idle" },
+        liveMessage: i18n.t(card.candidate.origin === "ai" ? "ai.applied" : "layout.apply"),
       });
     } catch (error) {
       if (error instanceof ApiClientError && (error.code === "CANDIDATE_STALE" || error.code === "REVISION_CONFLICT")) {
@@ -901,6 +912,136 @@ export function assetThumbnail(projectId: string, asset: Asset): string | null {
 
 export function activeGroupId(document: FigureDocumentV1, panelId: string): string | null {
   return groupForPanel(document, panelId)?.id ?? null;
+}
+
+export function sendAiPrompt(
+  prompt: string,
+  options: { includePreviewImage: boolean; visualReview: boolean },
+): Promise<void> {
+  if (isUndoPrompt(prompt)) return undo();
+  return later(() => sendAiNow(prompt, options));
+}
+
+export function cancelAiPrompt(): Promise<void> {
+  const status = useWorkspace.getState().aiStatus;
+  if (status.phase !== "running" || !status.jobId) return Promise.resolve();
+  return api.cancelJob(status.jobId, newKey()).then(
+    (job) => {
+      if (job.status === "cancelled") {
+        patch({ aiStatus: { phase: "cancelled" }, liveMessage: i18n.t("ai.cancelled") });
+      }
+    },
+    (error: unknown) => patch({ liveMessage: errorText(error) }),
+  );
+}
+
+async function sendAiNow(
+  prompt: string,
+  options: { includePreviewImage: boolean; visualReview: boolean },
+): Promise<void> {
+  const state = useWorkspace.getState();
+  const document = state.confirmed?.document;
+  if (!state.projectId || !state.confirmed || !document) return;
+  if (state.draft) {
+    patch({ dialog: "recovery" });
+    return;
+  }
+  const text = prompt.trim();
+  if (!text) return;
+  let settings: Awaited<ReturnType<typeof api.providerSettings>>;
+  try {
+    settings = await api.providerSettings();
+  } catch (error) {
+    patch({ aiStatus: { phase: "failed", code: "NETWORK", message: errorText(error) }, liveMessage: errorText(error) });
+    return;
+  }
+  if (!settings.config || !settings.hasSecret) {
+    patch({ aiStatus: { phase: "failed", code: "PROVIDER_NOT_CONFIGURED", message: i18n.t("ai.notConfigured") }, liveMessage: i18n.t("ai.notConfigured") });
+    return;
+  }
+  patch({ aiStatus: { phase: "running", jobId: "", label: i18n.t("ai.running") }, liveMessage: i18n.t("ai.running") });
+  try {
+    const accepted = await api.aiLayout(
+      state.projectId,
+      {
+        baseRevision: state.confirmed.revision,
+        prompt: text,
+        selectedPanelIds: selectedIds(state.selection, document),
+        replyLocale: state.locale,
+        includePreviewImage: options.includePreviewImage && settings.config.capabilities.imageInput,
+        visualReview: options.visualReview && settings.config.capabilities.imageInput,
+      },
+      newKey(),
+    );
+    patch({ aiStatus: { phase: "running", jobId: accepted.jobId, label: i18n.t("ai.running") } });
+    const job = await waitForJob(accepted.jobId);
+    if (useWorkspace.getState().aiStatus.phase === "cancelled") return;
+    if (job.status === "cancelled") {
+      patch({ aiStatus: { phase: "cancelled" }, liveMessage: i18n.t("ai.cancelled") });
+      return;
+    }
+    if (job.status === "failed") {
+      const code = job.error?.code ?? "REQUEST_INVALID";
+      const message = aiFailureMessage(code, job.error?.message ?? "");
+      patch({ aiStatus: { phase: "failed", code, message }, liveMessage: message });
+      return;
+    }
+    const result = job.status === "succeeded" ? job.result : null;
+    if (!result || !("kind" in result)) {
+      patch({ aiStatus: { phase: "failed", code: "REQUEST_INVALID", message: i18n.t("ai.jobFailed") }, liveMessage: i18n.t("ai.jobFailed") });
+      return;
+    }
+    if (result.kind === "clarification") {
+      patch({
+        aiStatus: { phase: "clarification", question: result.question, options: result.options ?? [] },
+        liveMessage: result.question,
+      });
+      return;
+    }
+    if (result.kind === "unsupported") {
+      patch({ aiStatus: { phase: "unsupported", reason: result.reason }, liveMessage: result.reason });
+      return;
+    }
+    revokePreviews(useWorkspace.getState().cards.map((card) => card.previewUrl));
+    const cards = result.candidates.map((candidate) => ({ candidate, previewUrl: null as string | null, previewError: null as string | null }));
+    const stale = cards[0] && cards[0].candidate.baseRevision !== useWorkspace.getState().confirmed?.revision;
+    patch({
+      cards,
+      activeCandidateId: stale ? null : cards[0]?.candidate.id ?? null,
+      aiStatus: { phase: "idle" },
+      layoutState: "idle",
+      layoutMessage: null,
+      liveMessage: stale ? i18n.t("ai.stale") : i18n.t("ai.ready"),
+    });
+    if (state.projectId) void loadPreviews(state.projectId, cards.map((card) => card.candidate.id));
+  } catch (error) {
+    const message = errorText(error);
+    patch({ aiStatus: { phase: "failed", code: error instanceof ApiClientError ? error.code : "NETWORK", message }, liveMessage: message });
+  }
+}
+
+function selectedIds(selection: ReturnType<typeof useWorkspace.getState>["selection"], document: FigureDocumentV1): string[] {
+  if (selection.kind === "panels") return selection.ids.filter((id) => document.panels[id]);
+  if (selection.kind === "group") return document.groups[selection.groupId]?.panelIds ?? [];
+  if (selection.kind === "label") return document.panels[selection.panelId] ? [selection.panelId] : [];
+  return [];
+}
+
+function isUndoPrompt(prompt: string): boolean {
+  const text = prompt.trim().toLowerCase();
+  return text === "撤销" || text === "撤消" || text === "undo";
+}
+
+function aiFailureMessage(code: string, message: string): string {
+  if (code === "PROVIDER_NOT_CONFIGURED") return i18n.t("ai.notConfigured");
+  if (code === "MODEL_OUTPUT_INVALID") return i18n.t("ai.invalidOutput");
+  if (code === "PROVIDER_CONFIG_CHANGED") return i18n.t("ai.configChanged");
+  if (code === "LAYOUT_CONFLICT" || code === "LOCKED_ELEMENT" || code === "GROUP_PARTIAL_EDIT" || code === "OUTSIDE_CANVAS") {
+    const key = `errors.${code}`;
+    const translated = i18n.t(key);
+    return translated === key ? message : translated;
+  }
+  return message || i18n.t("ai.jobFailed");
 }
 
 export { candidatesBlocked as layoutIsStale };
