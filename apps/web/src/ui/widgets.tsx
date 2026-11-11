@@ -83,6 +83,7 @@ export function NumberField(props: {
 export function TextField(props: {
   label: string;
   value: string;
+  placeholder?: string;
   onCommit: (value: string) => void;
   disabled?: boolean;
   disabledReason?: string;
@@ -95,6 +96,7 @@ export function TextField(props: {
       <span>{props.label}</span>
       <input
         data-testid={props.testId}
+        placeholder={props.placeholder}
         value={text}
         disabled={props.disabled || Boolean(props.disabledReason)}
         title={props.disabledReason}

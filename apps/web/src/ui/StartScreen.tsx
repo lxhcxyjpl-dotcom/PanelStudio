@@ -22,14 +22,12 @@ export function StartScreen() {
       <section className="start-hero" aria-labelledby="start-heading">
         <div className="start-intro">
           <h1 id="start-heading">{t("app.emptyTitle")}</h1>
-          <p>{t("app.emptyBody")}</p>
           <div className="empty-actions">
-            <Button action="empty-import" variant="primary" onClick={() => document.getElementById("import-input")?.click()}>
+            <Button action="empty-import" variant="primary" title={t("app.formats")} onClick={() => document.getElementById("import-input")?.click()}>
               <Icon name="plus" />{t("toolbar.import")}
             </Button>
             <Button action="open-sample" onClick={() => void open(openSample())}>{t("app.openSample")}<Icon name="arrowRight" /></Button>
           </div>
-          <small>{t("app.formats")}</small>
         </div>
         <div className="start-photo"><img src="/studio-proof.webp" alt="" width="1200" height="800" /></div>
       </section>

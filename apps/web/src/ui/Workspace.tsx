@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { BUNDLED_FONTS, NUDGE_MM } from "@panelstudio/contracts";
+import { NUDGE_MM } from "@panelstudio/contracts";
 import { api } from "../api/client";
 import { formatDiagnostic } from "../i18n/diagnostic";
 import { workspaceMode, sidebarWidth, localizedSummary } from "../model/chrome";
@@ -229,9 +229,6 @@ export function Workspace() {
       </div>
       {state.confirmed && <footer className="bottombar">
         <span>{t("status.panels", { count: state.confirmed?.document.panelOrder.length ?? 0 })}</span>
-        <span className="font-status" data-testid="font-status" title={t("status.fontsReady", { families: BUNDLED_FONTS.map((font) => font.family).join(", ") })}>
-          {t("status.typeReady")} · Noto Sans / Noto Sans SC
-        </span>
         {stale ? <span>{state.cards.some((card) => card.candidate.origin === "ai") ? t("ai.stale") : t("layout.stale")}</span> : null}
       </footer>}
       <div className="sr-only" aria-live="polite" data-testid="live">{state.liveMessage}</div>

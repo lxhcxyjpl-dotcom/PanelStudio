@@ -38,7 +38,7 @@ export function ReferenceRegions({ source, units, slots, change }: {
   }
   function overlay(r: Region) { return { left: r.x * 100 + "%", top: r.y * 100 + "%", width: r.width * 100 + "%", height: r.height * 100 + "%" }; }
   return <>
-    <div className="guide-sheet" data-testid="reference-sheet" aria-label={t("layout.reference")} style={{ width: "min(100%, " + source.aspect * (review ? 320 : 240) + "px)", aspectRatio: source.aspect }}
+    <div className="guide-sheet" data-testid="reference-sheet" aria-label={t("layout.reference")} title={t("layout.drawRegions")} style={{ width: "min(100%, " + source.aspect * (review ? 320 : 240) + "px)", aspectRatio: source.aspect }}
       onPointerDown={(e) => {
         if (e.button !== 0 || start.current) return;
         start.current = { point: point(e), pointer: e.pointerId }; e.currentTarget.setPointerCapture(e.pointerId);
@@ -55,7 +55,7 @@ export function ReferenceRegions({ source, units, slots, change }: {
         <b>{units.find((u) => u.id === s.unitId)?.name ?? i + 1}</b></span>)}
       {draft && <span className="guide-box selected" style={overlay(draft)} />}
     </div>
-    <small>{t(edit === null ? "layout.drawRegions" : "layout.redraw", { index: (edit ?? 0) + 1 })}</small>
+    {edit !== null && <small role="status">{t("layout.redraw", { index: edit + 1 })}</small>}
     <div className="guide-region-heading">
       <Button action="review-regions" variant="quiet" aria-expanded={review} aria-controls="reference-mappings"
         title={t("layout.reviewMappings")} onClick={() => { setReview(!review); setEdit(null); }}>

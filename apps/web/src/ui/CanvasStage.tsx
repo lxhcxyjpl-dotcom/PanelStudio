@@ -239,10 +239,8 @@ function EmptyCanvas({ overlay = false }: { overlay?: boolean }) {
   return (
     <div className={overlay ? "empty-overlay" : "empty-state"}>
       <h2>{i18n.t("app.emptyTitle")}</h2>
-      <p>{i18n.t("app.emptyBody")}</p>
-      <p>{i18n.t("app.formats")}</p>
       <div className="empty-actions">
-        <button type="button" className="button primary" data-action="empty-import" onClick={() => document.getElementById("import-input")?.click()}>
+        <button type="button" className="button primary" data-action="empty-import" title={i18n.t("app.formats")} onClick={() => document.getElementById("import-input")?.click()}>
           {i18n.t("toolbar.import")}
         </button>
         <button type="button" className="button" data-action="open-sample" onClick={() => void openSample()}>

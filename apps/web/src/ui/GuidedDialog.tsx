@@ -82,12 +82,11 @@ export function GuidedDialog({ document, open }: { document: FigureDocumentV1; o
           if (!busy && e.dataTransfer.files[0]) void load(e.dataTransfer.files[0]);
         }}>
         <h3 className="guide-section-heading"><Icon name="reference" />{t("layout.reference")}</h3>
-        <p>{t("layout.referenceHint")}</p>
         <label className={"guide-file" + (ref ? " has-reference" : "")}>
           <Icon name={ref ? "image" : "import"} />
           <span>{ref ? ref.name : t("layout.dropReference")}</span>
-          <small>{ref ? t("layout.changeReference") : "PNG · JPEG · WebP · SVG"}</small>
-          <input data-testid="reference-file" aria-label={t("layout.chooseImage")} type="file" accept=".png,.jpg,.jpeg,.webp,.svg"
+          {ref && <small>{t("layout.changeReference")}</small>}
+          <input data-testid="reference-file" aria-label={t("layout.chooseImage")} title={t("layout.referenceHint")} type="file" accept=".png,.jpg,.jpeg,.webp,.svg"
             onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) void load(f); }} /></label>
         {reading && <p role="status">{t("layout.readReference")}</p>}
         {fileError && <p role="alert">{t("layout.referenceError")}</p>}
@@ -108,7 +107,6 @@ export function GuidedDialog({ document, open }: { document: FigureDocumentV1; o
         <label className="field"><span className="guide-title guide-section-heading"><Icon name="sliders" />{t("layout.taste")}</span>
           <textarea data-testid="guide-words" maxLength={600} value={words} placeholder={t("layout.tasteExample")}
             onChange={(e) => describe(e.target.value)} /></label>
-        <small>{t("layout.preferencesHint")}</small>
         {!!parsed.unresolved.length && <div className="guide-unresolved" role="status">
           <p>{t("layout.unresolved", { text: parsed.unresolved.join(" · ") })}</p>
           <label><input type="checkbox" checked={allowPartial} onChange={(e) => setAllowPartial(e.target.checked)} /> {t("layout.useRecognized")}</label>

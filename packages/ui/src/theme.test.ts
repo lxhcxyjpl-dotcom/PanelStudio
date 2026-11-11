@@ -6,7 +6,7 @@ import { interaction } from "./interaction.js";
 import { metrics } from "./metrics.js";
 import { motion } from "./motion.js";
 import { renderThemeCss, themeTokens } from "./theme.js";
-import { uiFontFamily, uiType } from "./typography.js";
+import { uiFontFamily, uiFontSizes, uiType } from "./typography.js";
 
 const cssPath = join(dirname(fileURLToPath(import.meta.url)), "tokens.css");
 
@@ -50,7 +50,8 @@ describe("design metrics", () => {
     expect(motion.durationMs.buttonPress).toBe(70);
     expect(motion.buttonPressScale).toBe(0.985);
     expect(motion.reducedMotion.maxOpacityDurationMs).toBe(80);
-    expect(uiType.control).toEqual({ fontSizePx: 13, lineHeightPx: 20, fontWeight: 400 });
+    expect(Object.values(uiFontSizes)).toEqual([13, 15, 24, 56]);
+    expect(uiType.control).toEqual({ fontSizePx: uiFontSizes.body, lineHeightPx: 22, fontWeight: 400 });
     expect(uiFontFamily).toContain("Noto Sans SC");
     expect(interaction.snapTolerancePx).toBe(6);
     expect(interaction.zoom).toEqual({ min: 0.1, max: 4 });

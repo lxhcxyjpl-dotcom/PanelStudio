@@ -269,9 +269,8 @@ function ExportDialog({ open }: { open: boolean }) {
   const running = state.exportState?.status === "running" ? state.exportState : null;
   return (
     <Shell open={open} title={t("export.title")}>
-      <p>{t("export.fontList", { families: BUNDLED_FONTS.map((font) => font.family).join(", ") })}</p>
-      <p>{t("status.fontsReady", { families: BUNDLED_FONTS.map((font) => font.family).join(", ") })}</p>
-      <Button action="download-fonts" onClick={downloadFontBundle}>{t("export.downloadFonts")}</Button>
+      <p className="export-fonts" data-testid="font-status">{t("export.fontList", { families: BUNDLED_FONTS.map((font) => font.family).join(", ") })}</p>
+      <Button action="download-fonts" title={t("export.fontBundleHint")} onClick={downloadFontBundle}>{t("export.downloadFonts")}</Button>
       {running ? <p data-testid="export-phase">{t("export.running", { revision: running.revision, phase: running.phase })}</p> : null}
       <Button action="export-svg" disabledReason={state.confirmed ? undefined : t("app.noProject")} onClick={() => void exportFigure({ revision, format: "svg", options: { includeMetadata: metadata } } satisfies ExportRequest)}>
         {t("export.svg")}
@@ -298,7 +297,6 @@ function ExportDialog({ open }: { open: boolean }) {
       </Button>
       {state.exportState?.status === "ready" ? (
         <>
-          <p>{t("export.blockedHint")}</p>
           <Button action="download-again" onClick={() => void downloadAgain()}>{t("export.downloadAgain")}</Button>
           <ul data-testid="export-diagnostics">
             {state.exportState.diagnostics.map((item, index) => (

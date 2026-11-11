@@ -1,3 +1,5 @@
+import { uiFontSizes } from "./typography.js";
+
 const themeTokenNames = [
   "ui.background",
   "ui.workspace",
@@ -89,11 +91,13 @@ export function themeCustomProperty(token: ThemeTokenName): string {
 }
 
 export function renderThemeCss(): string {
+  // Root-relative sizes follow the reader's browser font preference in both themes.
+  const sizes = Object.entries(uiFontSizes).map(([role, px]) => `  --ui-type-${role}: ${px / 16}rem;`);
   const block = (selector: string, theme: keyof typeof themeTokens) => {
     const declarations = (Object.keys(themeTokens.light) as ThemeTokenName[]).map(
       (token) => `  ${themeCustomProperty(token)}: ${themeTokens[theme][token]};`,
     );
     return `${selector} {\n  color-scheme: ${theme};\n${declarations.join("\n")}\n}`;
   };
-  return `${block(':root,\n:root[data-theme="light"]', "light")}\n\n${block(':root[data-theme="dark"]', "dark")}\n`;
+  return `:root {\n${sizes.join("\n")}\n}\n\n${block(':root,\n:root[data-theme="light"]', "light")}\n\n${block(':root[data-theme="dark"]', "dark")}\n`;
 }

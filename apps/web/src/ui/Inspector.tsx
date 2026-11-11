@@ -191,10 +191,10 @@ function LabelFields({ document, panelId }: { document: FigureDocumentV1; panelI
       <h2>{t("labels.this")}</h2>
       <TextField
         label={t("labels.content")}
+        placeholder={t("labels.automatic")}
         value={overrides.text ?? ""}
         onCommit={(text) => void transact([{ type: "label.setOverrides", items: [{ panelId, value: mergedOverrides(overrides, { text: text.trim() ? text : null }) }] }])}
       />
-      <p className="muted">{t("labels.custom")}</p>
       <SelectField label={t("labels.font")} value={overrides.typography?.fontId ?? document.labelStyle.fontId} options={BUNDLED_FONTS.map((font) => ({ value: font.fontId, label: font.family }))} onChange={(fontId) => {
         if (fontId !== "noto-sans" && fontId !== "noto-sans-sc") return;
         commitOverride(document, panelId, { typography: { ...(overrides.typography ?? {}), fontId } });
