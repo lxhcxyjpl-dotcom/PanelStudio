@@ -130,7 +130,16 @@ CREATE INDEX IF NOT EXISTS assets_project ON assets(projectId);
 CREATE INDEX IF NOT EXISTS jobs_project ON jobs(projectId);
 `;
 
-const DATABASE_VERSION = 3;
+const LAYOUT_CHOICES_SCHEMA = `CREATE TABLE IF NOT EXISTS layout_choices (
+  projectId TEXT NOT NULL,
+  revision INTEGER NOT NULL,
+  exampleJson TEXT NOT NULL,
+  PRIMARY KEY (projectId, revision),
+  FOREIGN KEY (projectId) REFERENCES projects(id)
+);
+`;
+
+const DATABASE_VERSION = 4;
 const ASSET_COLUMNS = `id, projectId, createdAt, originalFilename, originalMediaType, originalByteLength,
   originalSha256, status, importJobId, normalizedJson, diagnosticsJson, removedFromLibraryAt,
   originalBlobPath, renderBlobPath, thumbnailBlobPath`;
@@ -305,7 +314,8 @@ export function openDatabase(dataDir: string): Database.Database {
             CREATE INDEX ai_history_revision ON jobs(projectId, json_extract(inputJson,'$.request.baseRevision'), createdAt DESC, id DESC) WHERE kind = 'ai_layout';
           `);
         }
-        migrateProjectAssetIds(db);
+        if (current < 3) migrateProjectAssetIds(db);
+        db.exec(LAYOUT_CHOICES_SCHEMA);
         db.pragma(`user_version = ${DATABASE_VERSION}`);
       });
     }

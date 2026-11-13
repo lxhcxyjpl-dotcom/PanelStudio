@@ -4,6 +4,7 @@ import {
   AILayoutRequestSchema,
   AIProviderConfigSchema,
   AIProviderSettingsSchema,
+  AIConnectionWriteRequestSchema,
   SecretDeleteResponseSchema,
   SecretWriteRequestSchema,
   SecretWriteResponseSchema,
@@ -84,6 +85,7 @@ const componentSchemas = {
   PreviewRequest: PreviewRequestSchema,
   ExportRequest: ExportRequestSchema,
   AIProviderConfig: AIProviderConfigSchema,
+  AIConnectionWriteRequest: AIConnectionWriteRequestSchema,
   AIProviderSettings: AIProviderSettingsSchema,
   SecretWriteRequest: SecretWriteRequestSchema,
   SecretWriteResponse: SecretWriteResponseSchema,
@@ -585,6 +587,16 @@ const operations: Operation[] = [
     responses: withError({
       "200": jsonResponse("Provider settings.", "AIProviderSettings"),
     }),
+  },
+  {
+    operationId: "putAiConnection",
+    method: "put",
+    path: "/api/v1/settings/ai-connection",
+    tags: ["Settings"],
+    summary: "Atomically save provider settings and an optional encrypted secret. Changing the endpoint without a new secret clears the old secret.",
+    requestBody: jsonBody("AIConnectionWriteRequest"),
+    idempotency: true,
+    responses: withError({ "200": jsonResponse("Non-secret connection settings.", "AIProviderSettings") }),
   },
   {
     operationId: "putAiProviderSecret",

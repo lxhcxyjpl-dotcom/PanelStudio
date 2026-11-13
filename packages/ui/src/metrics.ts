@@ -2,7 +2,7 @@ export const metrics = {
   designReferencePx: { width: 1440, height: 900 },
   topBarHeightPx: 64,
   leftSidebarPx: { default: 240, min: 208, max: 320 },
-  rightSidebarPx: { default: 304, min: 280, max: 360 },
+  rightSidebarPx: { default: 352, min: 320, max: 420 },
   bottomBarHeightPx: 28,
   sidebarDividerPx: 1,
   dividerHitPx: 8,

@@ -33,6 +33,12 @@ export function Inspector() {
   const { t } = useTranslation();
   const state = useWorkspace();
   const [tab, setTab] = useState<"properties" | "ai">("properties");
+  useEffect(() => {
+    if (state.aiStatus.phase === "running") {
+      setTab("ai");
+      patch({ rightOpen: true });
+    }
+  }, [state.aiStatus.phase]);
   const width = sidebarWidth("right", state.mode, state.rightWidth);
   const document = baseDocument(state);
   return (
@@ -48,12 +54,12 @@ export function Inspector() {
           <Icon name="sliders" />{t("inspector.tab")}
         </button>
         <button type="button" data-action="tab-ai" role="tab" aria-selected={tab === "ai"} onClick={() => setTab("ai")}>
-          <Icon name="layout" />{t("ai.tab")}
+          <Icon name="chat" />{t("ai.tab")}
         </button>
       </div>
       <Button action="close-inspector" className="drawer-close" variant="quiet" aria-label={t("a11y.close")}
         onClick={() => patch({rightOpen:false})}><Icon name="close" /></Button>
-      <div className="side-scroll">
+      <div className={"side-scroll" + (tab === "ai" ? " conversation-scroll" : "")}>
         {tab === "ai" ? <AiPanel /> : document ? <Properties document={document} /> : <p className="muted section">{t("app.noProject")}</p>}
       </div>
     </aside>
@@ -81,7 +87,7 @@ function CanvasFields({ document }: { document: FigureDocumentV1 }) {
   return (
     <>
       <section className="section canvas-fields">
-        <h2>{t("inspector.canvas")}</h2>
+        <h2 className="inspector-section-title"><Icon name="reference" />{t("inspector.canvas")}</h2>
         <div className="preset-row width-presets">
           {CANVAS_WIDTH_PRESETS_MM.map((width) => (
             <Button key={width} action={`width-${width}`} aria-pressed={canvas.widthMm === width} onClick={() => void transact([{ type: "canvas.set", canvas: { ...canvas, widthMm: width } }])}>
@@ -93,6 +99,7 @@ function CanvasFields({ document }: { document: FigureDocumentV1 }) {
           <NumberField label={t("inspector.width") + " (mm)"} value={canvas.widthMm} min={0.1} onCommit={(widthMm) => void transact([{ type: "canvas.set", canvas: { ...canvas, widthMm } }])} />
           <NumberField label={t("inspector.height") + " (mm)"} value={canvas.heightMm} min={0.1} onCommit={(heightMm) => void transact([{ type: "canvas.set", canvas: { ...canvas, heightMm } }])} />
         </div>
+        <details className="inspector-disclosure"><summary>{t("inspector.canvasDetails")}<Icon name="chevron" /></summary><div>
         <SelectField
           label={t("inspector.heightMode")}
           value={canvas.heightMode}
@@ -109,9 +116,10 @@ function CanvasFields({ document }: { document: FigureDocumentV1 }) {
           <span>{t("inspector.background")}</span>
           <input value={canvas.background} disabled title={t("inspector.backgroundLocked")} readOnly />
         </label>
+        </div></details>
       </section>
       <section className="section canvas-fields">
-        <h2>{t("inspector.gutter")}</h2>
+        <h2 className="inspector-section-title"><Icon name="layout" />{t("inspector.gutter")}</h2>
         <div className="field-pair">
           <NumberField label={t("inspector.gutterX") + " (mm)"} value={settings.gutterMm.horizontal} onCommit={(horizontal) => void transact([{ type: "layout.setSettings", layoutSettings: { ...settings, gutterMm: { ...settings.gutterMm, horizontal } } }])} />
           <NumberField label={t("inspector.gutterY") + " (mm)"} value={settings.gutterMm.vertical} onCommit={(vertical) => void transact([{ type: "layout.setSettings", layoutSettings: { ...settings, gutterMm: { ...settings.gutterMm, vertical } } }])} />
@@ -133,7 +141,7 @@ function CanvasFields({ document }: { document: FigureDocumentV1 }) {
         </details>
       </section>
       <section className="section canvas-fields">
-        <h2>{t("inspector.labels")}</h2>
+        <h2 className="inspector-section-title"><Icon name="edit" />{t("inspector.labels")}</h2>
         <LabelStyleFields style={style} />
       </section>
     </>
@@ -143,7 +151,7 @@ function CanvasFields({ document }: { document: FigureDocumentV1 }) {
 function LabelStyleFields({ style }: { style: FigureDocumentV1["labelStyle"] }) {
   const { t } = useTranslation();
   return (
-    <>
+    <div className="label-settings-grid">
       <SelectField label={t("labels.sequence")} value={style.sequence} options={[{ value: "upper-alpha", label: t("labels.upper") }, { value: "lower-alpha", label: t("labels.lower") }, { value: "number", label: t("labels.number") }]} onChange={(sequence) => void transact([{ type: "label.setStyle", labelStyle: { ...style, sequence: sequence as FigureDocumentV1["labelStyle"]["sequence"] } }])} />
       <SelectField label={t("labels.format")} value={style.format} options={[{ value: "plain", label: t("labels.plain") }, { value: "parentheses", label: t("labels.parentheses") }, { value: "dot", label: t("labels.dot") }]} onChange={(format) => void transact([{ type: "label.setStyle", labelStyle: { ...style, format: format as FigureDocumentV1["labelStyle"]["format"] } }])} />
       <SelectField label={t("labels.font")} value={style.fontId} options={BUNDLED_FONTS.map((font) => ({ value: font.fontId, label: font.family }))} onChange={(fontId) => void transact([{ type: "label.setStyle", labelStyle: { ...style, fontId: fontId as FigureDocumentV1["labelStyle"]["fontId"] } }])} />
@@ -152,7 +160,7 @@ function LabelStyleFields({ style }: { style: FigureDocumentV1["labelStyle"] }) 
       <ColorField label={t("labels.color")} value={style.color} onCommit={(color) => void transact([{ type: "label.setStyle", labelStyle: { ...style, color } }])} />
       <SelectField label={t("labels.placement")} value={style.placement} options={[{ value: "outside-top-left", label: t("labels.outside") }, { value: "inside-top-left", label: t("labels.inside") }]} onChange={(placement) => void transact([{ type: "label.setStyle", labelStyle: { ...style, placement: placement as FigureDocumentV1["labelStyle"]["placement"] } }])} />
       <NumberField label={t("labels.gap") + " (mm)"} value={style.gapMm} onCommit={(gapMm) => void transact([{ type: "label.setStyle", labelStyle: { ...style, gapMm } }])} />
-    </>
+    </div>
   );
 }
 

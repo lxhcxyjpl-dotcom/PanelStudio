@@ -244,13 +244,18 @@ export async function generateAi(prompt: string, options: AIOptions) {
     origin.jobId = jobId;
     if (origin.cancelRequested) { await api.cancelJob(jobId, newKey()); return; }
     if (!current(origin)) return;
+    // Clear only the submitted text; preserve anything typed while the request was queued.
+    if (get().aiPrompt === prompt) setPrompt("");
     patch({ aiStatus: { ...running, jobId } });
     void refreshAiHistory();
     await finishAi(origin, root, frozen, true);
   } catch (error) {
     if (current(origin)) failAi(error);
   } finally {
-    if (current(origin)) void refreshAiHistory();
+    if (current(origin)) {
+      if (["failed", "unsupported"].includes(get().aiStatus.phase) && !get().aiPrompt) setPrompt(prompt);
+      void refreshAiHistory();
+    }
   }
 }
 function failAi(error: unknown) {
@@ -283,7 +288,9 @@ async function finishAi(origin: Origin, root: Root, frozen: FrozenScope, show: b
 }
 export async function cancelAiPrompt() {
   const origin = active;
-  if (!origin || get().aiStatus.phase !== "running") return;
+  const status = get().aiStatus;
+  if (!origin || status.phase !== "running") return;
+  if (!get().aiPrompt) setPrompt(status.prompt);
   origin.cancelRequested = true;
   active = null;
   const ticket = ++sequence;

@@ -65,7 +65,7 @@ describe("SQLite v0.1 migration", () => {
       const oldResult = JSON.stringify({ kind: "candidates", candidates: [legacyCandidate] });
       legacy.prepare("UPDATE jobs SET resultJson = ? WHERE id = ?").run(oldResult, jobId);
       migrated = openDatabase(dir);
-      expect(migrated.pragma("user_version", { simple: true })).toBe(3);
+      expect(migrated.pragma("user_version", { simple: true })).toBe(4);
       expect(getProject(migrated, projectId)).toEqual(project);
       expect(getRevision(migrated, projectId, 1)?.documentHash).toBe(documentHash);
       expect(getAsset(migrated, projectId, assetId)?.originalFilename).toBe("legacy.svg");
@@ -121,6 +121,21 @@ describe("SQLite v0.1 migration", () => {
       const backup = new Database(path.join(dir, "backups", readdirSync(path.join(dir, "backups"))[0]!), { readonly: true });
       try { expect(backup.pragma("user_version", { simple: true })).toBe(2); } finally { backup.close(); }
     } finally { migrated?.close(); old.close(); }
+  });
+
+  it("adds layout choices to a version 3 database without rebuilding project assets", () => {
+    const dir = tempDir();
+    const old = openDatabase(dir);
+    old.exec("DROP TABLE layout_choices; PRAGMA user_version=3;");
+    const definition = old.prepare("SELECT sql FROM sqlite_schema WHERE name='assets'").get();
+    old.close();
+    const upgraded = openDatabase(dir);
+    try {
+      expect(upgraded.pragma("user_version", { simple: true })).toBe(4);
+      expect(upgraded.prepare("SELECT sql FROM sqlite_schema WHERE name='assets'").get()).toEqual(definition);
+      expect(upgraded.prepare("SELECT * FROM layout_choices").all()).toEqual([]);
+      expect(readdirSync(path.join(dir, "backups"))).toHaveLength(1);
+    } finally { upgraded.close(); }
   });
 
   it("rolls back every migration statement and rejects unknown newer versions", () => {

@@ -54,6 +54,9 @@ export function applyCommands(
 
 function applyOne(document: FigureDocumentV1, command: DomainCommand, assets: AssetLookup): void {
   switch (command.type) {
+    case "figure.setPublicationContext":
+      document.publicationContext = structuredClone(command.publicationContext);
+      return;
     case "panel.add":
       applyAdd(document, command, assets);
       return;

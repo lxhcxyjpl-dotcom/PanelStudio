@@ -6,6 +6,7 @@ import {
   LabelOverridesSchema,
   LabelStyleSchema,
   LayoutSettingsSchema,
+  PublicationContextSchema,
 } from "./document.js";
 import { DiagnosticSchema } from "./diagnostics.js";
 import {
@@ -188,6 +189,7 @@ export const GroupSetLockedCommandSchema = object({
 });
 
 export const DomainCommandSchema = Type.Union([
+  object({ type: Type.Literal("figure.setPublicationContext"), publicationContext: PublicationContextSchema }),
   PanelAddCommandSchema,
   PanelRemoveCommandSchema,
   PanelRenameCommandSchema,

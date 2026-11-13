@@ -140,6 +140,7 @@ export async function loadProject(projectId: string, fromBoot = false): Promise<
     history: document.history,
   };
   patch({
+    startMessage: "",
     projectId,
     title: project.title,
     confirmed,
@@ -177,7 +178,7 @@ export async function loadProject(projectId: string, fromBoot = false): Promise<
   });
 }
 
-export async function ensureProject(): Promise<string> {
+export async function ensureProject(askForContext = true): Promise<string> {
   const current = useWorkspace.getState();
   if (current.projectId && current.confirmed) return current.projectId;
   const title = current.locale === "zh-CN" ? "未命名图稿" : "Untitled figure";
@@ -198,6 +199,7 @@ export async function ensureProject(): Promise<string> {
     saveState: "saved",
     fittedProjectId: null,
     selection: { kind: "none" },
+    ...(askForContext ? { dialog: "publication" as const } : {}),
   });
   return created.project.id;
 }
@@ -252,6 +254,7 @@ function showStart(message: string): void {
   resetCandidateSession(null);
   writeProjectId(null);
   patch({
+    startMessage: "",
     projectId: null,
     confirmed: null,
     title: "",
@@ -377,6 +380,8 @@ export function placeAssets(assetIds: string[]): Promise<void> {
 }
 
 export async function openSample(): Promise<void> {
+  patch({ startMessage: "" });
+  await ensureProject(false);
   const files = await Promise.all([
     fileFromUrl(rasterUrl, "raster.png", "image/png"),
     fileFromUrl(photoUrl, "photo.jpg", "image/jpeg"),

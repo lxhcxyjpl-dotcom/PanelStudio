@@ -3,6 +3,7 @@ import type {
   AILayoutRequest,
   LayoutRequest,
   AIProviderConfig,
+  AIConnectionWriteRequest,
   AIProviderSettings,
   ApiError,
   Asset,
@@ -146,6 +147,9 @@ export const api = {
   },
   providerSettings(): Promise<AIProviderSettings> {
     return request("/settings/ai-provider");
+  },
+  saveConnection(connection: AIConnectionWriteRequest, key: string): Promise<AIProviderSettings> {
+    return request("/settings/ai-connection", jsonInit("PUT", connection, key));
   },
   saveProvider(config: AIProviderConfig, key: string): Promise<AIProviderSettings> {
     return request("/settings/ai-provider", jsonInit("PUT", config, key));

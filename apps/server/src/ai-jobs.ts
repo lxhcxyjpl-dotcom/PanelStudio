@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import {
   AIProviderSettingsSchema,
+  AIConnectionWriteRequestSchema,
   CandidateSchema,
   ENGINE_VERSIONS,
   RESOURCE_LIMITS,
@@ -20,6 +21,7 @@ import {
   AiCompileError,
   AiTransportError,
   buildScene,
+  chatCompletionsUrl,
   compileProposal,
   endpointProblem,
   isDirectUndo,
@@ -75,6 +77,26 @@ export function providerSettings(ctx: AppContext): AIProviderSettings {
   return settingsOf(readProvider(ctx.db));
 }
 
+export function saveProviderConnection(ctx: AppContext, body: unknown, key: string, requestHash: string): Response {
+  if (!Check(AIConnectionWriteRequestSchema, body)) throw new ApiException("REQUEST_INVALID", "The connection settings are invalid.");
+  const problem = settingsEndpointProblem(body.config);
+  if (problem) throw new ApiException("REQUEST_INVALID", problem);
+  if (body.secret !== undefined && (!body.secret.trim() || /[\r\n]/u.test(body.secret))) throw new ApiException("REQUEST_INVALID", "The secret is invalid.");
+  return immediate(ctx.db, () => {
+    const replay = takeReplay(ctx, "settings:ai-connection", key, requestHash);
+    if (replay) return replay;
+    const current = readProvider(ctx.db);
+    const sameEndpoint = current && chatCompletionsUrl(current.config.baseUrl) === chatCompletionsUrl(body.config.baseUrl);
+    const secret = body.secret === undefined ? (sameEndpoint ? current.encryptedSecret : null)
+      : encryptSecret(masterKey(ctx.dataDir), body.secret.trim());
+    const saved = writeProviderConfig(ctx.db, body.config, secret, ctx.now());
+    stopStaleAiJobs(ctx, saved.configRevision);
+    const response = settingsOf(saved);
+    remember(ctx, "settings:ai-connection", key, requestHash, 200, response);
+    return { status: 200, body: response };
+  });
+}
+
 export function saveProviderConfig(ctx: AppContext, body: unknown, key: string, requestHash: string): Response {
   if (!isAIProviderConfig(body)) throw new ApiException("REQUEST_INVALID", "The provider settings are invalid.");
   const problem = settingsEndpointProblem(body);
@@ -83,7 +105,8 @@ export function saveProviderConfig(ctx: AppContext, body: unknown, key: string, 
     const replay = takeReplay(ctx, "settings:ai-provider", key, requestHash);
     if (replay) return replay;
     const current = readProvider(ctx.db);
-    const saved = writeProviderConfig(ctx.db, body, current?.encryptedSecret ?? null, ctx.now());
+    const sameEndpoint = current && chatCompletionsUrl(current.config.baseUrl) === chatCompletionsUrl(body.baseUrl);
+    const saved = writeProviderConfig(ctx.db, body, sameEndpoint ? current.encryptedSecret : null, ctx.now());
     stopStaleAiJobs(ctx, saved.configRevision);
     const response = settingsOf(saved);
     if (!Check(AIProviderSettingsSchema, response)) {
@@ -357,6 +380,7 @@ async function runProviderTest(ctx: AppContext, job: JobDetail, signal: AbortSig
     fetchImpl: ctx.aiFetch,
     signal,
     maxTokens: 64,
+    connectionTest: true,
     messages: [{ role: "user", content: 'Reply with JSON {"ok":true} only.' }],
   });
   if (!stillCurrent(ctx, job.id, ready.provider.configRevision)) return;
@@ -405,14 +429,18 @@ async function runLayout(ctx: AppContext, job: JobDetail, signal: AbortSignal): 
   const sceneInput = { ...scope, baseRevision: request.baseRevision,
     configRevision: input.configRevision, previousTurns: input.previousTurns };
   const scene = buildScene(work.document, sceneInput);
+  scene.layoutExamples = input.layoutExamples ?? [];
   const canRender = ready.config.capabilities.imageInput;
   const inputPng = canRender && (request.includePreviewImage || request.visualReview)
     ? await tryPng(ctx, projectId, work.document, request.baseRevision) : null;
+  const panelImages = canRender && request.includePreviewImage
+    ? await renderPanelInputs(ctx, projectId, work.document, request.baseRevision, scope.scope === "selection" ? scope.selectedPanelIds : work.document.panelOrder)
+    : [];
   if (!stillCurrent(ctx, job.id, input.configRevision)) return;
   const providerInput = { config: ready.config, secret: ready.secret, replyLocale: request.replyLocale,
     prompt: request.prompt, scene, fetchImpl: ctx.aiFetch, signal };
   setPhase(ctx, job.id, "requesting-intent");
-  const resolved = await resolveModelIntent({ ...providerInput, previewPng: request.includePreviewImage ? inputPng : null });
+  const resolved = await resolveModelIntent({ ...providerInput, previewPng: request.includePreviewImage ? inputPng : null, panelImages });
   if (!stillCurrent(ctx, job.id, input.configRevision)) return;
   if (!resolved.ok) throw new AiCompileError("MODEL_OUTPUT_INVALID", resolved.message);
   const publish = (makeResult: () => AILayoutJobResult) => immediate(ctx.db, () => {
@@ -426,7 +454,7 @@ async function runLayout(ctx: AppContext, job: JobDetail, signal: AbortSignal): 
   }
   setPhase(ctx, job.id, "compiling");
   const compile = (intent: Extract<AIIntent, { kind: "proposal" }>) => {
-    const delta = compileProposal(work.document, intent, assets, scope);
+    const delta = compileProposal(work.document, intent, assets, scope, scene.layoutExamples);
     const commands = [...(work.candidate?.commands ?? []), ...delta.commands];
     if (commands.length > RESOURCE_LIMITS.maxCommandsPerTransaction) {
       throw new AiCompileError("AI_CHAIN_LIMIT", "The cumulative draft exceeds 64 commands.", { reason: "command-limit" });
@@ -473,6 +501,27 @@ async function runLayout(ctx: AppContext, job: JobDetail, signal: AbortSignal): 
       : { code: "AI_REVIEW_INCOMPLETE", severity: "warning", messageKey: "ai.reviewIncomplete", params: {} });
   }
   publish(() => ({ kind: "candidates", candidates: [storeCandidate(ctx, projectId, request.baseRevision, input.parentCandidateId, job.id, compiled)] }));
+}
+
+
+async function renderPanelInputs(ctx: AppContext, projectId: string, document: FigureDocumentV1,
+  revision: number, ids: string[]): Promise<Array<{ panelId: string; png: Uint8Array }>> {
+  return Promise.all(ids.map(async (id) => {
+    const source = document.panels[id]!;
+    const ratio = source.frameMm.width / source.frameMm.height;
+    const width = 120 * Math.min(1, ratio), height = width / ratio;
+    const isolated: FigureDocumentV1 = {
+      ...document,
+      panels: { [id]: { ...source, locked: false, frameMm: { x: 0, y: 0, width, height } } },
+      panelOrder: [id], stackOrder: [id], groups: {},
+      labelStyle: { ...document.labelStyle, visible: false },
+      layoutSettings: { ...document.layoutSettings, constraints: [], primaryPanelId: null },
+      canvas: { ...document.canvas, widthMm: width, heightMm: height, heightMode: "fixed",
+        marginsMm: { top: 0, right: 0, bottom: 0, left: 0 } },
+    };
+    const png = await renderDocumentPng(ctx, projectId, isolated, revision, Math.max(1, Math.round(720 * Math.min(1, ratio))));
+    return { panelId: id, png };
+  }));
 }
 
 function replyResult(intent: Exclude<AIIntent, { kind: "proposal" }>): AILayoutJobResult {

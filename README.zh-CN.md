@@ -15,11 +15,15 @@ PanelStudio 是一个本地或自部署的科研多面板排版编辑器。导�
 
 ![新版工作台中的六面板工程](docs/screenshots/studio-workspace.webp)
 
-首页可导入图片、打开工程包，或继续最近编辑的项目。编辑时可从左上角 **PanelStudio → 返回工作台首页** 切回。首页的科研印样场景为生成式插图。[首页实机截图](docs/screenshots/studio-home.webp) · [参考图与偏好窗口](docs/screenshots/studio-reference.webp)
+首页可先描述图稿目标、导入图片、打开工程包，或继续最近编辑的项目。右上角书本按钮提供三步「快速上手」，首次访问也会显示入口。编辑时可从左上角 **PanelStudio → 返回工作台首页** 切回。[对话交互与新手引导](docs/v0.3-conversation-ui.md) · [参考图与偏好窗口](docs/screenshots/studio-reference.webp)
 
 [可复现的六图工程](examples/refinement-six/) · [实机界面录像](docs/demo/v0.2-refinement.webm) · [本机 Illustrator 验收记录](docs/illustrator-compatibility.md)
 
 工具栏的 **参考图与偏好** 支持上传期刊组图、写下构图要求，或同时使用两者。可以指定主图、相邻对比、画布方向与面板间距，再预览候选。参考图在浏览器内识别，识别框可手动调整。参见[六图排版对照、工程包与 Illustrator 样稿](examples/reference-preferences/)。
+
+v0.3 开发中的 **按内容排版** 支持填写目标期刊、研究领域、一句话主张和排版偏好。配置支持图片输入的 API 后，模型可查看独立子图，结合相关论文版式与用户已采用的布局生成草案。参见[使用方式与验证范围](docs/v0.3-content-layout.md)。
+
+在 **设置 → AI 连接** 中选择服务商，填写服务地址、模型与 API 密钥，可一次保存并测试。支持 DeepSeek、OpenAI、OpenRouter、Ollama 快捷项及自定义 Chat Completions 兼容服务；协议细节与本地地址选项收在高级设置中。[连接方式、内页调整与验证范围](docs/v0.3-connection-ui.md)。
 
 在本机 Illustrator 30.7 中，中文混排样稿直接打开时出现字重替换。若遇到同一情况，可运行导出字体包中的编号字体还原脚本，再保存为 .ai。五组样稿的复测结果见上方实机验收记录。
 

@@ -1,5 +1,5 @@
 import Type, { type Static } from "typebox";
-import { AILayoutRequestSchema, AIProviderConfigSchema } from "./ai.js";
+import { AILayoutRequestSchema, AIProviderConfigSchema, LayoutExampleSchema } from "./ai.js";
 import { AssetSchema } from "./assets.js";
 import { DomainCommandSchema } from "./commands.js";
 import { DiagnosticSchema } from "./diagnostics.js";
@@ -25,6 +25,7 @@ export const AIFrozenInputSchema = object({
   parentCandidateId: nullable(UuidSchema),
   rootHash: DocumentHashSchema,
   sourceHash: DocumentHashSchema,
+  layoutExamples: Type.Optional(Type.Array(LayoutExampleSchema, { maxItems: 6 })),
   engineVersion: NonEmptyStringSchema,
   fontRegistryVersion: NonEmptyStringSchema,
   previousTurns: Type.Array(object({

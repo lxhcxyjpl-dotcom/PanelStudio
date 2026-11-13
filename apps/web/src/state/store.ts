@@ -48,6 +48,7 @@ export const useWorkspace = create<WorkspaceState>(() => ({
   exportState: null,
   backend: "unknown",
   booting: true,
+  startMessage: "",
   liveMessage: "",
   spacePan: false,
   dragging: false,

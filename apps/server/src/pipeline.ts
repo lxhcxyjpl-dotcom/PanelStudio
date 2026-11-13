@@ -78,6 +78,7 @@ import { normalizeRaster, rasterizeSvg, sniffMediaType, type RasterMediaType } f
 import { PNG_RENDERER, type RenderPool } from "./render-pool.js";
 import { compileSnapshot, type RenderSnapshot } from "./render-task.js";
 import { queueRenderJob } from "./render-jobs.js";
+import { rememberLayoutChoice } from "./layout-references.js";
 import type Database from "better-sqlite3";
 
 export type AppContext = {
@@ -506,6 +507,7 @@ function acceptCandidate(
     redoStack: [],
   });
   const response = transactionBody(project.id, saved, candidate.diagnostics);
+  if (candidate.validationMode === "layout") rememberLayoutChoice(ctx, project.id, saved.revision, next);
   remember(ctx, `transaction:${project.id}`, key, requestHash, 200, response);
   return { status: 200, body: response };
 }

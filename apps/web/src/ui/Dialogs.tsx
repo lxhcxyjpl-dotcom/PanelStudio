@@ -1,11 +1,12 @@
-import * as Dialog from "@radix-ui/react-dialog";
-import { useEffect, useState, type ReactNode } from "react";
+import { Shell } from "./DialogShell";
+export { Shell } from "./DialogShell";
+import { SettingsDialog } from "./SettingsDialog";
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { DEFAULT_PNG_DPI, PNG_DPI_OPTIONS, SVG_SUPPORT, type AIProviderConfig, type ExportRequest } from "@panelstudio/contracts";
-import { api, newKey, waitForJob } from "../api/client";
+import { DEFAULT_PNG_DPI, PNG_DPI_OPTIONS, SVG_SUPPORT, type ExportRequest } from "@panelstudio/contracts";
+import { api } from "../api/client";
 import { formatDiagnostic } from "../i18n/diagnostic";
-import { queryClient } from "../state/query";
 import { BUNDLED_FONTS } from "@panelstudio/contracts";
 import {
   discardDraft,
@@ -14,206 +15,79 @@ import {
   exportFigure,
   offerAssets,
   retrySave,
+  transact,
 } from "../state/session";
 import { patch, useWorkspace } from "../state/store";
 import { Button, Icon } from "./widgets";
+import { baseDocument } from "../state/types";
+import type { PublicationContext } from "@panelstudio/contracts";
 
 export function Dialogs() {
   const dialog = useWorkspace((state) => state.dialog);
   return (
     <>
-      <SettingsDialog open={dialog === "settings"} />
+      <SettingsDialog open={dialog === "settings" || dialog === "ai-settings"} initialSection={dialog === "ai-settings" ? "ai" : "general"} />
       <ShortcutsDialog open={dialog === "shortcuts"} />
       <ExportDialog open={dialog === "export"} />
       <SvgDialog open={dialog === "svg"} />
       <AssetDialog open={dialog === "asset"} />
       <RecoveryDialog open={dialog === "recovery"} />
       <QuotaDialog open={dialog === "quota"} />
+      <PublicationDialog open={dialog === "publication"} />
     </>
   );
 }
 
-export function Shell(props: { open: boolean; title: string; children: ReactNode; onClose?: () => void; className?: string }) {
+function PublicationDialog({ open }: { open: boolean }) {
   const { t } = useTranslation();
-  return (
-    <Dialog.Root open={props.open} onOpenChange={(open) => { if (!open) props.onClose ? props.onClose() : patch({ dialog: null }); }}>
-      <Dialog.Portal>
-        <Dialog.Overlay className="scrim" />
-        <Dialog.Content className={"dialog " + (props.className ?? "")} aria-describedby={undefined}>
-          <div className="dialog-heading">
-            <Dialog.Title>{props.title}</Dialog.Title>
-            <Dialog.Close asChild>
-              <Button action="close-dialog" variant="quiet" aria-label={t("a11y.close")} title={t("a11y.close")}><Icon name="close" /></Button>
-            </Dialog.Close>
-          </div>
-          {props.children}
-        </Dialog.Content>
-      </Dialog.Portal>
-    </Dialog.Root>
-  );
-}
-
-function SettingsDialog({ open }: { open: boolean }) {
-  const { t, i18n } = useTranslation();
   const state = useWorkspace();
-  return (
-    <Shell open={open} title={t("settings.title")}>
-      <label className="field">
-        <span>{t("settings.theme")}</span>
-        <select value={state.theme} onChange={(event) => patch({ theme: event.target.value === "dark" ? "dark" : "light" })}>
-          <option value="light">{t("settings.light")}</option>
-          <option value="dark">{t("settings.dark")}</option>
-        </select>
-      </label>
-      <label className="field">
-        <span>{t("settings.language")}</span>
-        <select
-          value={state.locale}
-          onChange={(event) => {
-            const locale = event.target.value === "en-US" ? "en-US" : "zh-CN";
-            patch({ locale });
-            void i18n.changeLanguage(locale);
-          }}
-        >
-          <option value="zh-CN">简体中文</option>
-          <option value="en-US">English</option>
-        </select>
-      </label>
-      <label className="field">
-        <span>{t("settings.reduceMotion")}</span>
-        <select value={state.motion} onChange={(event) => patch({ motion: event.target.value === "on" || event.target.value === "off" ? event.target.value : "system" })}>
-          <option value="system">{t("settings.motionSystem")}</option>
-          <option value="on">{t("settings.motionOn")}</option>
-          <option value="off">{t("settings.motionOff")}</option>
-        </select>
-      </label>
-      <label className="check">
-        <input type="checkbox" checked={state.reduceTransparency} onChange={(event) => patch({ reduceTransparency: event.target.checked })} />
-        {t("settings.reduceTransparency")}
-      </label>
-      <ProviderSettings />
-    </Shell>
-  );
-}
-
-function ProviderSettings() {
-  const { t } = useTranslation();
-  const settings = useQuery({ queryKey: ["ai-provider"], queryFn: () => api.providerSettings() });
-  const [baseUrl, setBaseUrl] = useState("");
-  const [model, setModel] = useState("");
-  const [structured, setStructured] = useState<AIProviderConfig["capabilities"]["structuredOutput"]>("json_object");
-  const [imageInput, setImageInput] = useState(false);
-  const [allowLocal, setAllowLocal] = useState(false);
-  const [secret, setSecret] = useState("");
-  const [message, setMessage] = useState("");
+  const [value, setValue] = useState<PublicationContext>({ journal: "", field: "", message: "", preference: "auto" });
+  const [busy, setBusy] = useState(false);
   useEffect(() => {
-    const config = settings.data?.config;
-    if (!config) return;
-    setBaseUrl(config.baseUrl);
-    setModel(config.model);
-    setStructured(config.capabilities.structuredOutput);
-    setImageInput(config.capabilities.imageInput);
-    setAllowLocal(config.allowLocalEndpoint);
-  }, [settings.data?.config]);
-  async function saveConfig() {
-    try {
-      await api.saveProvider(
-        {
-          adapter: "openai-compatible",
-          baseUrl: baseUrl.trim(),
-          model: model.trim(),
-          capabilities: { imageInput, structuredOutput: structured },
-          allowLocalEndpoint: allowLocal,
-        },
-        newKey(),
-      );
-      await queryClient.invalidateQueries({ queryKey: ["ai-provider"] });
-      setMessage(t("settings.saveProvider"));
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : t("ai.jobFailed"));
-    }
-  }
-  async function saveSecret() {
-    try {
-      await api.saveSecret(secret, newKey());
-      setSecret("");
-      await queryClient.invalidateQueries({ queryKey: ["ai-provider"] });
-      setMessage(t("settings.hasSecret"));
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : t("ai.jobFailed"));
-    }
-  }
-  async function removeSecret() {
-    try {
-      await api.deleteSecret(newKey());
-      setSecret("");
-      await queryClient.invalidateQueries({ queryKey: ["ai-provider"] });
-      setMessage(t("settings.noSecret"));
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : t("ai.jobFailed"));
-    }
-  }
-  async function testProvider() {
-    try {
-      const accepted = await api.testProvider(newKey());
-      const job = await waitForJob(accepted.jobId);
-      if (job.status === "succeeded" && job.result && "latencyMs" in job.result) {
-        setMessage(t("ai.testOk", { latency: job.result.latencyMs }));
-        return;
-      }
-      setMessage(job.status === "failed" ? job.error?.message ?? t("ai.jobFailed") : t("ai.jobFailed"));
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : t("ai.jobFailed"));
-    }
-  }
-  return (
-    <div className="section" data-testid="ai-settings">
-      <h2>{t("settings.provider")}</h2>
-      <p>{t("settings.aiNote")}</p>
-      <p data-testid="ai-secret-state">{settings.data?.hasSecret ? t("settings.hasSecret") : t("settings.noSecret")}</p>
-      <label className="field">
-        <span>{t("settings.baseUrl")}</span>
-        <input data-testid="ai-base-url" value={baseUrl} onChange={(event) => setBaseUrl(event.target.value)} />
+    if (open) setValue(baseDocument(useWorkspace.getState())?.publicationContext ??
+      { journal: "", field: "", message: useWorkspace.getState().startMessage, preference: "auto" });
+  }, [open, state.projectId]);
+  return <Shell open={open} title={t("publication.title")} className="brief-dialog">
+    <form className="publication-form" onSubmit={(event) => {
+      event.preventDefault();
+      setBusy(true);
+      void transact([{ type: "figure.setPublicationContext", publicationContext: {
+        journal: value.journal.trim(), field: value.field.trim(), message: value.message.trim(), preference: value.preference,
+      } }]).then(() => {
+        const now = useWorkspace.getState();
+        if (now.saveState === "saved" && now.dialog === "publication") patch({ dialog: null, startMessage: "" });
+      }).finally(() => setBusy(false));
+    }}>
+      <div className="brief-intro"><span className="brief-symbol"><Icon name="spark" /></span><h3>{t("publication.heading")}</h3></div>
+      <label className="field brief-message"><span className="sr-only">{t("publication.message")}</span>
+        <textarea autoFocus data-testid="figure-message" value={value.message} maxLength={1000} rows={3}
+          placeholder={t("publication.messagePlaceholder")} onChange={(e) => setValue({ ...value, message: e.target.value })} />
       </label>
-      <label className="field">
-        <span>{t("settings.model")}</span>
-        <input data-testid="ai-model" value={model} onChange={(event) => setModel(event.target.value)} />
+      <div className="brief-context-fields">
+      <label className="field"><span>{t("publication.journal")}</span>
+        <input data-testid="target-journal" value={value.journal} maxLength={160} list="journal-suggestions"
+          placeholder={t("publication.journalPlaceholder")} onChange={(e) => setValue({ ...value, journal: e.target.value })} />
+        <datalist id="journal-suggestions"><option value="Nature" /><option value="Nature Communications" /><option value="Science" /><option value="Cell" /></datalist>
       </label>
-      <label className="field">
-        <span>{t("settings.structured")}</span>
-        <select data-testid="ai-structured" value={structured} onChange={(event) => setStructured(event.target.value as AIProviderConfig["capabilities"]["structuredOutput"])}>
-          <option value="json_schema">json_schema</option>
-          <option value="json_object">json_object</option>
-          <option value="text_json">text_json</option>
-        </select>
+      <label className="field"><span>{t("publication.field")}</span>
+        <input data-testid="research-field" value={value.field} maxLength={240}
+          placeholder={t("publication.fieldPlaceholder")} onChange={(e) => setValue({ ...value, field: e.target.value })} />
       </label>
-      <label className="check">
-        <input data-testid="ai-image" type="checkbox" checked={imageInput} onChange={(event) => setImageInput(event.target.checked)} />
-        {t("settings.imageInput")}
-      </label>
-      <label className="check">
-        <input data-testid="ai-local" type="checkbox" checked={allowLocal} onChange={(event) => setAllowLocal(event.target.checked)} />
-        {t("settings.allowLocal")}
-      </label>
-      <Button action="save-provider" disabledReason={baseUrl.trim() && model.trim() ? undefined : t("settings.baseUrl")} onClick={() => void saveConfig()}>
-        {t("settings.saveProvider")}
-      </Button>
-      <label className="field">
-        <span>{t("settings.secret")}</span>
-        <input data-testid="ai-secret" type="password" autoComplete="off" value={secret} onChange={(event) => setSecret(event.target.value)} />
-      </label>
-      <Button action="save-secret" disabledReason={secret.trim() ? undefined : t("settings.secret")} onClick={() => void saveSecret()}>
-        {t("settings.saveSecret")}
-      </Button>
-      <Button action="delete-secret" disabledReason={settings.data?.hasSecret ? undefined : t("settings.noSecret")} onClick={() => void removeSecret()}>
-        {t("settings.deleteSecret")}
-      </Button>
-      <Button action="test-provider" disabledReason={settings.data?.config && settings.data.hasSecret ? undefined : t("ai.notConfigured")} onClick={() => void testProvider()}>
-        {t("ai.test")}
-      </Button>
-      {message ? <p data-testid="ai-provider-status">{message}</p> : null}
-    </div>
-  );
+      </div>
+      <fieldset className="brief-preferences" data-testid="layout-preference"><legend>{t("publication.preference")}</legend>
+        {(["auto", "comparison", "emphasis", "compact"] as const).map(kind => <label key={kind} className="brief-choice" data-checked={value.preference === kind}>
+          <input type="radio" name="layout-preference" value={kind} checked={value.preference === kind} onChange={() => setValue({ ...value, preference: kind })} />
+          <span className={"layout-glyph " + kind} aria-hidden="true"><i /><i /><i /><i /></span>
+          <span>{t("publication." + kind)}</span><Icon name="check" />
+        </label>)}
+      </fieldset>
+      {state.draft && <p className="brief-error" role="alert">{t("save.failed")}</p>}
+      <div className="dialog-actions">
+        <Button action="skip-publication" variant="quiet" disabled={busy} onClick={() => patch({ dialog: null })}>{t("publication.later")}</Button>
+        <Button action="save-publication" variant="primary" type="submit" disabled={busy || Boolean(state.draft)}>{t("publication.save")}</Button>
+      </div>
+    </form>
+  </Shell>;
 }
 
 function ShortcutsDialog({ open }: { open: boolean }) {

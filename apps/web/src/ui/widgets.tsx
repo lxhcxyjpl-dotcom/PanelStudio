@@ -158,6 +158,12 @@ export function Icon({ name }: { name: string }) {
 const stroke = { fill: "none", stroke: "currentColor", strokeWidth: 1.5, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
 
 const paths: Record<string, ReactNode> = {
+  arrowUp: <path {...stroke} d="M8 13V3M3.5 7.5 8 3l4.5 4.5" />,
+  spark: <path {...stroke} d="m9 1.5 1.7 4.8 4.8 1.7-4.8 1.7L9 14.5 7.3 9.7 2.5 8l4.8-1.7L9 1.5ZM2 1v3M.5 2.5h3" />,
+  book: <path {...stroke} d="M8 4C6 2.5 4 2.5 1.5 3v9c2.5-.5 4.5-.5 6.5 1 2-1.5 4-1.5 6.5-1V3C12 2.5 10 2.5 8 4Zm0 0v9" />,
+  chat: <path {...stroke} d="M3 2.5h10a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1H6l-3.5 2v-2A1 1 0 0 1 2 10.5v-7a1 1 0 0 1 1-1ZM5 6h6M5 8.5h4" />,
+  stop: <rect x="4" y="4" width="8" height="8" rx="1" fill="currentColor" />,
+  edit: <path {...stroke} d="m10.5 2.5 3 3M3 10l8-8 3 3-8 8-4 1 1-4Z" />,
   plus: <path {...stroke} d="M8 3v10M3 8h10" />,
   minus: <path {...stroke} d="M3 8h10" />,
   close: <path {...stroke} d="m4 4 8 8m0-8-8 8" />,

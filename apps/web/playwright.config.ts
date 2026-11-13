@@ -16,5 +16,6 @@ export default defineConfig({
     viewport: { width: 1440, height: 900 },
   },
   globalSetup: "./e2e/serve.mjs",
-  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"], viewport: { width: 1440, height: 900 } } }],
+  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"], viewport: { width: 1440, height: 900 },
+    ...(process.env.PANELSTUDIO_E2E_CHANNEL ? { channel: process.env.PANELSTUDIO_E2E_CHANNEL } : {}) } }],
 });

@@ -89,7 +89,7 @@ export const StandardLayoutRequestSchema = Type.Union([...standardRequests], req
 
 const coordinate = Type.Number({ minimum: 0, maximum: 1 });
 const extent = Type.Number({ exclusiveMinimum: 0, maximum: 1 });
-const GuidedPreferencesSchema = object({
+export const GuidedPreferencesSchema = object({
   gapMm: Type.Optional(Type.Number({ minimum: 0, maximum: 30 })),
   shape: Type.Optional(Type.Union([Type.Literal("wide"), Type.Literal("tall"), Type.Literal("square")])),
   focus: Type.Optional(UnitIdSchema),

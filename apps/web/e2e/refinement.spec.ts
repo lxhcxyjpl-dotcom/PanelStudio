@@ -3,6 +3,9 @@ import type { FigureDocumentV1 } from "@panelstudio/contracts";
 
 type Snapshot = { revision: number; documentHash: string; document: FigureDocumentV1 };
 test.beforeEach(async ({ page }) => {
+  await page.addLocatorHandler(page.getByRole("dialog", { name: /^(排版目标|Figure brief)$/ }), async () => {
+    await page.locator('[data-action="skip-publication"]').click();
+  });
   await page.addInitScript(() => localStorage.setItem("panelstudio.prefs", JSON.stringify({ theme: "light", motion: "on", locale: "zh-CN" })));
   await page.goto("/");
   const files = [2, 1, 1.5].map((ratio, i) => ({

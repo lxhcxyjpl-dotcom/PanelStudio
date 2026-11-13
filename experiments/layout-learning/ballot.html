@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>组图盲选 · PanelStudio</title>
+<style>
+:root {font:15px/1.55 "Segoe UI","Microsoft YaHei",sans-serif;color:#302e2a;background:#f8f6f1;--line:#dcd8ce;--accent:#a75035}
+* {box-sizing:border-box}
+[hidden] {display:none!important}
+body {max-width:1500px;margin:auto;padding:24px clamp(16px,3vw,50px) 50px}
+header,.answers,.nav,footer {display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+header {justify-content:space-between;border-bottom:1px solid var(--line);padding-bottom:14px}
+.brand {font:20px Georgia,serif}
+.meta,header span,figcaption,h2 {font:normal 12px/1.6 "Segoe UI","Microsoft YaHei",sans-serif;color:#625e56}
+main {margin-top:28px}
+h1 {font:normal 30px/1.3 Georgia,"Microsoft YaHei",serif;margin:4px 0 10px}
+p {margin:0;color:#625e56}
+.case {margin-top:24px;padding-bottom:20px;border-bottom:1px solid var(--line)}
+h2 {margin:0 0 8px}
+.pair {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+figure {margin:0;min-width:0}
+figcaption {margin:0 0 5px}
+.art {display:block;width:100%;height:auto;border:1px solid var(--line);border-radius:8px;background:#fff}
+button,.choice {font:inherit;color:inherit;border:1px solid var(--line);border-radius:7px;background:#fffdf8;cursor:pointer;padding:7px 13px}
+button:disabled {opacity:.45;cursor:default}
+button:focus-visible,.choice:focus-within {outline:2px solid var(--accent);outline-offset:3px}
+.preview {display:block;width:100%;padding:0;border:0;line-height:0;cursor:zoom-in;background:none}
+.preview:hover img {border-color:#a89b86}
+.answers {border:none;padding:0;margin:16px 0 0;gap:8px}
+.choice {display:inline-flex;align-items:center;gap:7px}
+.choice input {accent-color:var(--accent);margin:0}
+.choice:has(input:checked) {background:#f4e8de;border-color:var(--accent)}
+.sr-only {position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%)}
+footer {justify-content:space-between;margin-top:18px}
+.save {display:flex;align-items:center;gap:10px}
+dialog {padding:12px;border:1px solid var(--line);border-radius:8px;max-width:96vw;max-height:94vh}
+dialog::backdrop {background:#28251ec9}
+dialog img {width:min(1080px,89vw);height:auto;display:block}
+dialog form {text-align:right;margin-bottom:7px}
+@media(max-width:670px) {.pair{grid-template-columns:1fr}body{padding-top:14px}}
+@media print {header,footer,#hint,dialog {display:none!important}.case[hidden] {display:block!important}.case{break-inside:avoid;break-after:page}}
+</style>
+</head>
+<body>
+<header><strong class="brand">PanelStudio</strong><span>组图盲选</span></header>
+<main>
+<h1>哪一版更适合放进论文？</h1>
+<p id="hint">向下浏览各组，可按组号记录选择，例如 1A、2B。</p>
+__CARDS__
+<footer id="actions" hidden>
+  <div class="save"><button id="export" type="button">导出选择</button><span class="meta" id="status" role="status"></span></div>
+  <div class="nav"><button id="prev" type="button">上一组</button><button id="next" type="button">下一组</button></div>
+</footer>
+</main>
+<dialog id="zoom"><form method="dialog"><button>关闭</button></form><img id="large" alt="放大的组图"></dialog>
+<script>
+(function () {
+  "use strict";
+  const byId = id => document.getElementById(id);
+  const cards = Array.from(document.querySelectorAll(".case[data-question]"));
+  if (!cards.length) return;
+  const version = "__VERSION__", digest = "__DIGEST__", key = version + "-" + digest;
+  const ballot = {version, digest, ballotId: "", choices: {}};
+  const options = ["A", "B", "tie", "neither"];
+  let position = 0, storageOK = true;
+
+  try {
+    const saved = JSON.parse(localStorage.getItem(key));
+    if (saved && saved.version === version && saved.digest === digest && typeof saved.ballotId === "string") {
+      ballot.ballotId = saved.ballotId;
+      for (const card of cards) {
+        const q = card.dataset.question;
+        const vote = saved.choices && saved.choices[q];
+        if (options.includes(vote)) ballot.choices[q] = vote;
+      }
+    }
+  } catch (err) { storageOK = false; }
+  if (!ballot.ballotId) {
+    ballot.ballotId = window.crypto && typeof window.crypto.randomUUID === "function"
+      ? window.crypto.randomUUID() : String(Date.now()) + "-" + Math.random().toString(36).slice(2);
+  }
+  function update() {
+    cards.forEach((card, i) => { card.hidden = i !== position; });
+    byId("prev").disabled = position === 0;
+    byId("next").disabled = position === cards.length - 1;
+    const count = Object.keys(ballot.choices).length;
+    byId("export").disabled = !count;
+    byId("status").textContent = "已选 " + count + " / " + cards.length + (storageOK ? "" : " · 请导出保存");
+  }
+  const zoom = byId("zoom");
+  for (const card of cards) {
+    const q = card.dataset.question;
+    for (const input of card.querySelectorAll('input[type="radio"]')) {
+      if (ballot.choices[q] === input.value) input.checked = true;
+      input.addEventListener("change", () => {
+        ballot.choices[q] = input.value;
+        try { localStorage.setItem(key, JSON.stringify(ballot)); } catch (err) { storageOK = false; }
+        update();
+      });
+    }
+    if (typeof zoom.showModal === "function") {
+      for (const img of card.querySelectorAll("img.art")) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "preview";
+        button.setAttribute("aria-label", "放大方案 " + img.dataset.side);
+        img.parentNode.insertBefore(button, img);
+        button.appendChild(img);
+        button.addEventListener("click", () => {
+          byId("large").src = img.src;
+          byId("large").alt = img.alt;
+          zoom.showModal();
+        });
+      }
+    }
+  }
+  function navigate(step) {
+    position = Math.max(0, Math.min(cards.length - 1, position + step));
+    update();
+    cards[position].querySelector("h2").focus();
+  }
+  byId("prev").addEventListener("click", () => navigate(-1));
+  byId("next").addEventListener("click", () => navigate(1));
+  byId("export").addEventListener("click", () => {
+    const url = URL.createObjectURL(new Blob([JSON.stringify(ballot, null, 2)], {type:"application/json"}));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "panelstudio-盲选-" + ballot.ballotId.slice(0, 8) + ".json";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1500);
+  });
+  byId("hint").textContent = typeof zoom.showModal === "function"
+    ? "两版使用相同素材和版心宽度。点击图稿可放大。" : "两版使用相同素材和版心宽度。";
+  byId("actions").hidden = false;
+  update();
+}());
+</script>
+</body>
+</html>

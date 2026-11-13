@@ -1,6 +1,12 @@
 import { expect, test, type Page } from "@playwright/test";
 import type { FigureDocumentV1 } from "@panelstudio/contracts";
 
+test.beforeEach(async ({ page }) => {
+  await page.addLocatorHandler(page.getByRole("dialog", { name: /^(排版目标|Figure brief)$/ }), async () => {
+    await page.locator('[data-action="skip-publication"]').click();
+  });
+});
+
 const action = (p: Page, name: string) => p.locator('[data-action="' + name + '"]');
 const image = (name: string, inner: string) => ({name, mimeType:"image/svg+xml",
   buffer:Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="400" height="240" viewBox="0 0 400 240">' + inner + '</svg>')});

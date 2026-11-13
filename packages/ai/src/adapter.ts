@@ -20,6 +20,7 @@ export async function postChatCompletion(input: {
   fetchImpl?: typeof fetch;
   signal?: AbortSignal;
   maxTokens?: number;
+  connectionTest?: boolean;
 }): Promise<string> {
   const problem = endpointProblem(input.config.baseUrl, input.config.allowLocalEndpoint);
   if (problem) throw new AiTransportError(problem);
@@ -34,7 +35,7 @@ export async function postChatCompletion(input: {
         "content-type": "application/json",
         authorization: `Bearer ${input.secret}`,
       },
-      body: JSON.stringify(requestBody(input.config, input.messages, input.maxTokens)),
+      body: JSON.stringify(requestBody(input.config, input.messages, input.maxTokens, input.connectionTest === true)),
     });
   } catch (error) {
     if (isTimeout(error)) throw new AiTransportError("The provider request timed out.");
@@ -65,26 +66,32 @@ export function pngDataUrl(bytes: Uint8Array): string {
   return `data:image/png;base64,${binary}`;
 }
 
-function requestBody(config: AIProviderConfig, messages: ChatMessage[], maxTokens: number | undefined) {
+function requestBody(config: AIProviderConfig, messages: ChatMessage[], maxTokens: number | undefined, connectionTest: boolean) {
   const body: Record<string, unknown> = {
     model: config.model,
     temperature: 0,
     messages,
   };
   if (maxTokens !== undefined) body.max_tokens = maxTokens;
-  const format = responseFormat(config);
+  // Current official DeepSeek models think by default; a short connectivity probe
+  // must reserve its small output budget for the actual JSON reply.
+  if (connectionTest && new URL(config.baseUrl).hostname === "api.deepseek.com" &&
+      ["deepseek-flash", "deepseek-v4-pro", "deepseek-v4-flash", "deepseek-v4-flash-vision-exp"].includes(config.model)) {
+    body.thinking = { type: "disabled" };
+  }
+  const format = responseFormat(config, connectionTest);
   if (format) body.response_format = format;
   return body;
 }
 
-function responseFormat(config: AIProviderConfig): Record<string, unknown> | null {
+function responseFormat(config: AIProviderConfig, connectionTest: boolean): Record<string, unknown> | null {
   if (config.capabilities.structuredOutput === "json_schema") {
     return {
       type: "json_schema",
       json_schema: {
-        name: "AIIntent",
+        name: connectionTest ? "ConnectionTest" : "AIIntent",
         strict: true,
-        schema: toJsonSchema(AIIntentSchema),
+        schema: connectionTest ? { type: "object", properties: { ok: { type: "boolean" } }, required: ["ok"], additionalProperties: false } : toJsonSchema(AIIntentSchema),
       },
     };
   }

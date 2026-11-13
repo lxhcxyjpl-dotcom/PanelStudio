@@ -2,6 +2,12 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { expect, test } from "@playwright/test";
 
+test.beforeEach(async ({ page }) => {
+  await page.addLocatorHandler(page.getByRole("dialog", { name: /^(排版目标|Figure brief)$/ }), async () => {
+    await page.locator('[data-action="skip-publication"]').click();
+  });
+});
+
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
 const metricsUrl = "/@fs/" + path.join(root, "packages/text-metrics/src/index.ts").replaceAll("\\", "/");
 

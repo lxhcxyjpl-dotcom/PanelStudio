@@ -38,6 +38,7 @@ const paths = [
   "GET /api/v1/artifacts/{artifactId}/download",
   "GET /api/v1/settings/ai-provider",
   "PUT /api/v1/settings/ai-provider",
+  "PUT /api/v1/settings/ai-connection",
   "PUT /api/v1/settings/ai-provider/secret",
   "DELETE /api/v1/settings/ai-provider/secret",
   "POST /api/v1/settings/ai-provider/test",

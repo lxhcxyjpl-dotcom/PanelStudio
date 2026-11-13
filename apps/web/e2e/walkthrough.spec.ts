@@ -24,6 +24,9 @@ const figures = ["line.svg", "bars.svg", "scatter.svg", "schematic.svg", "histog
 );
 
 test.beforeEach(async ({ page }) => {
+  await page.addLocatorHandler(page.getByRole("dialog", { name: /^(排版目标|Figure brief)$/ }), async () => {
+    await page.locator('[data-action="skip-publication"]').click();
+  });
   await page.addInitScript(() => {
     localStorage.setItem(
       "panelstudio.prefs",
@@ -189,12 +192,13 @@ function readAll(stream: NodeJS.ReadableStream): Promise<string> {
 
 async function configure(page: Page, providerPort: number): Promise<void> {
   await page.getByRole("button", { name: "设置" }).click();
+  await page.locator("[data-action=settings-ai]").click();
   await page.getByTestId("ai-base-url").fill(`http://127.0.0.1:${providerPort}/v1`);
   await page.getByTestId("ai-model").fill("fixture-model");
+  await page.locator(".connection-advanced > summary").click();
   await page.getByTestId("ai-local").check();
-  await page.getByRole("button", { name: "保存模型设置" }).click();
   await page.getByTestId("ai-secret").fill(SECRET);
-  await page.getByRole("button", { name: "保存密钥" }).click();
+  await page.locator("[data-action=save-connection]").click();
   await expect(page.getByTestId("ai-secret-state")).toHaveText("已保存密钥");
   await page.getByRole("button", { name: "关闭" }).click();
 }

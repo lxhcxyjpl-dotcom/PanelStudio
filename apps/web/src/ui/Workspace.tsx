@@ -39,6 +39,7 @@ import { Inspector } from "./Inspector";
 import { LeftSidebar } from "./LeftSidebar";
 import { Toolbar } from "./Toolbar";
 import { StartScreen } from "./StartScreen";
+import { Onboarding } from "./Onboarding";
 import { Button } from "./widgets";
 
 export function Workspace() {
@@ -233,6 +234,7 @@ export function Workspace() {
       </footer>}
       <div className="sr-only" aria-live="polite" data-testid="live">{state.liveMessage}</div>
       <Dialogs />
+      <Onboarding open={state.dialog === "onboarding"} />
       {state.confirmed && <GuidedDialog key={state.projectId} document={state.confirmed.document} open={state.dialog === "guided"} />}
     </div>
   );

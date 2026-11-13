@@ -3,6 +3,7 @@ import {
   type AIEditScope,
   resolveLabelText,
   type FigureDocumentV1,
+  type LayoutExample,
 } from "@panelstudio/contracts";
 import { canonicalJson, resolvePanelLabel } from "@panelstudio/core";
 
@@ -14,6 +15,8 @@ export type FrozenScene = {
   selectedPanelIds: string[];
   scope: AIEditScope;
   previousTurns: TurnTranscript[];
+  publicationContext?: FigureDocumentV1["publicationContext"];
+  layoutExamples?: LayoutExample[];
   actions: readonly string[];
   canvas: {
     widthMm: number;
@@ -60,6 +63,7 @@ export function buildScene(
     selectedPanelIds: [...input.selectedPanelIds],
     scope: input.scope ?? "document",
     previousTurns: input.previousTurns ?? [],
+    ...(document.publicationContext ? { publicationContext: structuredClone(document.publicationContext) } : {}),
     actions: AI_ACTION_NAMES,
     canvas: {
       widthMm: document.canvas.widthMm,

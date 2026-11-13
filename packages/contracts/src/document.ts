@@ -174,6 +174,16 @@ export const LayoutSettingsSchema = object(
   { description: "Layout settings. Replacing them does not run layout." },
 );
 
+export const PublicationContextSchema = object({
+  journal: Type.String({ maxLength: 160 }),
+  field: Type.String({ maxLength: 240 }),
+  message: Type.String({ maxLength: 1000 }),
+  preference: Type.Union([
+    Type.Literal("auto"), Type.Literal("comparison"), Type.Literal("emphasis"), Type.Literal("compact"),
+  ]),
+});
+export type PublicationContext = Static<typeof PublicationContextSchema>;
+
 export const FigureDocumentSchema = object(
   {
     schemaVersion: Type.Literal(SCHEMA_VERSION),
@@ -197,6 +207,7 @@ export const FigureDocumentSchema = object(
     }),
     labelStyle: LabelStyleSchema,
     layoutSettings: LayoutSettingsSchema,
+    publicationContext: Type.Optional(PublicationContextSchema),
   },
   {
     description:

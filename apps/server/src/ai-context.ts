@@ -8,6 +8,7 @@ import { validateCandidateResult } from "@panelstudio/layout";
 import { getCandidate, getJobDetail, getProject, getRevision, queryAiHistory, type CandidateRecord, type JobDetail, type KeyCursor } from "./db.js";
 import { ApiException } from "./http.js";
 import type { AppContext } from "./pipeline.js";
+import { selectLayoutExamples } from "./layout-references.js";
 
 export function frozenInput(job: JobDetail): AIFrozenInput | null {
   return Check(AIFrozenInputSchema, job.input) ? job.input : null;
@@ -107,6 +108,7 @@ export function prepareTurn(
     request: { ...body, context, scope, selectedPanelIds },
     configRevision, parentCandidateId: parentId, rootHash, sourceHash, previousTurns,
     engineVersion: ENGINE_VERSIONS.layout, fontRegistryVersion: ENGINE_VERSIONS.fontRegistry,
+    layoutExamples: selectLayoutExamples(ctx, work.document),
   };
 }
 

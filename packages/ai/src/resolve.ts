@@ -16,12 +16,13 @@ export async function resolveModelIntent(input: {
   scene: FrozenScene;
   replyLocale: string;
   previewPng?: Uint8Array | null;
+  panelImages?: Array<{ panelId: string; png: Uint8Array }>;
   fetchImpl?: typeof fetch;
   signal?: AbortSignal;
 }): Promise<IntentResolution> {
   const messages: ChatMessage[] = [
     { role: "system", content: systemPrompt(input.config, input.replyLocale) },
-    { role: "user", content: userContent(userPrompt(input.prompt, input.scene), input.previewPng) },
+    { role: "user", content: userContent(userPrompt(input.prompt, input.scene), input.previewPng, input.panelImages) },
   ];
   const first = await postChatCompletion({
     config: input.config,
@@ -87,12 +88,16 @@ export async function reviewModelIntent(input: {
   return readIntent(content);
 }
 
-function userContent(text: string, previewPng: Uint8Array | null | undefined): ChatMessage["content"] {
-  if (!previewPng || previewPng.byteLength === 0) return text;
-  return [
-    { type: "text", text },
-    { type: "image_url", image_url: { url: pngDataUrl(previewPng) } },
-  ];
+function userContent(text: string, previewPng: Uint8Array | null | undefined,
+  panels: Array<{ panelId: string; png: Uint8Array }> = []): ChatMessage["content"] {
+  if (!previewPng?.byteLength && !panels.length) return text;
+  const result: Exclude<ChatMessage["content"], string> = [{ type: "text", text }];
+  if (previewPng?.byteLength) result.push({ type: "image_url", image_url: { url: pngDataUrl(previewPng) } });
+  for (const panel of panels) result.push(
+    { type: "text", text: "Independent panel " + panel.panelId },
+    { type: "image_url", image_url: { url: pngDataUrl(panel.png) } },
+  );
+  return result;
 }
 
 function readIntent(content: string): { ok: true; intent: AIIntent } | { ok: false; message: string } {

@@ -8,6 +8,8 @@ import {
   type DomainCommand,
   type FigureDocumentV1,
   type LayoutScore,
+  type LayoutExample,
+  layoutUnitIds,
 } from "@panelstudio/contracts";
 import {
   DocumentCommandError,
@@ -54,6 +56,7 @@ export function compileProposal(
   intent: Extract<AIIntent, { kind: "proposal" }>,
   assets: AssetLookup,
   selection?: { scope: AIEditScope; selectedPanelIds: string[] },
+  examples: LayoutExample[] = [],
 ): CompileResult {
   let current = document;
   const commands: DomainCommand[] = [];
@@ -63,11 +66,11 @@ export function compileProposal(
   const layoutAssets = layoutFacts(document, assets);
   for (const action of intent.actions) {
     const selected = selection?.scope === "selection" ? selection.selectedPanelIds : null;
-    if (selected && (action.type === "set_canvas" || action.type === "set_gutter" || action.type === "relabel" ||
+    if (selected && (action.type === "set_canvas" || action.type === "set_gutter" || action.type === "relabel" || action.type === "reference_layout" ||
       action.type === "layout" && action.request.family !== "selection-row")) {
       throw new AiCompileError("AI_SCOPE_VIOLATION", "This change requires document scope.", { reason: "scope-conflict" });
     }
-    const produced = compileAction(current, action, layoutAssets, assets, notes, selected);
+    const produced = compileAction(current, action, layoutAssets, assets, notes, selected, examples);
     if (produced.score) score = produced.score;
     diagnostics.push(...produced.diagnostics);
     if (produced.commands.length === 0) continue;
@@ -82,7 +85,7 @@ export function compileProposal(
     throw new AiCompileError("DOCUMENT_INVALID", "The compiled commands did not replay.");
   }
   if (selection?.scope === "selection") assertSelectionResult(document, current, selection.selectedPanelIds, intent.actions);
-  const validationMode = intent.actions.some((action) => action.type === "layout") ? "layout" : "edit";
+  const validationMode = intent.actions.some((action) => action.type === "layout" || action.type === "reference_layout") ? "layout" : "edit";
   const summary = [intent.summary, ...notes].filter((part) => part.length > 0).join(" ");
   return {
     commands,
@@ -101,8 +104,24 @@ function compileAction(
   assets: AssetLookup,
   notes: string[],
   selected: string[] | null,
+  examples: LayoutExample[],
 ): { commands: DomainCommand[]; score?: LayoutScore; diagnostics: Diagnostic[] } {
   switch (action.type) {
+    case "reference_layout": {
+      const reference = examples.find((example) => example.id === action.referenceId);
+      const ids = layoutUnitIds(document);
+      if (!reference || reference.slots.length !== ids.length || action.orderedUnitIds.length !== ids.length ||
+        new Set(action.orderedUnitIds).size !== ids.length || ids.some((id) => !action.orderedUnitIds.includes(id))) {
+        throw new AiCompileError("MODEL_OUTPUT_INVALID", "Reference layout must map every current unit to a provided example.");
+      }
+      const request = { family: "guided" as const, preferences: action.preferences, referenceAspect: reference.aspect,
+        referenceSlots: reference.slots.map((slot, i) => ({ ...slot, unitId: action.orderedUnitIds[i]! })) };
+      const solved = solveLayout({ document, request, assets: layoutAssets, maxCandidates: 1 });
+      if (!solved.ok) throw new AiCompileError(solved.code, solved.message, solved.details);
+      const candidate = solved.candidates[0]!;
+      applyCommands(document, candidate.commands, assets);
+      return { commands: candidate.commands, score: candidate.score, diagnostics: candidate.diagnostics };
+    }
     case "set_canvas": {
       if (action.widthMm === undefined && action.heightMm === undefined && action.heightMode === undefined) {
         throw new AiCompileError("MODEL_OUTPUT_INVALID", "set_canvas did not name a field.");

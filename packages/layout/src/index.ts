@@ -8,3 +8,4 @@ export { solveLayout } from "./solve.js";
 export { solveLocalRow } from "./local-row.js";
 export { validateCandidateResult } from "./validate.js";
 export type { LayoutAssetFacts, SolveLayoutFailure, SolveLayoutInput, SolveLayoutResult, SolvedCandidate } from "./solve.js";
+export { referenceTree } from "./guided-tree.js";

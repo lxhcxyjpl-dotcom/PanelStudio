@@ -24,6 +24,10 @@ export {
   uuidKeyed,
 } from "./primitives.js";
 export { nullable, object } from "./schema.js";
+export { PublicationContextSchema } from "./document.js";
+export type { PublicationContext } from "./document.js";
+export { LayoutExampleSchema, AIReferenceLayoutActionSchema } from "./ai.js";
+export type { LayoutExample } from "./ai.js";
 export { DiagnosticParamsSchema, DiagnosticSchema } from "./diagnostics.js";
 export type { Diagnostic } from "./diagnostics.js";
 export { ERROR_CODES, ApiErrorDetailsSchema, ApiErrorSchema, ErrorCodeSchema } from "./errors.js";
@@ -118,6 +122,7 @@ export {
   AIProviderCapabilitiesSchema,
   AIProviderConfigSchema,
   AIProviderSettingsSchema,
+  AIConnectionWriteRequestSchema,
   AIRelabelActionSchema,
   AIScaleToWidthActionSchema,
   AISetCanvasActionSchema,
@@ -136,7 +141,7 @@ export {
   StructuredOutputSchema,
   TargetRefSchema,
 } from "./ai.js";
-export type { AIAction, AIContext, AIEditScope, AIIntent, AILayoutRequest, AIProviderConfig, AIProviderSettings, AlignEdge, TargetRef } from "./ai.js";
+export type { AIAction, AIContext, AIEditScope, AIIntent, AILayoutRequest, AIProviderConfig, AIProviderSettings, AIConnectionWriteRequest, AlignEdge, TargetRef } from "./ai.js";
 export {
   AssetAcceptedSchema,
   AssetSchema,

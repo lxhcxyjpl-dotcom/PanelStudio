@@ -98,18 +98,19 @@ function AssetCard({ asset, count }: { asset: Asset; count: number }) {
       : `${Math.round(asset.normalized.viewport.width)}×${Math.round(asset.normalized.viewport.height)}`
     : "—";
   return (
-    <article className="asset-card">
+    <article className="asset-card" data-used={count > 0}>
       <div className="thumb">
         {projectId && asset.status === "ready" ? (
           <img alt="" src={`/api/v1/projects/${projectId}/assets/${asset.id}/thumbnail`} />
         ) : (
           <span>{format}</span>
         )}
+        {asset.status === "ready" && count > 0 && <span className="asset-use" title={t("assets.used", { count })} aria-label={t("assets.used", { count })}><Icon name="check" />{count > 1 ? count : null}</span>}
       </div>
       <div className="asset-copy">
         <strong title={asset.originalFilename}>{asset.originalFilename}</strong>
-        <span>{format} · {size}</span>
-        <span className="asset-status">{asset.status === "ready" ? t("assets.used", {count}) : t(asset.status === "failed" ? "assets.failed" : "assets.processing")}</span>
+        <span title={format + " · " + size}>{size}</span>
+        {asset.status !== "ready" && <span className="asset-status">{t(asset.status === "failed" ? "assets.failed" : "assets.processing")}</span>}
       </div>
       <div className="asset-tools">
         <Button action="add-asset" variant="quiet" aria-label={t("assets.add")} title={t("assets.add")}

@@ -3,6 +3,12 @@ import { fileURLToPath } from "node:url";
 import { expect, test, type Page } from "@playwright/test";
 import { uiFontSizes } from "@panelstudio/ui";
 
+test.beforeEach(async ({ page }) => {
+  await page.addLocatorHandler(page.getByRole("dialog", { name: /^(排版目标|Figure brief)$/ }), async () => {
+    await page.locator('[data-action="skip-publication"]').click();
+  });
+});
+
 const fixtures = fileURLToPath(new URL("../../../fixtures/mixed/", import.meta.url));
 const allowed = Object.values(uiFontSizes);
 
@@ -33,11 +39,12 @@ for (const { width, locale } of [{ width: 1440, locale: "zh-CN" }, { width: 320,
       JSON.stringify({ locale, theme: locale === "en-US" ? "dark" : "light", motion: "off" })), locale);
     await page.goto("/");
     const title = page.getByRole("heading", { level: 1 });
-    await expect(title).toHaveCSS("font-size", "56px");
+    const headingSize = width < 760 ? uiFontSizes.heading : uiFontSizes.display;
+    await expect(title).toHaveCSS("font-size", headingSize + "px");
     await expect(page.locator("[data-action=empty-import]")).toHaveCSS("font-size", "15px");
     await expectStudioType(page);
     await page.evaluate(() => document.documentElement.style.fontSize = "125%");
-    await expect(title).toHaveCSS("font-size", "70px");
+    await expect(title).toHaveCSS("font-size", headingSize * 1.25 + "px");
     await page.evaluate(() => document.documentElement.style.removeProperty("font-size"));
 
     await page.getByTestId("import-input").setInputFiles([path.join(fixtures, "raster.png"), path.join(fixtures, "photo.jpg")]);

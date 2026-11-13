@@ -18,6 +18,7 @@ import {
   jobIsOpen,
   providerSettings,
   saveProviderConfig,
+  saveProviderConnection,
   saveProviderSecret,
   SSE_HEARTBEAT_INTERVAL_MS,
 } from "./ai-jobs.js";
@@ -285,6 +286,12 @@ export function registerRoutes(app: FastifyInstance, ctx: AppContext): void {
   });
 
   app.get("/api/v1/settings/ai-provider", async () => providerSettings(ctx));
+
+  app.put("/api/v1/settings/ai-connection", async (request, reply) => {
+    const key = requireIdempotencyKey(request);
+    const result = saveProviderConnection(ctx, request.body, key, hashJson(request.body));
+    return reply.status(result.status).send(result.body);
+  });
 
   app.put("/api/v1/settings/ai-provider", async (request, reply) => {
     const key = requireIdempotencyKey(request);

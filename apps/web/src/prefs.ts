@@ -20,7 +20,7 @@ const FALLBACK: Preferences = {
   motion: "system",
   reduceTransparency: false,
   leftWidth: 240,
-  rightWidth: 304,
+  rightWidth: 352,
 };
 
 export function readPrefs(): Preferences {
@@ -38,7 +38,7 @@ export function readPrefs(): Preferences {
       motion: parsed.motion === "on" || parsed.motion === "off" ? parsed.motion : "system",
       reduceTransparency: parsed.reduceTransparency === true,
       leftWidth: clamp(parsed.leftWidth, 208, 320, 240),
-      rightWidth: clamp(parsed.rightWidth, 280, 360, 304),
+      rightWidth: clamp(parsed.rightWidth, 320, 420, 352),
     };
   } catch {
     return { ...FALLBACK };

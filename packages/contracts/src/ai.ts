@@ -6,7 +6,7 @@ import {
   LabelSequenceSchema,
   LabelTypographyOverrideSchema,
 } from "./document.js";
-import { StandardLayoutRequestSchema } from "./layout.js";
+import { StandardLayoutRequestSchema, GuidedPreferencesSchema, UnitIdSchema } from "./layout.js";
 import {
   FontIdSchema,
   FontWeightSchema,
@@ -51,6 +51,11 @@ export const AIProviderSettingsSchema = object({
   configRevision: RevisionSchema,
   hasSecret: Type.Boolean(),
   config: nullable(AIProviderConfigSchema),
+});
+
+export const AIConnectionWriteRequestSchema = object({
+  config: AIProviderConfigSchema,
+  secret: Type.Optional(NonEmptyStringSchema),
 });
 
 export const SecretWriteRequestSchema = object({
@@ -137,8 +142,33 @@ const targetList = Type.Array(TargetRefSchema, { minItems: 1 });
 
 export const AILayoutActionSchema = object({
   type: Type.Literal("layout"),
-  request: StandardLayoutRequestSchema,
+  request: Type.Union([StandardLayoutRequestSchema,
+    object({ family: Type.Literal("guided"), preferences: GuidedPreferencesSchema })]),
 });
+
+export const AIReferenceLayoutActionSchema = object({
+  type: Type.Literal("reference_layout"),
+  referenceId: Type.String({ minLength: 1, maxLength: 160 }),
+  orderedUnitIds: Type.Array(UnitIdSchema, { minItems: 2, maxItems: 8, uniqueItems: true }),
+  preferences: GuidedPreferencesSchema,
+});
+
+const normalizedPosition = Type.Number({ minimum: 0, maximum: 1 });
+const normalizedExtent = Type.Number({ exclusiveMinimum: 0, maximum: 1 });
+export const LayoutExampleSchema = object({
+  id: Type.String({ minLength: 1, maxLength: 160 }),
+  origin: Type.Union([Type.Literal("paper"), Type.Literal("accepted")]),
+  journal: Type.String({ maxLength: 160 }),
+  field: Type.String({ maxLength: 500 }),
+  title: Type.Optional(Type.String({ maxLength: 500 })),
+  sourceUrl: Type.Optional(Type.String({ maxLength: 500, pattern: "^https?://" })),
+  aspect: Type.Number({ exclusiveMinimum: 0, maximum: 1000 }),
+  panelTypes: Type.Array(Type.String({ maxLength: 40 }), { minItems: 2, maxItems: 8 }),
+  slots: Type.Array(object({
+    x: normalizedPosition, y: normalizedPosition, width: normalizedExtent, height: normalizedExtent,
+  }), { minItems: 2, maxItems: 8 }),
+});
+export type LayoutExample = Static<typeof LayoutExampleSchema>;
 
 export const AISetCanvasActionSchema = object({
   type: Type.Literal("set_canvas"),
@@ -215,6 +245,7 @@ export const AIRelabelActionSchema = object({
 });
 
 export const AIActionSchema = Type.Union([
+  AIReferenceLayoutActionSchema,
   AILayoutActionSchema,
   AISetCanvasActionSchema,
   AISetGutterActionSchema,
@@ -257,6 +288,7 @@ export const AIIntentSchema = Type.Union([
 export type AlignEdge = Static<typeof AlignEdgeSchema>;
 export type AIProviderConfig = Static<typeof AIProviderConfigSchema>;
 export type AIProviderSettings = Static<typeof AIProviderSettingsSchema>;
+export type AIConnectionWriteRequest = Static<typeof AIConnectionWriteRequestSchema>;
 export type AILayoutRequest = Static<typeof AILayoutRequestSchema>;
 export type AIContext = Static<typeof AIContextSchema>;
 export type AIEditScope = Static<typeof AIEditScopeSchema>;

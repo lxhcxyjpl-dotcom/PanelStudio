@@ -1,6 +1,7 @@
 import { createServer, type Server } from "node:http";
 import path from "node:path";
 import { once } from "node:events";
+import { mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { fixtureIntent, type FrozenScene } from "../../../packages/ai/src/index.ts";
 import { expect, test, type Page } from "@playwright/test";
@@ -11,6 +12,9 @@ const photo = path.join(root, "fixtures/mixed/photo.jpg");
 const SECRET = "ephemeral-test-secret";
 
 test.beforeEach(async ({ page }) => {
+  await page.addLocatorHandler(page.getByRole("dialog", { name: /^(排版目标|Figure brief)$/ }), async () => {
+    await page.locator('[data-action="skip-publication"]').click();
+  });
   await page.addInitScript(() => {
     localStorage.setItem(
       "panelstudio.prefs",
@@ -137,6 +141,7 @@ test.describe.serial("phase 5 AI", () => {
     await page.locator("[data-action=tab-ai]").click();
     await expect(prompt).toHaveValue("把 A 向右移动 2 mm");
     for (let round = 1; round <= 3; round++) {
+      await prompt.fill("把 A 向右移动 2 mm");
       await page.locator("[data-action=ai-send]").click();
       await expect(page.locator("[data-action=ai-apply]")).toBeEnabled();
       await expect(page.getByTestId("ai-change").first()).toContainText(`${round * 2} mm`);
@@ -191,6 +196,7 @@ test.describe.serial("phase 5 AI", () => {
       expect(await frames(page)).toEqual(edited);
       await page.locator("[data-action=compare-draft]").click();
       expect(await frames(page)).not.toEqual(edited);
+      await page.locator(".draft-actions summary").click();
       await page.locator("[data-action=ai-manual]").click();
       expect(await frames(page)).toEqual(edited);
     } finally { mode = "fixture"; release(); }
@@ -213,13 +219,16 @@ test.describe.serial("phase 5 AI", () => {
     mode = "fixture";
     await page.goto("/");
     await page.getByRole("button", { name: "设置" }).click();
+    await page.locator("[data-action=settings-ai]").click();
     await page.getByRole("button", { name: "测试连接" }).click();
     await expect(page.getByTestId("ai-provider-status")).toContainText("连接成功");
+    await page.locator(".connection-advanced > summary").click();
     await page.getByRole("button", { name: "删除密钥" }).click();
-    await expect(page.getByTestId("ai-secret-state")).toHaveText("还没有密钥");
-    await expect(page.getByRole("button", { name: "测试连接" })).toBeDisabled();
+    await expect(page.getByTestId("ai-secret-state")).toHaveText("");
+    await page.locator("[data-action=test-provider]").click();
+    await expect(page.getByText("请填写这个服务的 API 密钥。", { exact: true })).toBeVisible();
     await page.getByTestId("ai-secret").fill(SECRET);
-    await page.getByRole("button", { name: "保存密钥" }).click();
+    await page.locator("[data-action=save-connection]").click();
     await expect(page.getByTestId("ai-secret")).toHaveValue("");
     await expect(page.getByTestId("ai-secret-state")).toHaveText("已保存密钥");
     await page.getByRole("button", { name: "关闭" }).click();
@@ -235,6 +244,7 @@ test.describe.serial("phase 5 AI", () => {
     await expect(page.getByRole("button", { name: "取消请求" })).toBeVisible();
     await page.getByRole("button", { name: "取消请求" }).click();
     await expect(page.getByTestId("ai-status")).toContainText("已取消");
+    await expect(page.getByTestId("ai-prompt")).toHaveValue("把 A 向右移动 2 mm");
     release();
     mode = "fixture";
   });
@@ -247,6 +257,7 @@ test.describe.serial("phase 5 AI", () => {
     await page.getByTestId("ai-prompt").fill("把 A 向右移动 2 mm");
     await page.getByRole("button", { name: "发送" }).click();
     await expect(page.getByTestId("ai-proposal")).toBeVisible();
+    await page.locator(".draft-actions summary").click();
     await page.getByRole("button", { name: "继续手动编辑" }).click();
     await page.getByTestId("canvas").focus();
     await page.keyboard.press("Control+A");
@@ -261,11 +272,44 @@ test.describe.serial("phase 5 AI", () => {
     await page.getByRole("button", { name: "基于当前稿重新生成" }).click();
     await expect(page.getByRole("button", { name: "取消请求" })).toBeVisible();
     await page.getByRole("button", { name: "设置" }).click();
+  await page.locator("[data-action=settings-ai]").click();
     await page.getByTestId("ai-model").fill("other-fixture-model");
-    await page.getByRole("button", { name: "保存模型设置" }).click();
+    await page.locator("[data-action=save-connection]").click();
     await expect(page.getByText("模型设置已变化").first()).toBeVisible();
     release();
     mode = "fixture";
+  });
+
+  test("chat composer handles Enter, multiline and IME input, and stays visible beside a draft", async ({ page }) => {
+    mode = "fixture";
+    await page.goto("/");
+    await configure(page, port);
+    await importFigures(page, [raster, photo]);
+    await page.locator("[data-action=tab-ai]").click();
+    const calls: string[] = [];
+    page.on("request", request => { if (request.url().includes("/ai-layouts") && request.method() === "POST") calls.push(request.url()); });
+    const prompt = page.getByTestId("ai-prompt");
+    await prompt.fill("把 A 向右移动 2 mm");
+    await prompt.press("Shift+Enter");
+    await expect(prompt).toHaveValue("把 A 向右移动 2 mm\n");
+    await prompt.dispatchEvent("keydown", { key: "Enter", isComposing: true, keyCode: 229 });
+    expect(calls).toEqual([]);
+    await prompt.fill("把 A 向右移动 2 mm");
+    await prompt.press("Enter");
+    await expect(page.getByTestId("ai-proposal")).toBeVisible();
+    await expect(prompt).toHaveValue("");
+    expect(calls).toHaveLength(1);
+    await expect(prompt).toBeInViewport();
+    const output = path.join(root, ".panelstudio/acceptance-interaction-20261113");
+    mkdirSync(output, { recursive: true });
+    await page.screenshot({ animations: "disabled", path: path.join(output, "chat-draft-desktop.png") });
+    await page.getByTestId("ai-thread").evaluate(element => { element.scrollTop = 0; });
+    await expect(prompt).toBeInViewport();
+    await page.setViewportSize({ width: 390, height: 844 });
+    if (!await page.getByTestId("right-sidebar").isVisible()) await page.locator("[data-action=drawer-inspector]").click();
+    await expect(prompt).toBeInViewport();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await page.screenshot({ animations: "disabled", path: path.join(output, "chat-draft-mobile.png") });
   });
 });
 
@@ -280,13 +324,13 @@ function intentFor(body: unknown) {
 
 async function configure(page: Page, providerPort: number): Promise<void> {
   await page.getByRole("button", { name: "设置" }).click();
+  await page.locator("[data-action=settings-ai]").click();
   await page.getByTestId("ai-base-url").fill(`http://127.0.0.1:${providerPort}/v1`);
   await page.getByTestId("ai-model").fill("fixture-model");
+  await page.locator(".connection-advanced > summary").click();
   await page.getByTestId("ai-local").check();
-  await page.getByRole("button", { name: "保存模型设置" }).click();
-  await expect(page.getByTestId("ai-provider-status")).toContainText("保存模型设置");
   await page.getByTestId("ai-secret").fill(SECRET);
-  await page.getByRole("button", { name: "保存密钥" }).click();
+  await page.locator("[data-action=save-connection]").click();
   await expect(page.getByTestId("ai-secret")).toHaveValue("");
   await expect(page.getByTestId("ai-secret-state")).toHaveText("已保存密钥");
   await page.getByRole("button", { name: "关闭" }).click();

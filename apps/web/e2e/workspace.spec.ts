@@ -8,6 +8,9 @@ const photo = path.join(root, "fixtures/mixed/photo.jpg");
 const script = path.join(root, "fixtures/rejected/script.svg");
 
 test.beforeEach(async ({ page }) => {
+  await page.addLocatorHandler(page.getByRole("dialog", { name: /^(排版目标|Figure brief)$/ }), async () => {
+    await page.locator('[data-action="skip-publication"]').click();
+  });
   await page.addInitScript(() => {
     localStorage.setItem(
       "panelstudio.prefs",

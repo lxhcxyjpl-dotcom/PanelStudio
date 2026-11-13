@@ -14,17 +14,17 @@ const ASSET_A = "22222222-2222-4222-8222-222222222221";
 const ASSET_B = "22222222-2222-4222-8222-222222222222";
 
 describe("phase 4 workspace rules", () => {
-  it("uses the handbook column widths at 1440, 1280, and 1024", () => {
+  it("uses responsive editor column widths at 1440, 1280, and 1024", () => {
     expect(workspaceMode(1440)).toBe("full");
     expect(workspaceMode(1280)).toBe("full");
     expect(workspaceMode(1024)).toBe("compact");
     expect(workspaceMode(1023)).toBe("drawer");
     expect(sidebarWidth("left", "full", 240)).toBe(240);
-    expect(sidebarWidth("right", "full", 304)).toBe(304);
+    expect(sidebarWidth("right", "full", 352)).toBe(352);
     expect(sidebarWidth("left", "compact", 240)).toBe(208);
-    expect(sidebarWidth("right", "compact", 304)).toBe(280);
+    expect(sidebarWidth("right", "compact", 352)).toBe(320);
     expect(sidebarWidth("left", "full", 100)).toBe(208);
-    expect(sidebarWidth("right", "full", 900)).toBe(360);
+    expect(sidebarWidth("right", "full", 900)).toBe(420);
   });
 
   it("keeps the representative copy and falls back through the same keys", () => {

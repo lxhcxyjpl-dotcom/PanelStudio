@@ -1665,6 +1665,58 @@
         }
       }
     },
+    "/api/v1/settings/ai-connection": {
+      "put": {
+        "operationId": "putAiConnection",
+        "tags": [
+          "Settings"
+        ],
+        "summary": "Atomically save provider settings and an optional encrypted secret. Changing the endpoint without a new secret clears the old secret.",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/IdempotencyKey"
+            },
+            "description": "Unique request id. The same key and the same request return the first response. The same key and a different request return IDEMPOTENCY_KEY_REUSED."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AIConnectionWriteRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Non-secret connection settings.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AIProviderSettings"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error envelope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/settings/ai-provider/secret": {
       "put": {
         "operationId": "putAiProviderSecret",
@@ -3413,6 +3465,50 @@
                 },
                 "description": "Layout settings. Replacing them does not run layout.",
                 "additionalProperties": false
+              },
+              "publicationContext": {
+                "type": "object",
+                "required": [
+                  "journal",
+                  "field",
+                  "message",
+                  "preference"
+                ],
+                "properties": {
+                  "journal": {
+                    "type": "string",
+                    "maxLength": 160
+                  },
+                  "field": {
+                    "type": "string",
+                    "maxLength": 240
+                  },
+                  "message": {
+                    "type": "string",
+                    "maxLength": 1000
+                  },
+                  "preference": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "const": "auto"
+                      },
+                      {
+                        "type": "string",
+                        "const": "comparison"
+                      },
+                      {
+                        "type": "string",
+                        "const": "emphasis"
+                      },
+                      {
+                        "type": "string",
+                        "const": "compact"
+                      }
+                    ]
+                  }
+                },
+                "additionalProperties": false
               }
             },
             "description": "The only figure document model. Client theme, language, zoom, selection, and API keys are not fields.",
@@ -4180,6 +4276,50 @@
                 },
                 "description": "Layout settings. Replacing them does not run layout.",
                 "additionalProperties": false
+              },
+              "publicationContext": {
+                "type": "object",
+                "required": [
+                  "journal",
+                  "field",
+                  "message",
+                  "preference"
+                ],
+                "properties": {
+                  "journal": {
+                    "type": "string",
+                    "maxLength": 160
+                  },
+                  "field": {
+                    "type": "string",
+                    "maxLength": 240
+                  },
+                  "message": {
+                    "type": "string",
+                    "maxLength": 1000
+                  },
+                  "preference": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "const": "auto"
+                      },
+                      {
+                        "type": "string",
+                        "const": "comparison"
+                      },
+                      {
+                        "type": "string",
+                        "const": "emphasis"
+                      },
+                      {
+                        "type": "string",
+                        "const": "compact"
+                      }
+                    ]
+                  }
+                },
+                "additionalProperties": false
               }
             },
             "description": "The only figure document model. Client theme, language, zoom, selection, and API keys are not fields.",
@@ -4232,6 +4372,64 @@
                 "type": "array",
                 "items": {
                   "anyOf": [
+                    {
+                      "type": "object",
+                      "required": [
+                        "type",
+                        "publicationContext"
+                      ],
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "const": "figure.setPublicationContext"
+                        },
+                        "publicationContext": {
+                          "type": "object",
+                          "required": [
+                            "journal",
+                            "field",
+                            "message",
+                            "preference"
+                          ],
+                          "properties": {
+                            "journal": {
+                              "type": "string",
+                              "maxLength": 160
+                            },
+                            "field": {
+                              "type": "string",
+                              "maxLength": 240
+                            },
+                            "message": {
+                              "type": "string",
+                              "maxLength": 1000
+                            },
+                            "preference": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "const": "auto"
+                                },
+                                {
+                                  "type": "string",
+                                  "const": "comparison"
+                                },
+                                {
+                                  "type": "string",
+                                  "const": "emphasis"
+                                },
+                                {
+                                  "type": "string",
+                                  "const": "compact"
+                                }
+                              ]
+                            }
+                          },
+                          "additionalProperties": false
+                        }
+                      },
+                      "additionalProperties": false
+                    },
                     {
                       "type": "object",
                       "required": [
@@ -5895,6 +6093,50 @@
                   }
                 },
                 "description": "Layout settings. Replacing them does not run layout.",
+                "additionalProperties": false
+              },
+              "publicationContext": {
+                "type": "object",
+                "required": [
+                  "journal",
+                  "field",
+                  "message",
+                  "preference"
+                ],
+                "properties": {
+                  "journal": {
+                    "type": "string",
+                    "maxLength": 160
+                  },
+                  "field": {
+                    "type": "string",
+                    "maxLength": 240
+                  },
+                  "message": {
+                    "type": "string",
+                    "maxLength": 1000
+                  },
+                  "preference": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "const": "auto"
+                      },
+                      {
+                        "type": "string",
+                        "const": "comparison"
+                      },
+                      {
+                        "type": "string",
+                        "const": "emphasis"
+                      },
+                      {
+                        "type": "string",
+                        "const": "compact"
+                      }
+                    ]
+                  }
+                },
                 "additionalProperties": false
               }
             },
@@ -8019,6 +8261,64 @@
                         "type": "object",
                         "required": [
                           "type",
+                          "publicationContext"
+                        ],
+                        "properties": {
+                          "type": {
+                            "type": "string",
+                            "const": "figure.setPublicationContext"
+                          },
+                          "publicationContext": {
+                            "type": "object",
+                            "required": [
+                              "journal",
+                              "field",
+                              "message",
+                              "preference"
+                            ],
+                            "properties": {
+                              "journal": {
+                                "type": "string",
+                                "maxLength": 160
+                              },
+                              "field": {
+                                "type": "string",
+                                "maxLength": 240
+                              },
+                              "message": {
+                                "type": "string",
+                                "maxLength": 1000
+                              },
+                              "preference": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "const": "auto"
+                                  },
+                                  {
+                                    "type": "string",
+                                    "const": "comparison"
+                                  },
+                                  {
+                                    "type": "string",
+                                    "const": "emphasis"
+                                  },
+                                  {
+                                    "type": "string",
+                                    "const": "compact"
+                                  }
+                                ]
+                              }
+                            },
+                            "additionalProperties": false
+                          }
+                        },
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "required": [
+                          "type",
                           "panelId",
                           "assetId",
                           "frameMm"
@@ -9625,6 +9925,50 @@
                       },
                       "description": "Layout settings. Replacing them does not run layout.",
                       "additionalProperties": false
+                    },
+                    "publicationContext": {
+                      "type": "object",
+                      "required": [
+                        "journal",
+                        "field",
+                        "message",
+                        "preference"
+                      ],
+                      "properties": {
+                        "journal": {
+                          "type": "string",
+                          "maxLength": 160
+                        },
+                        "field": {
+                          "type": "string",
+                          "maxLength": 240
+                        },
+                        "message": {
+                          "type": "string",
+                          "maxLength": 1000
+                        },
+                        "preference": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "const": "auto"
+                            },
+                            {
+                              "type": "string",
+                              "const": "comparison"
+                            },
+                            {
+                              "type": "string",
+                              "const": "emphasis"
+                            },
+                            {
+                              "type": "string",
+                              "const": "compact"
+                            }
+                          ]
+                        }
+                      },
+                      "additionalProperties": false
                     }
                   },
                   "description": "The only figure document model. Client theme, language, zoom, selection, and API keys are not fields.",
@@ -9827,6 +10171,64 @@
             "type": "array",
             "items": {
               "anyOf": [
+                {
+                  "type": "object",
+                  "required": [
+                    "type",
+                    "publicationContext"
+                  ],
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "const": "figure.setPublicationContext"
+                    },
+                    "publicationContext": {
+                      "type": "object",
+                      "required": [
+                        "journal",
+                        "field",
+                        "message",
+                        "preference"
+                      ],
+                      "properties": {
+                        "journal": {
+                          "type": "string",
+                          "maxLength": 160
+                        },
+                        "field": {
+                          "type": "string",
+                          "maxLength": 240
+                        },
+                        "message": {
+                          "type": "string",
+                          "maxLength": 1000
+                        },
+                        "preference": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "const": "auto"
+                            },
+                            {
+                              "type": "string",
+                              "const": "comparison"
+                            },
+                            {
+                              "type": "string",
+                              "const": "emphasis"
+                            },
+                            {
+                              "type": "string",
+                              "const": "compact"
+                            }
+                          ]
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  },
+                  "additionalProperties": false
+                },
                 {
                   "type": "object",
                   "required": [
@@ -11437,6 +11839,50 @@
                 },
                 "description": "Layout settings. Replacing them does not run layout.",
                 "additionalProperties": false
+              },
+              "publicationContext": {
+                "type": "object",
+                "required": [
+                  "journal",
+                  "field",
+                  "message",
+                  "preference"
+                ],
+                "properties": {
+                  "journal": {
+                    "type": "string",
+                    "maxLength": 160
+                  },
+                  "field": {
+                    "type": "string",
+                    "maxLength": 240
+                  },
+                  "message": {
+                    "type": "string",
+                    "maxLength": 1000
+                  },
+                  "preference": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "const": "auto"
+                      },
+                      {
+                        "type": "string",
+                        "const": "comparison"
+                      },
+                      {
+                        "type": "string",
+                        "const": "emphasis"
+                      },
+                      {
+                        "type": "string",
+                        "const": "compact"
+                      }
+                    ]
+                  }
+                },
+                "additionalProperties": false
               }
             },
             "description": "The only figure document model. Client theme, language, zoom, selection, and API keys are not fields.",
@@ -12416,6 +12862,79 @@
           }
         },
         "description": "Non-secret provider settings. The response model has no secret field.",
+        "additionalProperties": false
+      },
+      "AIConnectionWriteRequest": {
+        "type": "object",
+        "required": [
+          "config"
+        ],
+        "properties": {
+          "config": {
+            "type": "object",
+            "required": [
+              "adapter",
+              "baseUrl",
+              "model",
+              "capabilities",
+              "allowLocalEndpoint"
+            ],
+            "properties": {
+              "adapter": {
+                "type": "string",
+                "const": "openai-compatible"
+              },
+              "baseUrl": {
+                "type": "string",
+                "minLength": 1,
+                "format": "uri",
+                "description": "API prefix. The adapter appends /chat/completions once. Remote endpoints use HTTPS unless allowLocalEndpoint is true."
+              },
+              "model": {
+                "type": "string",
+                "minLength": 1
+              },
+              "capabilities": {
+                "type": "object",
+                "required": [
+                  "imageInput",
+                  "structuredOutput"
+                ],
+                "properties": {
+                  "imageInput": {
+                    "type": "boolean"
+                  },
+                  "structuredOutput": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "const": "json_schema"
+                      },
+                      {
+                        "type": "string",
+                        "const": "json_object"
+                      },
+                      {
+                        "type": "string",
+                        "const": "text_json"
+                      }
+                    ]
+                  }
+                },
+                "additionalProperties": false
+              },
+              "allowLocalEndpoint": {
+                "type": "boolean"
+              }
+            },
+            "description": "Non-secret provider settings. The response model has no secret field.",
+            "additionalProperties": false
+          },
+          "secret": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
         "additionalProperties": false
       },
       "AIProviderSettings": {
@@ -13784,6 +14303,64 @@
                                   "type": "array",
                                   "items": {
                                     "anyOf": [
+                                      {
+                                        "type": "object",
+                                        "required": [
+                                          "type",
+                                          "publicationContext"
+                                        ],
+                                        "properties": {
+                                          "type": {
+                                            "type": "string",
+                                            "const": "figure.setPublicationContext"
+                                          },
+                                          "publicationContext": {
+                                            "type": "object",
+                                            "required": [
+                                              "journal",
+                                              "field",
+                                              "message",
+                                              "preference"
+                                            ],
+                                            "properties": {
+                                              "journal": {
+                                                "type": "string",
+                                                "maxLength": 160
+                                              },
+                                              "field": {
+                                                "type": "string",
+                                                "maxLength": 240
+                                              },
+                                              "message": {
+                                                "type": "string",
+                                                "maxLength": 1000
+                                              },
+                                              "preference": {
+                                                "anyOf": [
+                                                  {
+                                                    "type": "string",
+                                                    "const": "auto"
+                                                  },
+                                                  {
+                                                    "type": "string",
+                                                    "const": "comparison"
+                                                  },
+                                                  {
+                                                    "type": "string",
+                                                    "const": "emphasis"
+                                                  },
+                                                  {
+                                                    "type": "string",
+                                                    "const": "compact"
+                                                  }
+                                                ]
+                                              }
+                                            },
+                                            "additionalProperties": false
+                                          }
+                                        },
+                                        "additionalProperties": false
+                                      },
                                       {
                                         "type": "object",
                                         "required": [
@@ -15393,6 +15970,50 @@
                                         }
                                       },
                                       "description": "Layout settings. Replacing them does not run layout.",
+                                      "additionalProperties": false
+                                    },
+                                    "publicationContext": {
+                                      "type": "object",
+                                      "required": [
+                                        "journal",
+                                        "field",
+                                        "message",
+                                        "preference"
+                                      ],
+                                      "properties": {
+                                        "journal": {
+                                          "type": "string",
+                                          "maxLength": 160
+                                        },
+                                        "field": {
+                                          "type": "string",
+                                          "maxLength": 240
+                                        },
+                                        "message": {
+                                          "type": "string",
+                                          "maxLength": 1000
+                                        },
+                                        "preference": {
+                                          "anyOf": [
+                                            {
+                                              "type": "string",
+                                              "const": "auto"
+                                            },
+                                            {
+                                              "type": "string",
+                                              "const": "comparison"
+                                            },
+                                            {
+                                              "type": "string",
+                                              "const": "emphasis"
+                                            },
+                                            {
+                                              "type": "string",
+                                              "const": "compact"
+                                            }
+                                          ]
+                                        }
+                                      },
                                       "additionalProperties": false
                                     }
                                   },
@@ -19848,6 +20469,50 @@
             },
             "description": "Layout settings. Replacing them does not run layout.",
             "additionalProperties": false
+          },
+          "publicationContext": {
+            "type": "object",
+            "required": [
+              "journal",
+              "field",
+              "message",
+              "preference"
+            ],
+            "properties": {
+              "journal": {
+                "type": "string",
+                "maxLength": 160
+              },
+              "field": {
+                "type": "string",
+                "maxLength": 240
+              },
+              "message": {
+                "type": "string",
+                "maxLength": 1000
+              },
+              "preference": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "const": "auto"
+                  },
+                  {
+                    "type": "string",
+                    "const": "comparison"
+                  },
+                  {
+                    "type": "string",
+                    "const": "emphasis"
+                  },
+                  {
+                    "type": "string",
+                    "const": "compact"
+                  }
+                ]
+              }
+            },
+            "additionalProperties": false
           }
         },
         "description": "The only figure document model. Client theme, language, zoom, selection, and API keys are not fields.",
@@ -19855,6 +20520,64 @@
       },
       "DomainCommand": {
         "anyOf": [
+          {
+            "type": "object",
+            "required": [
+              "type",
+              "publicationContext"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "figure.setPublicationContext"
+              },
+              "publicationContext": {
+                "type": "object",
+                "required": [
+                  "journal",
+                  "field",
+                  "message",
+                  "preference"
+                ],
+                "properties": {
+                  "journal": {
+                    "type": "string",
+                    "maxLength": 160
+                  },
+                  "field": {
+                    "type": "string",
+                    "maxLength": 240
+                  },
+                  "message": {
+                    "type": "string",
+                    "maxLength": 1000
+                  },
+                  "preference": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "const": "auto"
+                      },
+                      {
+                        "type": "string",
+                        "const": "comparison"
+                      },
+                      {
+                        "type": "string",
+                        "const": "emphasis"
+                      },
+                      {
+                        "type": "string",
+                        "const": "compact"
+                      }
+                    ]
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "additionalProperties": false
+          },
           {
             "type": "object",
             "required": [
@@ -21495,6 +22218,135 @@
                       "type": "object",
                       "required": [
                         "type",
+                        "referenceId",
+                        "orderedUnitIds",
+                        "preferences"
+                      ],
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "const": "reference_layout"
+                        },
+                        "referenceId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160
+                        },
+                        "orderedUnitIds": {
+                          "type": "array",
+                          "items": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "pattern": "^panel:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+                              },
+                              {
+                                "type": "string",
+                                "pattern": "^group:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+                              }
+                            ]
+                          },
+                          "minItems": 2,
+                          "maxItems": 8,
+                          "uniqueItems": true
+                        },
+                        "preferences": {
+                          "type": "object",
+                          "properties": {
+                            "gapMm": {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 30
+                            },
+                            "shape": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "const": "wide"
+                                },
+                                {
+                                  "type": "string",
+                                  "const": "tall"
+                                },
+                                {
+                                  "type": "string",
+                                  "const": "square"
+                                }
+                              ]
+                            },
+                            "focus": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "pattern": "^panel:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+                                },
+                                {
+                                  "type": "string",
+                                  "pattern": "^group:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+                                }
+                              ]
+                            },
+                            "pair": {
+                              "type": "object",
+                              "required": [
+                                "first",
+                                "second",
+                                "axis"
+                              ],
+                              "properties": {
+                                "first": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "pattern": "^panel:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+                                    },
+                                    {
+                                      "type": "string",
+                                      "pattern": "^group:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+                                    }
+                                  ]
+                                },
+                                "second": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "pattern": "^panel:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+                                    },
+                                    {
+                                      "type": "string",
+                                      "pattern": "^group:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+                                    }
+                                  ]
+                                },
+                                "axis": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "const": "horizontal"
+                                    },
+                                    {
+                                      "type": "string",
+                                      "const": "vertical"
+                                    },
+                                    {
+                                      "type": "string",
+                                      "const": "any"
+                                    }
+                                  ]
+                                }
+                              },
+                              "additionalProperties": false
+                            }
+                          },
+                          "additionalProperties": false
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "type",
                         "request"
                       ],
                       "properties": {
@@ -21505,52 +22357,15 @@
                         "request": {
                           "anyOf": [
                             {
-                              "type": "object",
-                              "required": [
-                                "family",
-                                "orderedUnitIds"
-                              ],
-                              "properties": {
-                                "family": {
-                                  "anyOf": [
-                                    {
-                                      "type": "string",
-                                      "const": "auto"
-                                    },
-                                    {
-                                      "type": "string",
-                                      "const": "rows"
-                                    },
-                                    {
-                                      "type": "string",
-                                      "const": "hero-top"
-                                    },
-                                    {
-                                      "type": "string",
-                                      "const": "hero-left"
-                                    }
-                                  ],
-                                  "description": "rows: 1–3 units per row. hero-top: primary on the top row. hero-left: primary on the left. auto searches the applicable families. Layout order does not change labels."
-                                },
-                                "primaryPanelId": {
-                                  "type": "string",
-                                  "format": "uuid",
-                                  "description": "UUID. Letters such as A, B, and C are labels, not object ids."
-                                },
-                                "canvasOverride": {
+                              "anyOf": [
+                                {
                                   "type": "object",
+                                  "required": [
+                                    "family",
+                                    "orderedUnitIds"
+                                  ],
                                   "properties": {
-                                    "widthMm": {
-                                      "type": "number",
-                                      "exclusiveMinimum": 0,
-                                      "description": "Finite length in millimeters."
-                                    },
-                                    "heightMm": {
-                                      "type": "number",
-                                      "exclusiveMinimum": 0,
-                                      "description": "Finite length in millimeters."
-                                    },
-                                    "heightMode": {
+                                    "family": {
                                       "anyOf": [
                                         {
                                           "type": "string",
@@ -21558,139 +22373,407 @@
                                         },
                                         {
                                           "type": "string",
-                                          "const": "fixed"
+                                          "const": "rows"
+                                        },
+                                        {
+                                          "type": "string",
+                                          "const": "hero-top"
+                                        },
+                                        {
+                                          "type": "string",
+                                          "const": "hero-left"
                                         }
-                                      ]
+                                      ],
+                                      "description": "rows: 1–3 units per row. hero-top: primary on the top row. hero-left: primary on the left. auto searches the applicable families. Layout order does not change labels."
+                                    },
+                                    "primaryPanelId": {
+                                      "type": "string",
+                                      "format": "uuid",
+                                      "description": "UUID. Letters such as A, B, and C are labels, not object ids."
+                                    },
+                                    "canvasOverride": {
+                                      "type": "object",
+                                      "properties": {
+                                        "widthMm": {
+                                          "type": "number",
+                                          "exclusiveMinimum": 0,
+                                          "description": "Finite length in millimeters."
+                                        },
+                                        "heightMm": {
+                                          "type": "number",
+                                          "exclusiveMinimum": 0,
+                                          "description": "Finite length in millimeters."
+                                        },
+                                        "heightMode": {
+                                          "anyOf": [
+                                            {
+                                              "type": "string",
+                                              "const": "auto"
+                                            },
+                                            {
+                                              "type": "string",
+                                              "const": "fixed"
+                                            }
+                                          ]
+                                        }
+                                      },
+                                      "additionalProperties": false
+                                    },
+                                    "gutterOverrideMm": {
+                                      "type": "object",
+                                      "required": [
+                                        "horizontal",
+                                        "vertical"
+                                      ],
+                                      "properties": {
+                                        "horizontal": {
+                                          "type": "number",
+                                          "minimum": 0,
+                                          "description": "Finite length in millimeters, zero allowed."
+                                        },
+                                        "vertical": {
+                                          "type": "number",
+                                          "minimum": 0,
+                                          "description": "Finite length in millimeters, zero allowed."
+                                        }
+                                      },
+                                      "additionalProperties": false
+                                    },
+                                    "orderedUnitIds": {
+                                      "type": "array",
+                                      "items": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string",
+                                            "pattern": "^panel:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+                                          },
+                                          {
+                                            "type": "string",
+                                            "pattern": "^group:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+                                          }
+                                        ]
+                                      },
+                                      "minItems": 1
                                     }
                                   },
+                                  "description": "orderedUnitIds is set and rows is absent.",
                                   "additionalProperties": false
                                 },
-                                "gutterOverrideMm": {
+                                {
                                   "type": "object",
                                   "required": [
-                                    "horizontal",
-                                    "vertical"
+                                    "family",
+                                    "rows"
                                   ],
                                   "properties": {
-                                    "horizontal": {
-                                      "type": "number",
-                                      "minimum": 0,
-                                      "description": "Finite length in millimeters, zero allowed."
+                                    "family": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "const": "auto"
+                                        },
+                                        {
+                                          "type": "string",
+                                          "const": "rows"
+                                        },
+                                        {
+                                          "type": "string",
+                                          "const": "hero-top"
+                                        },
+                                        {
+                                          "type": "string",
+                                          "const": "hero-left"
+                                        }
+                                      ],
+                                      "description": "rows: 1–3 units per row. hero-top: primary on the top row. hero-left: primary on the left. auto searches the applicable families. Layout order does not change labels."
                                     },
-                                    "vertical": {
+                                    "primaryPanelId": {
+                                      "type": "string",
+                                      "format": "uuid",
+                                      "description": "UUID. Letters such as A, B, and C are labels, not object ids."
+                                    },
+                                    "canvasOverride": {
+                                      "type": "object",
+                                      "properties": {
+                                        "widthMm": {
+                                          "type": "number",
+                                          "exclusiveMinimum": 0,
+                                          "description": "Finite length in millimeters."
+                                        },
+                                        "heightMm": {
+                                          "type": "number",
+                                          "exclusiveMinimum": 0,
+                                          "description": "Finite length in millimeters."
+                                        },
+                                        "heightMode": {
+                                          "anyOf": [
+                                            {
+                                              "type": "string",
+                                              "const": "auto"
+                                            },
+                                            {
+                                              "type": "string",
+                                              "const": "fixed"
+                                            }
+                                          ]
+                                        }
+                                      },
+                                      "additionalProperties": false
+                                    },
+                                    "gutterOverrideMm": {
+                                      "type": "object",
+                                      "required": [
+                                        "horizontal",
+                                        "vertical"
+                                      ],
+                                      "properties": {
+                                        "horizontal": {
+                                          "type": "number",
+                                          "minimum": 0,
+                                          "description": "Finite length in millimeters, zero allowed."
+                                        },
+                                        "vertical": {
+                                          "type": "number",
+                                          "minimum": 0,
+                                          "description": "Finite length in millimeters, zero allowed."
+                                        }
+                                      },
+                                      "additionalProperties": false
+                                    },
+                                    "rows": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "array",
+                                        "items": {
+                                          "anyOf": [
+                                            {
+                                              "type": "string",
+                                              "pattern": "^panel:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+                                            },
+                                            {
+                                              "type": "string",
+                                              "pattern": "^group:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+                                            }
+                                          ]
+                                        },
+                                        "minItems": 1,
+                                        "maxItems": 3
+                                      },
+                                      "minItems": 1,
+                                      "description": "Hero rows describe only the secondary region. Each row has 1 to 3 units."
+                                    }
+                                  },
+                                  "description": "rows is set and orderedUnitIds is absent.",
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "required": [
+                                    "family"
+                                  ],
+                                  "properties": {
+                                    "family": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "const": "auto"
+                                        },
+                                        {
+                                          "type": "string",
+                                          "const": "rows"
+                                        },
+                                        {
+                                          "type": "string",
+                                          "const": "hero-top"
+                                        },
+                                        {
+                                          "type": "string",
+                                          "const": "hero-left"
+                                        }
+                                      ],
+                                      "description": "rows: 1–3 units per row. hero-top: primary on the top row. hero-left: primary on the left. auto searches the applicable families. Layout order does not change labels."
+                                    },
+                                    "primaryPanelId": {
+                                      "type": "string",
+                                      "format": "uuid",
+                                      "description": "UUID. Letters such as A, B, and C are labels, not object ids."
+                                    },
+                                    "canvasOverride": {
+                                      "type": "object",
+                                      "properties": {
+                                        "widthMm": {
+                                          "type": "number",
+                                          "exclusiveMinimum": 0,
+                                          "description": "Finite length in millimeters."
+                                        },
+                                        "heightMm": {
+                                          "type": "number",
+                                          "exclusiveMinimum": 0,
+                                          "description": "Finite length in millimeters."
+                                        },
+                                        "heightMode": {
+                                          "anyOf": [
+                                            {
+                                              "type": "string",
+                                              "const": "auto"
+                                            },
+                                            {
+                                              "type": "string",
+                                              "const": "fixed"
+                                            }
+                                          ]
+                                        }
+                                      },
+                                      "additionalProperties": false
+                                    },
+                                    "gutterOverrideMm": {
+                                      "type": "object",
+                                      "required": [
+                                        "horizontal",
+                                        "vertical"
+                                      ],
+                                      "properties": {
+                                        "horizontal": {
+                                          "type": "number",
+                                          "minimum": 0,
+                                          "description": "Finite length in millimeters, zero allowed."
+                                        },
+                                        "vertical": {
+                                          "type": "number",
+                                          "minimum": 0,
+                                          "description": "Finite length in millimeters, zero allowed."
+                                        }
+                                      },
+                                      "additionalProperties": false
+                                    }
+                                  },
+                                  "description": "Neither orderedUnitIds nor rows. Order comes from panelOrder.",
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "required": [
+                                    "family",
+                                    "orderedUnitIds",
+                                    "sizing"
+                                  ],
+                                  "properties": {
+                                    "family": {
+                                      "type": "string",
+                                      "const": "selection-row"
+                                    },
+                                    "orderedUnitIds": {
+                                      "type": "array",
+                                      "items": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string",
+                                            "pattern": "^panel:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+                                          },
+                                          {
+                                            "type": "string",
+                                            "pattern": "^group:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+                                          }
+                                        ]
+                                      },
+                                      "minItems": 2,
+                                      "maxItems": 3,
+                                      "uniqueItems": true
+                                    },
+                                    "sizing": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "const": "preserve"
+                                        },
+                                        {
+                                          "type": "string",
+                                          "const": "equal-width"
+                                        },
+                                        {
+                                          "type": "string",
+                                          "const": "equal-height"
+                                        }
+                                      ]
+                                    },
+                                    "regionMm": {
+                                      "type": "object",
+                                      "required": [
+                                        "x",
+                                        "y",
+                                        "width",
+                                        "height"
+                                      ],
+                                      "properties": {
+                                        "x": {
+                                          "type": "number",
+                                          "description": "Millimeters."
+                                        },
+                                        "y": {
+                                          "type": "number",
+                                          "description": "Millimeters."
+                                        },
+                                        "width": {
+                                          "type": "number",
+                                          "exclusiveMinimum": 0,
+                                          "description": "Finite length in millimeters."
+                                        },
+                                        "height": {
+                                          "type": "number",
+                                          "exclusiveMinimum": 0,
+                                          "description": "Finite length in millimeters."
+                                        }
+                                      },
+                                      "description": "Rectangle in document millimeters.",
+                                      "additionalProperties": false
+                                    },
+                                    "gapMm": {
                                       "type": "number",
                                       "minimum": 0,
                                       "description": "Finite length in millimeters, zero allowed."
                                     }
                                   },
                                   "additionalProperties": false
-                                },
-                                "orderedUnitIds": {
-                                  "type": "array",
-                                  "items": {
-                                    "anyOf": [
-                                      {
-                                        "type": "string",
-                                        "pattern": "^panel:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
-                                      },
-                                      {
-                                        "type": "string",
-                                        "pattern": "^group:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
-                                      }
-                                    ]
-                                  },
-                                  "minItems": 1
                                 }
-                              },
-                              "description": "orderedUnitIds is set and rows is absent.",
-                              "additionalProperties": false
+                              ],
+                              "description": "At most one of orderedUnitIds and rows. primaryPanelId is omitted when the request does not set one; the stored setting uses null instead."
                             },
                             {
                               "type": "object",
                               "required": [
                                 "family",
-                                "rows"
+                                "preferences"
                               ],
                               "properties": {
                                 "family": {
-                                  "anyOf": [
-                                    {
-                                      "type": "string",
-                                      "const": "auto"
-                                    },
-                                    {
-                                      "type": "string",
-                                      "const": "rows"
-                                    },
-                                    {
-                                      "type": "string",
-                                      "const": "hero-top"
-                                    },
-                                    {
-                                      "type": "string",
-                                      "const": "hero-left"
-                                    }
-                                  ],
-                                  "description": "rows: 1–3 units per row. hero-top: primary on the top row. hero-left: primary on the left. auto searches the applicable families. Layout order does not change labels."
-                                },
-                                "primaryPanelId": {
                                   "type": "string",
-                                  "format": "uuid",
-                                  "description": "UUID. Letters such as A, B, and C are labels, not object ids."
+                                  "const": "guided"
                                 },
-                                "canvasOverride": {
+                                "preferences": {
                                   "type": "object",
                                   "properties": {
-                                    "widthMm": {
+                                    "gapMm": {
                                       "type": "number",
-                                      "exclusiveMinimum": 0,
-                                      "description": "Finite length in millimeters."
+                                      "minimum": 0,
+                                      "maximum": 30
                                     },
-                                    "heightMm": {
-                                      "type": "number",
-                                      "exclusiveMinimum": 0,
-                                      "description": "Finite length in millimeters."
-                                    },
-                                    "heightMode": {
+                                    "shape": {
                                       "anyOf": [
                                         {
                                           "type": "string",
-                                          "const": "auto"
+                                          "const": "wide"
                                         },
                                         {
                                           "type": "string",
-                                          "const": "fixed"
+                                          "const": "tall"
+                                        },
+                                        {
+                                          "type": "string",
+                                          "const": "square"
                                         }
                                       ]
-                                    }
-                                  },
-                                  "additionalProperties": false
-                                },
-                                "gutterOverrideMm": {
-                                  "type": "object",
-                                  "required": [
-                                    "horizontal",
-                                    "vertical"
-                                  ],
-                                  "properties": {
-                                    "horizontal": {
-                                      "type": "number",
-                                      "minimum": 0,
-                                      "description": "Finite length in millimeters, zero allowed."
                                     },
-                                    "vertical": {
-                                      "type": "number",
-                                      "minimum": 0,
-                                      "description": "Finite length in millimeters, zero allowed."
-                                    }
-                                  },
-                                  "additionalProperties": false
-                                },
-                                "rows": {
-                                  "type": "array",
-                                  "items": {
-                                    "type": "array",
-                                    "items": {
+                                    "focus": {
                                       "anyOf": [
                                         {
                                           "type": "string",
@@ -21702,187 +22785,64 @@
                                         }
                                       ]
                                     },
-                                    "minItems": 1,
-                                    "maxItems": 3
-                                  },
-                                  "minItems": 1,
-                                  "description": "Hero rows describe only the secondary region. Each row has 1 to 3 units."
-                                }
-                              },
-                              "description": "rows is set and orderedUnitIds is absent.",
-                              "additionalProperties": false
-                            },
-                            {
-                              "type": "object",
-                              "required": [
-                                "family"
-                              ],
-                              "properties": {
-                                "family": {
-                                  "anyOf": [
-                                    {
-                                      "type": "string",
-                                      "const": "auto"
-                                    },
-                                    {
-                                      "type": "string",
-                                      "const": "rows"
-                                    },
-                                    {
-                                      "type": "string",
-                                      "const": "hero-top"
-                                    },
-                                    {
-                                      "type": "string",
-                                      "const": "hero-left"
-                                    }
-                                  ],
-                                  "description": "rows: 1–3 units per row. hero-top: primary on the top row. hero-left: primary on the left. auto searches the applicable families. Layout order does not change labels."
-                                },
-                                "primaryPanelId": {
-                                  "type": "string",
-                                  "format": "uuid",
-                                  "description": "UUID. Letters such as A, B, and C are labels, not object ids."
-                                },
-                                "canvasOverride": {
-                                  "type": "object",
-                                  "properties": {
-                                    "widthMm": {
-                                      "type": "number",
-                                      "exclusiveMinimum": 0,
-                                      "description": "Finite length in millimeters."
-                                    },
-                                    "heightMm": {
-                                      "type": "number",
-                                      "exclusiveMinimum": 0,
-                                      "description": "Finite length in millimeters."
-                                    },
-                                    "heightMode": {
-                                      "anyOf": [
-                                        {
-                                          "type": "string",
-                                          "const": "auto"
+                                    "pair": {
+                                      "type": "object",
+                                      "required": [
+                                        "first",
+                                        "second",
+                                        "axis"
+                                      ],
+                                      "properties": {
+                                        "first": {
+                                          "anyOf": [
+                                            {
+                                              "type": "string",
+                                              "pattern": "^panel:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+                                            },
+                                            {
+                                              "type": "string",
+                                              "pattern": "^group:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+                                            }
+                                          ]
                                         },
-                                        {
-                                          "type": "string",
-                                          "const": "fixed"
+                                        "second": {
+                                          "anyOf": [
+                                            {
+                                              "type": "string",
+                                              "pattern": "^panel:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+                                            },
+                                            {
+                                              "type": "string",
+                                              "pattern": "^group:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+                                            }
+                                          ]
+                                        },
+                                        "axis": {
+                                          "anyOf": [
+                                            {
+                                              "type": "string",
+                                              "const": "horizontal"
+                                            },
+                                            {
+                                              "type": "string",
+                                              "const": "vertical"
+                                            },
+                                            {
+                                              "type": "string",
+                                              "const": "any"
+                                            }
+                                          ]
                                         }
-                                      ]
-                                    }
-                                  },
-                                  "additionalProperties": false
-                                },
-                                "gutterOverrideMm": {
-                                  "type": "object",
-                                  "required": [
-                                    "horizontal",
-                                    "vertical"
-                                  ],
-                                  "properties": {
-                                    "horizontal": {
-                                      "type": "number",
-                                      "minimum": 0,
-                                      "description": "Finite length in millimeters, zero allowed."
-                                    },
-                                    "vertical": {
-                                      "type": "number",
-                                      "minimum": 0,
-                                      "description": "Finite length in millimeters, zero allowed."
-                                    }
-                                  },
-                                  "additionalProperties": false
-                                }
-                              },
-                              "description": "Neither orderedUnitIds nor rows. Order comes from panelOrder.",
-                              "additionalProperties": false
-                            },
-                            {
-                              "type": "object",
-                              "required": [
-                                "family",
-                                "orderedUnitIds",
-                                "sizing"
-                              ],
-                              "properties": {
-                                "family": {
-                                  "type": "string",
-                                  "const": "selection-row"
-                                },
-                                "orderedUnitIds": {
-                                  "type": "array",
-                                  "items": {
-                                    "anyOf": [
-                                      {
-                                        "type": "string",
-                                        "pattern": "^panel:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
                                       },
-                                      {
-                                        "type": "string",
-                                        "pattern": "^group:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
-                                      }
-                                    ]
-                                  },
-                                  "minItems": 2,
-                                  "maxItems": 3,
-                                  "uniqueItems": true
-                                },
-                                "sizing": {
-                                  "anyOf": [
-                                    {
-                                      "type": "string",
-                                      "const": "preserve"
-                                    },
-                                    {
-                                      "type": "string",
-                                      "const": "equal-width"
-                                    },
-                                    {
-                                      "type": "string",
-                                      "const": "equal-height"
-                                    }
-                                  ]
-                                },
-                                "regionMm": {
-                                  "type": "object",
-                                  "required": [
-                                    "x",
-                                    "y",
-                                    "width",
-                                    "height"
-                                  ],
-                                  "properties": {
-                                    "x": {
-                                      "type": "number",
-                                      "description": "Millimeters."
-                                    },
-                                    "y": {
-                                      "type": "number",
-                                      "description": "Millimeters."
-                                    },
-                                    "width": {
-                                      "type": "number",
-                                      "exclusiveMinimum": 0,
-                                      "description": "Finite length in millimeters."
-                                    },
-                                    "height": {
-                                      "type": "number",
-                                      "exclusiveMinimum": 0,
-                                      "description": "Finite length in millimeters."
+                                      "additionalProperties": false
                                     }
                                   },
-                                  "description": "Rectangle in document millimeters.",
                                   "additionalProperties": false
-                                },
-                                "gapMm": {
-                                  "type": "number",
-                                  "minimum": 0,
-                                  "description": "Finite length in millimeters, zero allowed."
                                 }
                               },
                               "additionalProperties": false
                             }
-                          ],
-                          "description": "At most one of orderedUnitIds and rows. primaryPanelId is omitted when the request does not set one; the stored setting uses null instead."
+                          ]
                         }
                       },
                       "additionalProperties": false

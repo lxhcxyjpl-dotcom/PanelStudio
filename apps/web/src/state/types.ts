@@ -51,7 +51,7 @@ export type ExportState =
     }
   | { status: "failed"; message: string };
 
-export type DialogName = null | "settings" | "shortcuts" | "export" | "svg" | "asset" | "recovery" | "quota" | "guided";
+export type DialogName = null | "settings" | "ai-settings" | "shortcuts" | "export" | "svg" | "asset" | "recovery" | "quota" | "guided" | "publication" | "onboarding";
 
 export type QuotaChoice = { assetIds: string[]; remaining: number };
 
@@ -119,6 +119,7 @@ export type WorkspaceState = {
   exportState: ExportState;
   backend: "unknown" | "ok" | "down";
   booting: boolean;
+  startMessage: string;
   liveMessage: string;
   spacePan: boolean;
   dragging: boolean;

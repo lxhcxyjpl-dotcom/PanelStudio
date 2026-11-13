@@ -87,6 +87,7 @@ export const JOB_EVENT_NAMES = [
 ] as const;
 
 export const DOMAIN_COMMAND_NAMES = [
+  "figure.setPublicationContext",
   "panel.add",
   "panel.remove",
   "panel.rename",
@@ -107,6 +108,7 @@ export const DOMAIN_COMMAND_NAMES = [
 ] as const;
 
 export const AI_ACTION_NAMES = [
+  "reference_layout",
   "layout",
   "set_canvas",
   "set_gutter",
