@@ -1,0 +1,1168 @@
+﻿{
+    "version":  "30.7.0",
+    "restoreLabelFonts":  false,
+    "windows":  "10.0.26200.0",
+    "generatedUtc":  "2026-11-14T19:47:31.2070157Z",
+    "records":  [
+                    {
+                        "sample":  "01-mixed",
+                        "version":  "30.7.0",
+                        "build":  "114R",
+                        "checks":  [
+                                       {
+                                           "name":  "Artboard dimensions within 0.1 mm",
+                                           "pass":  true,
+                                           "value":  [
+                                                         180,
+                                                         86
+                                                     ]
+                                       },
+                                       {
+                                           "name":  "Independent raster objects",
+                                           "pass":  true,
+                                           "value":  [
+                                                         2,
+                                                         0
+                                                     ]
+                                       },
+                                       {
+                                           "name":  "Editable gradient paint",
+                                           "pass":  true,
+                                           "value":  1
+                                       },
+                                       {
+                                           "name":  "Native label A",
+                                           "pass":  true,
+                                           "value":  "TextFrame"
+                                       },
+                                       {
+                                           "name":  "Font and weight A",
+                                           "pass":  false,
+                                           "value":  "NotoSansJP-Bold"
+                                       },
+                                       {
+                                           "name":  "Label size within 0.1 pt A",
+                                           "pass":  true,
+                                           "value":  0
+                                       },
+                                       {
+                                           "name":  "Label baseline within 0.1 mm A",
+                                           "pass":  true,
+                                           "value":  [
+                                                         0,
+                                                         -0.0001
+                                                     ]
+                                       },
+                                       {
+                                           "name":  "Independent panel group A",
+                                           "pass":  true,
+                                           "value":  "panel-80db0b69-91e2-445f-9d7d-74d599600657"
+                                       },
+                                       {
+                                           "name":  "Crop frame within 0.1 mm A",
+                                           "pass":  true,
+                                           "value":  [
+                                                         12,
+                                                         18,
+                                                         34,
+                                                         17
+                                                     ]
+                                       },
+                                       {
+                                           "name":  "Native label B",
+                                           "pass":  true,
+                                           "value":  "TextFrame"
+                                       },
+                                       {
+                                           "name":  "Font and weight B",
+                                           "pass":  false,
+                                           "value":  "NotoSansJP-Bold"
+                                       },
+                                       {
+                                           "name":  "Label size within 0.1 pt B",
+                                           "pass":  true,
+                                           "value":  0
+                                       },
+                                       {
+                                           "name":  "Label baseline within 0.1 mm B",
+                                           "pass":  true,
+                                           "value":  [
+                                                         0,
+                                                         -0.0003
+                                                     ]
+                                       },
+                                       {
+                                           "name":  "Independent panel group B",
+                                           "pass":  true,
+                                           "value":  "panel-8a89b336-6d96-41ae-b859-b75d7bb2ae2e"
+                                       },
+                                       {
+                                           "name":  "Crop frame within 0.1 mm B",
+                                           "pass":  true,
+                                           "value":  [
+                                                         59,
+                                                         25,
+                                                         34,
+                                                         17
+                                                     ]
+                                       },
+                                       {
+                                           "name":  "Native label C",
+                                           "pass":  true,
+                                           "value":  "TextFrame"
+                                       },
+                                       {
+                                           "name":  "Font and weight C",
+                                           "pass":  false,
+                                           "value":  "NotoSansJP-Bold"
+                                       },
+                                       {
+                                           "name":  "Label size within 0.1 pt C",
+                                           "pass":  true,
+                                           "value":  0
+                                       },
+                                       {
+                                           "name":  "Label baseline within 0.1 mm C",
+                                           "pass":  true,
+                                           "value":  [
+                                                         0.0001,
+                                                         0.0001
+                                                     ]
+                                       },
+                                       {
+                                           "name":  "Independent panel group C",
+                                           "pass":  true,
+                                           "value":  "panel-aeaaac4b-c5f3-46ad-af99-4fcfa3fbb622"
+                                       },
+                                       {
+                                           "name":  "Crop frame within 0.1 mm C",
+                                           "pass":  true,
+                                           "value":  [
+                                                         106,
+                                                         32,
+                                                         34,
+                                                         22.6667
+                                                     ]
+                                       },
+                                       {
+                                           "name":  "Independent 1 mm translation A",
+                                           "pass":  true,
+                                           "value":  1
+                                       },
+                                       {
+                                           "name":  "Independent 1 mm translation B",
+                                           "pass":  true,
+                                           "value":  1
+                                       },
+                                       {
+                                           "name":  "Independent 1 mm translation C",
+                                           "pass":  true,
+                                           "value":  1
+                                       },
+                                       {
+                                           "name":  "Native AI reopen",
+                                           "pass":  true,
+                                           "value":  1
+                                       },
+                                       {
+                                           "name":  "Edited native label persisted",
+                                           "pass":  true,
+                                           "value":  "X"
+                                       },
+                                       {
+                                           "name":  "Edited imported native text persisted",
+                                           "pass":  true,
+                                           "value":  "n=13"
+                                       },
+                                       {
+                                           "name":  "Requested label faces survived native reopen",
+                                           "pass":  false,
+                                           "value":  [
+                                                         "NotoSansJP-Bold",
+                                                         "NotoSansJP-Bold",
+                                                         "NotoSansJP-Bold"
+                                                     ]
+                                       },
+                                       {
+                                           "name":  "Label sizes survived native reopen within 0.1 pt",
+                                           "pass":  true,
+                                           "value":  3
+                                       },
+                                       {
+                                           "name":  "Edited Bezier handle persisted",
+                                           "pass":  true,
+                                           "value":  [
+                                                         56.1259829209545,
+                                                         183.11812470913
+                                                     ]
+                                       },
+                                       {
+                                           "name":  "Rasters persisted after reopen",
+                                           "pass":  true,
+                                           "value":  2
+                                       }
+                                   ],
+                        "panels":  [
+                                       {
+                                           "label":  "A",
+                                           "font":  "NotoSansJP-Bold",
+                                           "family":  "Noto Sans JP",
+                                           "sizePt":  8.99999904632568,
+                                           "baselineMm":  [
+                                                              12,
+                                                              16.9999
+                                                          ]
+                                       },
+                                       {
+                                           "label":  "B",
+                                           "font":  "NotoSansJP-Bold",
+                                           "family":  "Noto Sans JP",
+                                           "sizePt":  8.99999904632568,
+                                           "baselineMm":  [
+                                                              59,
+                                                              23.9997
+                                                          ]
+                                       },
+                                       {
+                                           "label":  "C",
+                                           "font":  "NotoSansJP-Bold",
+                                           "family":  "Noto Sans JP",
+                                           "sizePt":  8.99999904632568,
+                                           "baselineMm":  [
+                                                              106.0001,
+                                                              31.0001
+                                                          ]
+                                       }
+                                   ]
+                    },
+                    {
+                        "sample":  "02-cropped",
+                        "version":  "30.7.0",
+                        "build":  "114R",
+                        "checks":  [
+                                       {
+                                           "name":  "Artboard dimensions within 0.1 mm",
+                                           "pass":  true,
+                                           "value":  [
+                                                         160,
+                                                         75
+                                                     ]
+                                       },
+                                       {
+                                           "name":  "Independent raster objects",
+                                           "pass":  true,
+                                           "value":  [
+                                                         2,
+                                                         0
+                                                     ]
+                                       },
+                                       {
+                                           "name":  "Editable gradient paint",
+                                           "pass":  true,
+                                           "value":  1
+                                       },
+                                       {
+                                           "name":  "Native label A",
+                                           "pass":  true,
+                                           "value":  "TextFrame"
+                                       },
+                                       {
+                                           "name":  "Font and weight A",
+                                           "pass":  false,
+                                           "value":  "NotoSansJP-Regular"
+                                       },
+                                       {
+                                           "name":  "Label size within 0.1 pt A",
+                                           "pass":  true,
+                                           "value":  0
+                                       },
+                                       {
+                                           "name":  "Label baseline within 0.1 mm A",
+                                           "pass":  true,
+                                           "value":  [
+                                                         0,
+                                                         -0.0001
+                                                     ]
+                                       },
+                                       {
+                                           "name":  "Independent panel group A",
+                                           "pass":  true,
+                                           "value":  "panel-4fb27ebc-0e51-4c09-899c-56e6d2545a8e"
+                                       },
+                                       {
+                                           "name":  "Crop frame within 0.1 mm A",
+                                           "pass":  true,
+                                           "value":  [
+                                                         12,
+                                                         18,
+                                                         34,
+                                                         21.1556
+                                                     ]
+                                       },
+                                       {
+                                           "name":  "Native label B",
+                                           "pass":  true,
+                                           "value":  "TextFrame"
+                                       },
+                                       {
+                                           "name":  "Font and weight B",
+                                           "pass":  false,
+                                           "value":  "NotoSansJP-Regular"
+                                       },
+                                       {
+                                           "name":  "Label size within 0.1 pt B",
+                                           "pass":  true,
+                                           "value":  0
+                                       },
+                                       {
+                                           "name":  "Label baseline within 0.1 mm B",
+                                           "pass":  true,
+                                           "value":  [
+                                                         0,
+                                                         -0.0003
+                                                     ]
+                                       },
+                                       {
+                                           "name":  "Independent panel group B",
+                                           "pass":  true,
+                                           "value":  "panel-34800716-d398-45cb-9c47-faf9572debd8"
+                                       },
+                                       {
+                                           "name":  "Crop frame within 0.1 mm B",
+                                           "pass":  true,
+                                           "value":  [
+                                                         59,
+                                                         25,
+                                                         34,
+                                                         17
+                                                     ]
+                                       },
+                                       {
+                                           "name":  "Native label C",
+                                           "pass":  true,
+                                           "value":  "TextFrame"
+                                       },
+                                       {
+                                           "name":  "Font and weight C",
+                                           "pass":  false,
+                                           "value":  "NotoSansJP-Regular"
+                                       },
+                                       {
+                                           "name":  "Label size within 0.1 pt C",
+                                           "pass":  true,
+                                           "value":  0
+                                       },
+                                       {
+                                           "name":  "Label baseline within 0.1 mm C",
+                                           "pass":  true,
+                                           "value":  [
+                                                         0.0001,
+                                                         0.0001
+                                                     ]
+                                       },
+                                       {
+                                           "name":  "Independent panel group C",
+                                           "pass":  true,
+                                           "value":  "panel-66addc9f-1ff2-403a-b28c-2d65ca77fc26"
+                                       },
+                                       {
+                                           "name":  "Crop frame within 0.1 mm C",
+                                           "pass":  true,
+                                           "value":  [
+                                                         106,
+                                                         32,
+                                                         34,
+                                                         17
+                                                     ]
+                                       },
+                                       {
+                                           "name":  "Independent 1 mm translation A",
+                                           "pass":  true,
+                                           "value":  1
+                                       },
+                                       {
+                                           "name":  "Independent 1 mm translation B",
+                                           "pass":  true,
+                                           "value":  1
+                                       },
+                                       {
+                                           "name":  "Independent 1 mm translation C",
+                                           "pass":  true,
+                                           "value":  1
+                                       },
+                                       {
+                                           "name":  "Native AI reopen",
+                                           "pass":  true,
+                                           "value":  1
+                                       },
+                                       {
+                                           "name":  "Edited native label persisted",
+                                           "pass":  true,
+                                           "value":  "X"
+                                       },
+                                       {
+                                           "name":  "Edited imported native text persisted",
+                                           "pass":  true,
+                                           "value":  "n=13"
+                                       },
+                                       {
+                                           "name":  "Requested label faces survived native reopen",
+                                           "pass":  false,
+                                           "value":  [
+                                                         "NotoSansJP-Regular",
+                                                         "NotoSansJP-Regular",
+                                                         "NotoSansJP-Regular"
+                                                     ]
+                                       },
+                                       {
+                                           "name":  "Label sizes survived native reopen within 0.1 pt",
+                                           "pass":  true,
+                                           "value":  3
+                                       },
+                                       {
+                                           "name":  "Edited Bezier handle persisted",
+                                           "pass":  true,
+                                           "value":  [
+                                                         189.354330699275,
+                                                         132.094488844872
+                                                     ]
+                                       },
+                                       {
+                                           "name":  "Rasters persisted after reopen",
+                                           "pass":  true,
+                                           "value":  2
+                                       }
+                                   ],
+                        "panels":  [
+                                       {
+                                           "label":  "A",
+                                           "font":  "NotoSansJP-Regular",
+                                           "family":  "Noto Sans JP",
+                                           "sizePt":  10,
+                                           "baselineMm":  [
+                                                              12,
+                                                              16.9999
+                                                          ]
+                                       },
+                                       {
+                                           "label":  "B",
+                                           "font":  "NotoSansJP-Regular",
+                                           "family":  "Noto Sans JP",
+                                           "sizePt":  10,
+                                           "baselineMm":  [
+                                                              59,
+                                                              23.9997
+                                                          ]
+                                       },
+                                       {
+                                           "label":  "C",
+                                           "font":  "NotoSansJP-Regular",
+                                           "family":  "Noto Sans JP",
+                                           "sizePt":  10,
+                                           "baselineMm":  [
+                                                              106.0001,
+                                                              31.0001
+                                                          ]
+                                       }
+                                   ]
+                    },
+                    {
+                        "sample":  "03-cjk",
+                        "version":  "30.7.0",
+                        "build":  "114R",
+                        "checks":  [
+                                       {
+                                           "name":  "Artboard dimensions within 0.1 mm",
+                                           "pass":  true,
+                                           "value":  [
+                                                         175,
+                                                         83
+                                                     ]
+                                       },
+                                       {
+                                           "name":  "Independent raster objects",
+                                           "pass":  true,
+                                           "value":  [
+                                                         2,
+                                                         0
+                                                     ]
+                                       },
+                                       {
+                                           "name":  "Editable gradient paint",
+                                           "pass":  true,
+                                           "value":  1
+                                       },
+                                       {
+                                           "name":  "Native label 图甲",
+                                           "pass":  true,
+                                           "value":  "TextFrame"
+                                       },
+                                       {
+                                           "name":  "Font and weight 图甲",
+                                           "pass":  false,
+                                           "value":  "NotoSansSC-Thin"
+                                       },
+                                       {
+                                           "name":  "Label size within 0.1 pt 图甲",
+                                           "pass":  true,
+                                           "value":  0
+                                       },
+                                       {
+                                           "name":  "Label baseline within 0.1 mm 图甲",
+                                           "pass":  true,
+                                           "value":  [
+                                                         0,
+                                                         -0.0001
+                                                     ]
+                                       },
+                                       {
+                                           "name":  "Independent panel group 图甲",
+                                           "pass":  true,
+                                           "value":  "panel-fb6839b5-43c6-4e86-b91a-25c5031245a6"
+                                       },
+                                       {
+                                           "name":  "Crop frame within 0.1 mm 图甲",
+                                           "pass":  true,
+                                           "value":  [
+                                                         12,
+                                                         18,
+                                                         34,
+                                                         17
+                                                     ]
+                                       },
+                                       {
+                                           "name":  "Native label (β)",
+                                           "pass":  true,
+                                           "value":  "TextFrame"
+                                       },
+                                       {
+                                           "name":  "Font and weight (β)",
+                                           "pass":  false,
+                                           "value":  "NotoSansSC-Thin"
+                                       },
+                                       {
+                                           "name":  "Label size within 0.1 pt (β)",
+                                           "pass":  true,
+                                           "value":  0
+                                       },
+                                       {
+                                           "name":  "Label baseline within 0.1 mm (β)",
+                                           "pass":  true,
+                                           "value":  [
+                                                         0,
+                                                         -0.0003
+                                                     ]
+                                       },
+                                       {
+                                           "name":  "Independent panel group (β)",
+                                           "pass":  true,
+                                           "value":  "panel-40644922-1b66-43f6-bfbd-459f92ca1d4e"
+                                       },
+                                       {
+                                           "name":  "Crop frame within 0.1 mm (β)",
+                                           "pass":  true,
+                                           "value":  [
+                                                         59,
+                                                         25,
+                                                         34,
+                                                         43.7143
+                                                     ]
+                                       },
+                                       {
+                                           "name":  "Native label III",
+                                           "pass":  true,
+                                           "value":  "TextFrame"
+                                       },
+                                       {
+                                           "name":  "Font and weight III",
+                                           "pass":  false,
+                                           "value":  "NotoSansSC-Thin"
+                                       },
+                                       {
+                                           "name":  "Label size within 0.1 pt III",
+                                           "pass":  true,
+                                           "value":  0
+                                       },
+                                       {
+                                           "name":  "Label baseline within 0.1 mm III",
+                                           "pass":  true,
+                                           "value":  [
+                                                         0.0001,
+                                                         0.0001
+                                                     ]
+                                       },
+                                       {
+                                           "name":  "Independent panel group III",
+                                           "pass":  true,
+                                           "value":  "panel-1064b895-e1aa-44f3-82be-e5a798a77132"
+                                       },
+                                       {
+                                           "name":  "Crop frame within 0.1 mm III",
+                                           "pass":  true,
+                                           "value":  [
+                                                         106,
+                                                         32,
+                                                         34,
+                                                         22.6667
+                                                     ]
+                                       },
+                                       {
+                                           "name":  "Independent 1 mm translation 图甲",
+                                           "pass":  true,
+                                           "value":  1
+                                       },
+                                       {
+                                           "name":  "Independent 1 mm translation (β)",
+                                           "pass":  true,
+                                           "value":  1
+                                       },
+                                       {
+                                           "name":  "Independent 1 mm translation III",
+                                           "pass":  true,
+                                           "value":  1
+                                       },
+                                       {
+                                           "name":  "Native AI reopen",
+                                           "pass":  true,
+                                           "value":  1
+                                       },
+                                       {
+                                           "name":  "Edited native label persisted",
+                                           "pass":  true,
+                                           "value":  "X"
+                                       },
+                                       {
+                                           "name":  "Edited imported native text persisted",
+                                           "pass":  true,
+                                           "value":  "n=13"
+                                       },
+                                       {
+                                           "name":  "Requested label faces survived native reopen",
+                                           "pass":  false,
+                                           "value":  [
+                                                         "NotoSansSC-Thin",
+                                                         "NotoSansSC-Thin",
+                                                         "NotoSansSC-Thin"
+                                                     ]
+                                       },
+                                       {
+                                           "name":  "Label sizes survived native reopen within 0.1 pt",
+                                           "pass":  true,
+                                           "value":  3
+                                       },
+                                       {
+                                           "name":  "Edited Bezier handle persisted",
+                                           "pass":  true,
+                                           "value":  [
+                                                         56.1259688542584,
+                                                         174.614187345504
+                                                     ]
+                                       },
+                                       {
+                                           "name":  "Rasters persisted after reopen",
+                                           "pass":  true,
+                                           "value":  2
+                                       }
+                                   ],
+                        "panels":  [
+                                       {
+                                           "label":  "图甲",
+                                           "font":  "NotoSansSC-Thin",
+                                           "family":  "Noto Sans SC",
+                                           "sizePt":  11.0000019073486,
+                                           "baselineMm":  [
+                                                              12,
+                                                              16.9999
+                                                          ]
+                                       },
+                                       {
+                                           "label":  "(β)",
+                                           "font":  "NotoSansSC-Thin",
+                                           "family":  "Noto Sans SC",
+                                           "sizePt":  11.0000019073486,
+                                           "baselineMm":  [
+                                                              59,
+                                                              23.9997
+                                                          ]
+                                       },
+                                       {
+                                           "label":  "III",
+                                           "font":  "NotoSansSC-Thin",
+                                           "family":  "Noto Sans SC",
+                                           "sizePt":  11.0000019073486,
+                                           "baselineMm":  [
+                                                              106.0001,
+                                                              31.0001
+                                                          ]
+                                       }
+                                   ]
+                    },
+                    {
+                        "sample":  "04-alpha",
+                        "version":  "30.7.0",
+                        "build":  "114R",
+                        "checks":  [
+                                       {
+                                           "name":  "Artboard dimensions within 0.1 mm",
+                                           "pass":  true,
+                                           "value":  [
+                                                         155,
+                                                         85
+                                                     ]
+                                       },
+                                       {
+                                           "name":  "Independent raster objects",
+                                           "pass":  true,
+                                           "value":  [
+                                                         1,
+                                                         0
+                                                     ]
+                                       },
+                                       {
+                                           "name":  "Editable gradient paint",
+                                           "pass":  true,
+                                           "value":  2
+                                       },
+                                       {
+                                           "name":  "Group opacity",
+                                           "pass":  true,
+                                           "value":  62
+                                       },
+                                       {
+                                           "name":  "Native label A",
+                                           "pass":  true,
+                                           "value":  "TextFrame"
+                                       },
+                                       {
+                                           "name":  "Font and weight A",
+                                           "pass":  false,
+                                           "value":  "NotoSansJP-Regular"
+                                       },
+                                       {
+                                           "name":  "Label size within 0.1 pt A",
+                                           "pass":  true,
+                                           "value":  0
+                                       },
+                                       {
+                                           "name":  "Label baseline within 0.1 mm A",
+                                           "pass":  true,
+                                           "value":  [
+                                                         0,
+                                                         -0.0001
+                                                     ]
+                                       },
+                                       {
+                                           "name":  "Independent panel group A",
+                                           "pass":  true,
+                                           "value":  "panel-c94b7430-8e8c-4058-81a3-0599a5fb361e"
+                                       },
+                                       {
+                                           "name":  "Crop frame within 0.1 mm A",
+                                           "pass":  true,
+                                           "value":  [
+                                                         12,
+                                                         18,
+                                                         34,
+                                                         17
+                                                     ]
+                                       },
+                                       {
+                                           "name":  "Native label B",
+                                           "pass":  true,
+                                           "value":  "TextFrame"
+                                       },
+                                       {
+                                           "name":  "Font and weight B",
+                                           "pass":  false,
+                                           "value":  "NotoSansJP-Regular"
+                                       },
+                                       {
+                                           "name":  "Label size within 0.1 pt B",
+                                           "pass":  true,
+                                           "value":  0
+                                       },
+                                       {
+                                           "name":  "Label baseline within 0.1 mm B",
+                                           "pass":  true,
+                                           "value":  [
+                                                         0,
+                                                         -0.0003
+                                                     ]
+                                       },
+                                       {
+                                           "name":  "Independent panel group B",
+                                           "pass":  true,
+                                           "value":  "panel-e5e12787-2f9a-46ea-8644-b4c304eb0702"
+                                       },
+                                       {
+                                           "name":  "Crop frame within 0.1 mm B",
+                                           "pass":  true,
+                                           "value":  [
+                                                         59,
+                                                         25,
+                                                         34,
+                                                         17
+                                                     ]
+                                       },
+                                       {
+                                           "name":  "Native label C",
+                                           "pass":  true,
+                                           "value":  "TextFrame"
+                                       },
+                                       {
+                                           "name":  "Font and weight C",
+                                           "pass":  false,
+                                           "value":  "NotoSansJP-Regular"
+                                       },
+                                       {
+                                           "name":  "Label size within 0.1 pt C",
+                                           "pass":  true,
+                                           "value":  0
+                                       },
+                                       {
+                                           "name":  "Label baseline within 0.1 mm C",
+                                           "pass":  true,
+                                           "value":  [
+                                                         0.0001,
+                                                         0.0001
+                                                     ]
+                                       },
+                                       {
+                                           "name":  "Independent panel group C",
+                                           "pass":  true,
+                                           "value":  "panel-bae7b593-ec4d-455c-85ff-6bd2e1fe42b6"
+                                       },
+                                       {
+                                           "name":  "Crop frame within 0.1 mm C",
+                                           "pass":  true,
+                                           "value":  [
+                                                         106,
+                                                         32,
+                                                         34,
+                                                         17
+                                                     ]
+                                       },
+                                       {
+                                           "name":  "Independent 1 mm translation A",
+                                           "pass":  true,
+                                           "value":  1
+                                       },
+                                       {
+                                           "name":  "Independent 1 mm translation B",
+                                           "pass":  true,
+                                           "value":  1
+                                       },
+                                       {
+                                           "name":  "Independent 1 mm translation C",
+                                           "pass":  true,
+                                           "value":  1
+                                       },
+                                       {
+                                           "name":  "Native AI reopen",
+                                           "pass":  true,
+                                           "value":  1
+                                       },
+                                       {
+                                           "name":  "Edited native label persisted",
+                                           "pass":  true,
+                                           "value":  "X"
+                                       },
+                                       {
+                                           "name":  "Edited imported native text persisted",
+                                           "pass":  true,
+                                           "value":  "n=13"
+                                       },
+                                       {
+                                           "name":  "Requested label faces survived native reopen",
+                                           "pass":  false,
+                                           "value":  [
+                                                         "NotoSansJP-Regular",
+                                                         "NotoSansJP-Regular",
+                                                         "NotoSansJP-Regular"
+                                                     ]
+                                       },
+                                       {
+                                           "name":  "Label sizes survived native reopen within 0.1 pt",
+                                           "pass":  true,
+                                           "value":  3
+                                       },
+                                       {
+                                           "name":  "Edited Bezier handle persisted",
+                                           "pass":  true,
+                                           "value":  [
+                                                         322.582679669688,
+                                                         140.598425016404
+                                                     ]
+                                       },
+                                       {
+                                           "name":  "Rasters persisted after reopen",
+                                           "pass":  true,
+                                           "value":  1
+                                       }
+                                   ],
+                        "panels":  [
+                                       {
+                                           "label":  "A",
+                                           "font":  "NotoSansJP-Regular",
+                                           "family":  "Noto Sans JP",
+                                           "sizePt":  7.99999952316284,
+                                           "baselineMm":  [
+                                                              12,
+                                                              16.9999
+                                                          ]
+                                       },
+                                       {
+                                           "label":  "B",
+                                           "font":  "NotoSansJP-Regular",
+                                           "family":  "Noto Sans JP",
+                                           "sizePt":  7.99999952316284,
+                                           "baselineMm":  [
+                                                              59,
+                                                              23.9997
+                                                          ]
+                                       },
+                                       {
+                                           "label":  "C",
+                                           "font":  "NotoSansJP-Regular",
+                                           "family":  "Noto Sans JP",
+                                           "sizePt":  7.99999952316284,
+                                           "baselineMm":  [
+                                                              106.0001,
+                                                              31.0001
+                                                          ]
+                                       }
+                                   ]
+                    },
+                    {
+                        "sample":  "05-repeated-vector",
+                        "version":  "30.7.0",
+                        "build":  "114R",
+                        "checks":  [
+                                       {
+                                           "name":  "Artboard dimensions within 0.1 mm",
+                                           "pass":  true,
+                                           "value":  [
+                                                         172,
+                                                         80
+                                                     ]
+                                       },
+                                       {
+                                           "name":  "Independent raster objects",
+                                           "pass":  true,
+                                           "value":  [
+                                                         1,
+                                                         0
+                                                     ]
+                                       },
+                                       {
+                                           "name":  "Editable gradient paint",
+                                           "pass":  true,
+                                           "value":  2
+                                       },
+                                       {
+                                           "name":  "Native label (A)",
+                                           "pass":  true,
+                                           "value":  "TextFrame"
+                                       },
+                                       {
+                                           "name":  "Font and weight (A)",
+                                           "pass":  false,
+                                           "value":  "NotoSansJP-Bold"
+                                       },
+                                       {
+                                           "name":  "Label size within 0.1 pt (A)",
+                                           "pass":  true,
+                                           "value":  0
+                                       },
+                                       {
+                                           "name":  "Label baseline within 0.1 mm (A)",
+                                           "pass":  true,
+                                           "value":  [
+                                                         0,
+                                                         -0.0001
+                                                     ]
+                                       },
+                                       {
+                                           "name":  "Independent panel group (A)",
+                                           "pass":  true,
+                                           "value":  "panel-773d0aed-8b8f-4291-83c5-1e427d89e363"
+                                       },
+                                       {
+                                           "name":  "Crop frame within 0.1 mm (A)",
+                                           "pass":  true,
+                                           "value":  [
+                                                         12,
+                                                         18,
+                                                         34,
+                                                         17
+                                                     ]
+                                       },
+                                       {
+                                           "name":  "Native label (B)",
+                                           "pass":  true,
+                                           "value":  "TextFrame"
+                                       },
+                                       {
+                                           "name":  "Font and weight (B)",
+                                           "pass":  false,
+                                           "value":  "NotoSansJP-Bold"
+                                       },
+                                       {
+                                           "name":  "Label size within 0.1 pt (B)",
+                                           "pass":  true,
+                                           "value":  0
+                                       },
+                                       {
+                                           "name":  "Label baseline within 0.1 mm (B)",
+                                           "pass":  true,
+                                           "value":  [
+                                                         0,
+                                                         -0.0003
+                                                     ]
+                                       },
+                                       {
+                                           "name":  "Independent panel group (B)",
+                                           "pass":  true,
+                                           "value":  "panel-c47b5c5a-968e-4e1d-b6bb-9a3e1ef77276"
+                                       },
+                                       {
+                                           "name":  "Crop frame within 0.1 mm (B)",
+                                           "pass":  true,
+                                           "value":  [
+                                                         59,
+                                                         25,
+                                                         34,
+                                                         17
+                                                     ]
+                                       },
+                                       {
+                                           "name":  "Native label (C)",
+                                           "pass":  true,
+                                           "value":  "TextFrame"
+                                       },
+                                       {
+                                           "name":  "Font and weight (C)",
+                                           "pass":  false,
+                                           "value":  "NotoSansJP-Bold"
+                                       },
+                                       {
+                                           "name":  "Label size within 0.1 pt (C)",
+                                           "pass":  true,
+                                           "value":  0
+                                       },
+                                       {
+                                           "name":  "Label baseline within 0.1 mm (C)",
+                                           "pass":  true,
+                                           "value":  [
+                                                         0.0001,
+                                                         0.0001
+                                                     ]
+                                       },
+                                       {
+                                           "name":  "Independent panel group (C)",
+                                           "pass":  true,
+                                           "value":  "panel-83bcb946-2110-4da6-a0ea-a1cc67b2ac79"
+                                       },
+                                       {
+                                           "name":  "Crop frame within 0.1 mm (C)",
+                                           "pass":  true,
+                                           "value":  [
+                                                         106,
+                                                         32,
+                                                         34,
+                                                         43.7143
+                                                     ]
+                                       },
+                                       {
+                                           "name":  "Independent 1 mm translation (A)",
+                                           "pass":  true,
+                                           "value":  1
+                                       },
+                                       {
+                                           "name":  "Independent 1 mm translation (B)",
+                                           "pass":  true,
+                                           "value":  1
+                                       },
+                                       {
+                                           "name":  "Independent 1 mm translation (C)",
+                                           "pass":  true,
+                                           "value":  1
+                                       },
+                                       {
+                                           "name":  "Native AI reopen",
+                                           "pass":  true,
+                                           "value":  1
+                                       },
+                                       {
+                                           "name":  "Edited native label persisted",
+                                           "pass":  true,
+                                           "value":  "X"
+                                       },
+                                       {
+                                           "name":  "Edited imported native text persisted",
+                                           "pass":  true,
+                                           "value":  "n=13"
+                                       },
+                                       {
+                                           "name":  "Requested label faces survived native reopen",
+                                           "pass":  false,
+                                           "value":  [
+                                                         "NotoSansJP-Bold",
+                                                         "NotoSansJP-Bold",
+                                                         "NotoSansJP-Bold"
+                                                     ]
+                                       },
+                                       {
+                                           "name":  "Label sizes survived native reopen within 0.1 pt",
+                                           "pass":  true,
+                                           "value":  3
+                                       },
+                                       {
+                                           "name":  "Edited Bezier handle persisted",
+                                           "pass":  true,
+                                           "value":  [
+                                                         189.354316632579,
+                                                         146.267721281053
+                                                     ]
+                                       },
+                                       {
+                                           "name":  "Rasters persisted after reopen",
+                                           "pass":  true,
+                                           "value":  1
+                                       }
+                                   ],
+                        "panels":  [
+                                       {
+                                           "label":  "(A)",
+                                           "font":  "NotoSansJP-Bold",
+                                           "family":  "Noto Sans JP",
+                                           "sizePt":  12,
+                                           "baselineMm":  [
+                                                              12,
+                                                              16.9999
+                                                          ]
+                                       },
+                                       {
+                                           "label":  "(B)",
+                                           "font":  "NotoSansJP-Bold",
+                                           "family":  "Noto Sans JP",
+                                           "sizePt":  12,
+                                           "baselineMm":  [
+                                                              59,
+                                                              23.9997
+                                                          ]
+                                       },
+                                       {
+                                           "label":  "(C)",
+                                           "font":  "NotoSansJP-Bold",
+                                           "family":  "Noto Sans JP",
+                                           "sizePt":  12,
+                                           "baselineMm":  [
+                                                              106.0001,
+                                                              31.0001
+                                                          ]
+                                       }
+                                   ]
+                    }
+                ]
+}

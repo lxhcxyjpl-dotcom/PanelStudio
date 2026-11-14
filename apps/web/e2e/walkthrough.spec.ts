@@ -30,7 +30,7 @@ test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
     localStorage.setItem(
       "panelstudio.prefs",
-      JSON.stringify({ theme: "light", locale: "zh-CN", motion: "off", reduceTransparency: false, leftWidth: 240, rightWidth: 304 }),
+      JSON.stringify({ theme: "light", locale: "zh-CN", motion: "off", reduceTransparency: false, leftWidth: 240, rightWidth: 352 }),
     );
   });
 });
@@ -38,7 +38,7 @@ test.beforeEach(async ({ page }) => {
 test("imports six drawings, lays them out, applies one sentence, and exports SVG", async ({ page }) => {
   const provider = await fixtureProvider();
   try {
-    await page.goto("/");
+    await page.goto("/app");
     await beat(page);
     await shot(page, "01-empty");
     await page.getByTestId("import-input").setInputFiles(figures);
@@ -95,7 +95,7 @@ test("v0.2 six-panel continuous refinement, local row and editable export", asyn
     await page.screenshot({ path: path.join(images, name + ".png") });
   };
   try {
-    await page.goto("/");
+    await page.goto("/app");
     await configure(page, provider.port);
     await page.getByTestId("import-input").setInputFiles([...figures.slice(0, 5), path.join(assets, "heatmap.png")]);
     await button("tab-panels").click();

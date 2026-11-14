@@ -4,12 +4,10 @@ import { useTranslation } from "react-i18next";
 import { NUDGE_MM } from "@panelstudio/contracts";
 import { api } from "../api/client";
 import { formatDiagnostic } from "../i18n/diagnostic";
-import { workspaceMode, sidebarWidth, localizedSummary } from "../model/chrome";
+import { workspaceMode, sidebarWidth } from "../model/chrome";
 import { geometryLocked, panelIdsOf } from "../model/document-ui";
 import { fitCamera } from "../model/view";
 import {
-  acceptCandidate,
-  boot,
   cancelCrop,
   cancelNudge,
   commitCrop,
@@ -22,40 +20,36 @@ import {
   importFiles,
   queueNudge,
   redo,
-  requestLayout,
   selectAll,
-  selectCandidate,
   undo,
 } from "../state/session";
 import { patch, useWorkspace } from "../state/store";
-import { baseDocument, candidatesStale } from "../state/types";
+import { baseDocument } from "../state/types";
 import { CanvasStage } from "./CanvasStage";
-import { proposalChanges, labelName } from "../model/changes";
+import { labelName } from "../model/changes";
 import { cancelGesture } from "./gesture";
 import { labelDiagnostics } from "@panelstudio/core/labels";
-import { Dialogs } from "./Dialogs";
-import { GuidedDialog } from "./GuidedDialog";
 import { Inspector } from "./Inspector";
 import { LeftSidebar } from "./LeftSidebar";
 import { Toolbar } from "./Toolbar";
 import { StartScreen } from "./StartScreen";
-import { Onboarding } from "./Onboarding";
 import { Button } from "./widgets";
 
-export function Workspace() {
+export function Workspace({ active = true }: { active?: boolean }) {
   const { t } = useTranslation();
   const state = useWorkspace();
   const drawerSide = state.confirmed && (state.mode === "drawer" || state.mode === "phone")
     ? state.leftOpen ? "assets" : state.rightOpen ? "inspector" : null : null;
   useEffect(() => {
-    if (!drawerSide) return;
+    if (!active || !drawerSide) return;
     const trigger = document.querySelector<HTMLButtonElement>('[data-action="drawer-' + drawerSide + '"]');
     document.getElementById("studio-" + drawerSide)?.querySelector<HTMLButtonElement>('[role="tab"][aria-selected="true"]')?.focus({preventScroll:true});
     return () => { if (trigger?.isConnected && trigger.getClientRects().length) trigger.focus({preventScroll:true}); };
-  }, [drawerSide]);
+  }, [drawerSide, active]);
   useEffect(() => {
-    void boot();
+    if (!active) return;
     const onResize = () => patch({ mode: workspaceMode(window.innerWidth) });
+    onResize();
     window.addEventListener("resize", onResize);
     const onDragEnter = (event: DragEvent) => {
       if (useWorkspace.getState().dialog === "guided") return;
@@ -86,9 +80,10 @@ export function Workspace() {
       window.removeEventListener("dragover", onDragOver);
       window.removeEventListener("drop", onDrop);
     };
-  }, []);
+  }, [active]);
 
   useEffect(() => {
+    if (!active) return;
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.isComposing || event.key === "Process") return;
       const current = useWorkspace.getState();
@@ -203,11 +198,10 @@ export function Workspace() {
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("keyup", onKeyUp);
     };
-  }, []);
+  }, [active]);
 
   const left = sidebarWidth("left", state.mode, state.leftWidth);
   const right = sidebarWidth("right", state.mode, state.rightWidth);
-  const stale = candidatesStale(state);
   return (
     <div className="app" data-testid="workspace" data-editor={Boolean(state.confirmed)}>
       <Toolbar inert={Boolean(drawerSide)} />
@@ -217,7 +211,6 @@ export function Workspace() {
           {state.mode === "full" ? <Divider side="left" width={left} /> : <div className="divider" />}
           <div className="canvas-column" inert={Boolean(drawerSide)}>
             {state.confirmed && <><Banners /><CanvasStage /></>}
-            <CandidateDock />
           </div>
           {state.mode === "full" ? <Divider side="right" width={right} /> : <div className="divider" />}
           <Inspector />
@@ -230,12 +223,14 @@ export function Workspace() {
       </div>
       {state.confirmed && <footer className="bottombar">
         <span>{t("status.panels", { count: state.confirmed?.document.panelOrder.length ?? 0 })}</span>
-        {stale ? <span>{state.cards.some((card) => card.candidate.origin === "ai") ? t("ai.stale") : t("layout.stale")}</span> : null}
       </footer>}
+      {state.confirmed && <nav className="mobile-workspace-nav" aria-label={t("toolbar.more")}>
+        <Button action="mobile-assets" variant="quiet" onClick={() => patch({ assetTab: "assets", leftOpen: true, rightOpen: false })}>{t("assets.tab")}</Button>
+        <Button action="mobile-panels" variant="quiet" onClick={() => patch({ assetTab: "panels", leftOpen: true, rightOpen: false })}>{t("panels.tab")}</Button>
+        <Button action="mobile-properties" variant="quiet" onClick={() => patch({ inspectorMode: "properties", rightOpen: true, leftOpen: false })}>{t("inspector.tab")}</Button>
+        <Button action="mobile-refine" variant="quiet" onClick={() => patch({ inspectorMode: "ai", rightOpen: true, leftOpen: false })}>{t("ai.tab")}</Button>
+      </nav>}
       <div className="sr-only" aria-live="polite" data-testid="live">{state.liveMessage}</div>
-      <Dialogs />
-      <Onboarding open={state.dialog === "onboarding"} />
-      {state.confirmed && <GuidedDialog key={state.projectId} document={state.confirmed.document} open={state.dialog === "guided"} />}
     </div>
   );
 }
@@ -261,65 +256,11 @@ function Banners() {
         </p>
       ) : null}
       {state.saveState === "conflict" ? <p className="banner">{t("save.conflict")}</p> : null}
-      {state.layoutState === "conflict" || state.layoutState === "error" ? <p className="banner">{state.layoutMessage}</p> : null}
-      {state.layoutState === "loading" ? <p className="banner">{t("layout.loading")}</p> : null}
-      {candidatesStale(state) ? (
-        <p className="banner">
-          {state.cards.some((card) => card.candidate.origin === "ai") ? t("ai.stale") : t("layout.stale")}
-          {state.cards.some((card) => card.candidate.origin === "ai") ? null : (
-            <Button action="regenerate-layout" onClick={() => void requestLayout(state.cardLayoutRequest ?? { family: "auto" })}>{t("layout.regenerate")}</Button>
-          )}
-        </p>
-      ) : null}
-      {labelIssues.map((issue, index) => <p className="banner quiet" key={`label-${index}`}>{issue.panelIds?.map((id) => art ? labelName(art, id) : "").join(", ")} · {formatDiagnostic(t, issue)}</p>)}
-      {missing.length > 0 ? (
-        <p className="banner quiet">
-          {t("status.fontMissing")}
-          {missing.map((item, index) => <span key={`${item.messageKey}-${index}`}> {formatDiagnostic(t, item)}</span>)}
-        </p>
-      ) : null}
+      {labelIssues.length + missing.length > 0 && <details className="banner quiet artwork-notices"><summary>{t("status.artworkNotices", { count: labelIssues.length + missing.length })}</summary>
+        {labelIssues.map((issue, index) => <p key={`label-${index}`}>{issue.panelIds?.map((id) => art ? labelName(art, id) : "").join(", ")} · {formatDiagnostic(t, issue)}</p>)}
+        {missing.map((item, index) => <p key={`font-${index}`}>{t("status.fontMissing")} · {formatDiagnostic(t, item)}</p>)}
+      </details>}
     </div>
-  );
-}
-
-function CandidateDock() {
-  const { t, i18n } = useTranslation();
-  const state = useWorkspace();
-  if (state.cards.some((card) => card.candidate.origin === "ai")) return null;
-  if (state.cards.length === 0 && state.layoutState === "idle") return null;
-  const stale = candidatesStale(state);
-  const applyReason = !state.activeCandidateId ? t("layout.pick") : stale ? t("layout.stale") : undefined;
-  return (
-    <section className="candidates" aria-label={t("layout.preview")} data-keys="candidates">
-      <header>
-        <strong>{t("layout.preview")}</strong>
-        <Button action="apply-layout" variant="primary" disabledReason={applyReason} onClick={() => void acceptCandidate()}>{t("layout.apply")}</Button>
-        <Button action="cancel-layout" onClick={dismissCandidates}>{t("layout.cancel")}</Button>
-        <Button action="manual-edit" onClick={continueEditing}>{t("layout.manual")}</Button>
-      </header>
-      <div className="candidate-row">
-        {state.cards.map((card) => {
-          const canvas = card.candidate.previewDocument.canvas;
-          const active = card.candidate.id === state.activeCandidateId;
-          return (
-            <button
-              key={card.candidate.id}
-              type="button"
-              data-action="select-candidate"
-              data-testid="candidate-card"
-              className={active ? "candidate active" : "candidate"}
-              onClick={() => selectCandidate(card.candidate.id)}
-            >
-              {card.previewUrl ? <img alt="" src={card.previewUrl} /> : <span>{card.previewError ?? t("layout.loading")}</span>}
-              <strong>{localizedSummary(card.candidate.summary, i18n.language)}</strong>
-              <span>{t("layout.canvasSize", { width: round(canvas.widthMm), height: round(canvas.heightMm) })}</span>
-              {state.cards.length === 1 && state.candidateRoot ? proposalChanges(state.candidateRoot.document, card.candidate.previewDocument).filter((change) => change.kind === "size").map((change) => <span key={change.label}>{t("ai.changeSize", change)}</span>) : null}
-              {card.candidate.diagnostics.map((item, index) => <em key={`${item.code}-${index}`}>{formatDiagnostic(t, item)}</em>)}
-            </button>
-          );
-        })}
-      </div>
-    </section>
   );
 }
 
@@ -366,8 +307,4 @@ function isTyping(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
   if (target.isContentEditable) return true;
   return target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.tagName === "SELECT";
-}
-
-function round(value: number): number {
-  return Math.round(value * 100) / 100;
 }

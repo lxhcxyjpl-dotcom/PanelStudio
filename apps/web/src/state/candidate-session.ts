@@ -48,6 +48,7 @@ export function resetCandidateSession(projectId: string | null) {
   releaseCards();
   patch({
     cardLayoutRequest: null,
+    inspectorMode: "properties",
     cards: [], activeCandidateId: null, candidateRoot: null, compareMode: "editing", aiScope: "document",
     frozenScope: null, scopeChanged: false, awaitingAnswer: null, aiHistory: [], historyCursor: null,
     aiStatus: { phase: "idle" }, layoutState: "idle", layoutMessage: null,
@@ -82,6 +83,7 @@ export function dismissCandidates() {
   sequence++;
   releaseCards();
   patch({
+    ...(get().inspectorMode === "layout" ? { inspectorMode: "properties" as const } : {}),
     cards: [], activeCandidateId: null, candidateRoot: null, compareMode: "editing",
     frozenScope: null, scopeChanged: false, awaitingAnswer: null, aiStatus: { phase: "idle" },
     layoutState: "idle", layoutMessage: null, liveMessage: i18n.t("ai.discarded"),

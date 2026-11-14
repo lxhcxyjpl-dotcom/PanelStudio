@@ -26,7 +26,7 @@ test.beforeAll(async () => {
 test.afterAll(() => mock.close());
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem("panelstudio.prefs", JSON.stringify({ theme: "light", locale: "zh-CN", motion: "off" })));
-  await page.goto("/");
+  await page.goto("/app");
 });
 
 async function openConnection(page: Page) {

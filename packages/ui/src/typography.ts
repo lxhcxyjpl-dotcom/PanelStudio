@@ -1,5 +1,5 @@
 export const uiFontFamily =
-  '"Segoe UI", -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif';
+  '"Inter", "Noto Sans SC", "Segoe UI", -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif';
 
 export const uiFontSizes = { caption: 13, body: 15, heading: 24, display: 56 } as const;
 

@@ -26,21 +26,20 @@ import {
 import { patch, useWorkspace } from "../state/store";
 import { baseDocument } from "../state/types";
 import { AiPanel } from "./AiPanel";
+import { ArrangeInspector } from "./ArrangeInspector";
 import { LocalRow } from "./LocalRow";
-import { Button, Icon, NumberField, SelectField, TextField } from "./widgets";
+import { Button, Icon, NumberField, SelectField, TabBar, TextField } from "./widgets";
 
 export function Inspector() {
   const { t } = useTranslation();
   const state = useWorkspace();
-  const [tab, setTab] = useState<"properties" | "ai">("properties");
-  useEffect(() => {
-    if (state.aiStatus.phase === "running") {
-      setTab("ai");
-      patch({ rightOpen: true });
-    }
-  }, [state.aiStatus.phase]);
+  const tab = state.inspectorMode;
+  const setTab = (inspectorMode: typeof tab) => patch({ inspectorMode });
   const width = sidebarWidth("right", state.mode, state.rightWidth);
-  const document = baseDocument(state);
+  const previewing = state.compareMode !== "editing";
+  const document = state.compareMode === "original" ? state.candidateRoot?.document ?? baseDocument(state)
+    : state.compareMode === "draft" ? state.cards.find(card => card.candidate.id === state.activeCandidateId)?.candidate.previewDocument ?? baseDocument(state)
+    : baseDocument(state);
   return (
     <aside
       className="sidebar right-sidebar" id="studio-inspector"
@@ -49,18 +48,17 @@ export function Inspector() {
       style={{ width }}
       aria-label={t("a11y.right")}
     >
-      <div className="tabs" role="tablist">
-        <button type="button" data-action="tab-properties" role="tab" aria-selected={tab === "properties"} onClick={() => { setTab("properties"); continueEditing(); }}>
-          <Icon name="sliders" />{t("inspector.tab")}
-        </button>
-        <button type="button" data-action="tab-ai" role="tab" aria-selected={tab === "ai"} onClick={() => setTab("ai")}>
-          <Icon name="chat" />{t("ai.tab")}
-        </button>
-      </div>
+      <TabBar id="inspector-tabs" value={tab} onChange={setTab} label={t("a11y.right")} items={[
+        { value: "properties", label: t("inspector.tab"), action: "tab-properties" }, { value: "ai", label: t("ai.tab"), action: "tab-ai" },
+        ...((tab === "layout" || state.cards.some(card => card.candidate.origin !== "ai")) ? [{ value: "layout" as const, label: t("toolbar.autoLayout"), action: "tab-layout" }] : []),
+      ]} />
       <Button action="close-inspector" className="drawer-close" variant="quiet" aria-label={t("a11y.close")}
         onClick={() => patch({rightOpen:false})}><Icon name="close" /></Button>
-      <div className={"side-scroll" + (tab === "ai" ? " conversation-scroll" : "")}>
-        {tab === "ai" ? <AiPanel /> : document ? <Properties document={document} /> : <p className="muted section">{t("app.noProject")}</p>}
+      <div className={"side-scroll" + (tab === "ai" ? " conversation-scroll" : "")} role="tabpanel" id="inspector-tabs-panel" aria-labelledby={"inspector-tabs-" + tab}>
+        {tab === "ai" ? <AiPanel /> : tab === "layout" ? <ArrangeInspector /> : document ? <>
+          {previewing && <div className="preview-readonly"><p>{t("inspector.previewReadOnly")}</p><Button action="properties-edit" onClick={continueEditing}>{t("inspector.returnEditing")}</Button></div>}
+          <fieldset className="property-content" disabled={previewing}><Properties document={document} /></fieldset>
+        </> : <p className="muted section">{t("app.noProject")}</p>}
       </div>
     </aside>
   );
@@ -171,19 +169,22 @@ function PanelFields({ document, panelId }: { document: FigureDocumentV1; panelI
   const blocked = geometryLocked(document, panelId);
   const reason = blocked === "group" ? t("inspector.disabledGroup") : blocked === "lock" ? t("inspector.disabledLock") : undefined;
   return (
-    <section className="section">
+    <><section className="section panel-properties">
       <h2>{panel.name}</h2>
       <TextField label={t("panels.name")} value={panel.name} onCommit={(name) => void transact([{ type: "panel.rename", panelId, name }])} />
+      <div className="field-pair">
       <NumberField label="X (mm)" value={panel.frameMm.x} disabledReason={reason} onCommit={(x) => void transact([translateSelection(document, [panelId], x - panel.frameMm.x, 0)])} />
       <NumberField label="Y (mm)" value={panel.frameMm.y} disabledReason={reason} onCommit={(y) => void transact([translateSelection(document, [panelId], 0, y - panel.frameMm.y)])} />
+      </div><div className="field-pair">
       <NumberField label={t("inspector.width") + " (mm)"} value={panel.frameMm.width} min={0.1} disabledReason={reason} onCommit={(width) => void transact([scalePanel(document, panelId, { width }, "top-left")])} />
       <NumberField label={t("inspector.height") + " (mm)"} value={panel.frameMm.height} min={0.1} disabledReason={reason} onCommit={(height) => void transact([scalePanel(document, panelId, { height }, "top-left")])} />
+      </div><p className="panel-proportion"><Icon name="lock" />{t("inspector.proportion")} · {(panel.frameMm.width / panel.frameMm.height).toFixed(2)} : 1</p><div className="panel-actions">
       <Button action="enter-crop" disabledReason={reason} onClick={() => enterCrop(panelId)}>{t("inspector.crop")}</Button>
       <Button action="panel-lock" onClick={() => void transact([{ type: "panel.setLocked", panelIds: [panelId], locked: !panel.locked }])}>
         {panel.locked ? t("panels.unlock") : t("panels.lock")}
       </Button>
       <Button action="select-its-label" onClick={() => patch({ selection: { kind: "label", panelId } })}>{t("panels.label")}</Button>
-    </section>
+      </div></section><LabelFields document={document} panelId={panelId} /></>
   );
 }
 
@@ -224,6 +225,16 @@ function LabelFields({ document, panelId }: { document: FigureDocumentV1; panelI
 
 function MultiFields({ document, ids }: { document: FigureDocumentV1; ids: string[] }) {
   const { t } = useTranslation();
+  const styles = ids.map(id => ({ ...document.labelStyle, ...document.panels[id]?.labelOverrides.typography }));
+  function common<K extends "fontId" | "fontSizePt" | "fontWeight">(key: K): FigureDocumentV1["labelStyle"][K] | "mixed" {
+    return styles.every(style => style[key] === styles[0]?.[key]) ? styles[0]?.[key] ?? document.labelStyle[key] : "mixed";
+  }
+  function setTypography(typography: NonNullable<LabelOverrides["typography"]>) {
+    void transact([{ type: "label.setOverrides", items: ids.flatMap(panelId => {
+      const panel = document.panels[panelId];
+      return panel ? [{ panelId, value: mergedOverrides(panel.labelOverrides, { typography: { ...panel.labelOverrides.typography, ...typography } }) }] : [];
+    }) }]);
+  }
   const colors = ids.map((id) => document.panels[id]?.labelOverrides.typography?.color ?? document.labelStyle.color);
   const color = colors.every((item) => item === colors[0]) ? colors[0] ?? document.labelStyle.color : "mixed";
   const tooFew = ids.length < 2 ? t("inspector.needTwo") : undefined;
@@ -244,6 +255,11 @@ function MultiFields({ document, ids }: { document: FigureDocumentV1; ids: strin
       <Button action="equal-width" disabledReason={tooFew} onClick={() => void equalSize("width")}>{t("inspector.equalWidth")}</Button>
       <Button action="equal-height" disabledReason={tooFew} onClick={() => void equalSize("height")}>{t("inspector.equalHeight")}</Button>
       <h2>{t("inspector.common")}</h2>
+      <SelectField label={t("labels.font")} value={common("fontId")} options={[{ value: "mixed", label: t("inspector.mixed") }, ...BUNDLED_FONTS.map(font => ({ value: font.fontId, label: font.family }))]}
+        onChange={fontId => { if (fontId === "noto-sans" || fontId === "noto-sans-sc") setTypography({ fontId }); }} />
+      <div className="field-pair"><NumberField label={t("labels.size") + " (pt)"} value={common("fontSizePt")} mixedLabel={t("inspector.mixed")} min={0.1} onCommit={fontSizePt => setTypography({ fontSizePt })} />
+      <SelectField label={t("labels.weight")} value={String(common("fontWeight"))} options={[{ value: "mixed", label: t("inspector.mixed") }, { value: "400", label: t("labels.regular") }, { value: "700", label: t("labels.bold") }]}
+        onChange={weight => { if (weight === "400" || weight === "700") setTypography({ fontWeight: weight === "700" ? 700 : 400 }); }} /></div>
       {color === "mixed" ? <p>{t("inspector.mixed")}</p> : null}
       <ColorField
         label={t("labels.color")}

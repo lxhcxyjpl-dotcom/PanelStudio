@@ -1,0 +1,64 @@
+Scope: 9 of 10 workspace projects
+packages/ui test$ vitest run
+packages/contracts test$ vitest run
+packages/ui test:  RUN  v5.1.0 D:/CodexData/Projects/github开源项目/PanelStudio/packages/ui
+packages/contracts test:  RUN  v5.1.0 D:/CodexData/Projects/github开源项目/PanelStudio/packages/contracts
+packages/ui test:  Test Files  1 passed (1)
+packages/ui test:       Tests  3 passed (3)
+packages/ui test:    Start at  12:00:35
+packages/ui test:    Duration  244ms (transform 56%, import 27%, tests 9%, worker 8%)
+packages/ui test: Done
+packages/contracts test:  Test Files  7 passed (7)
+packages/contracts test:       Tests  33 passed (33)
+packages/contracts test:    Start at  12:00:35
+packages/contracts test:    Duration  980ms (import 92%, tests 4%, transform 3%, worker 1%)
+packages/contracts test: Done
+packages/text-metrics test$ vitest run
+packages/svg test$ vitest run
+packages/text-metrics test:  RUN  v5.1.0 D:/CodexData/Projects/github开源项目/PanelStudio/packages/text-metrics
+packages/svg test:  RUN  v5.1.0 D:/CodexData/Projects/github开源项目/PanelStudio/packages/svg
+packages/svg test:  Test Files  1 passed (1)
+packages/svg test:       Tests  7 passed (7)
+packages/svg test:    Start at  12:00:37
+packages/svg test:    Duration  952ms (import 85%, transform 12%, tests 2%, worker 1%)
+packages/svg test: Done
+packages/text-metrics test:  Test Files  1 passed (1)
+packages/text-metrics test:       Tests  3 passed (3)
+packages/text-metrics test:    Start at  12:00:37
+packages/text-metrics test:    Duration  1.05s (import 81%, transform 9%, tests 9%, worker 1%)
+packages/text-metrics test: Done
+packages/core test$ vitest run
+packages/core test:  RUN  v5.1.0 D:/CodexData/Projects/github开源项目/PanelStudio/packages/core
+packages/core test:  Test Files  3 passed (3)
+packages/core test:       Tests  19 passed (19)
+packages/core test:    Start at  12:00:38
+packages/core test:    Duration  1.04s (import 83%, transform 11%, tests 6%, worker 1%)
+packages/core test: Done
+packages/layout test$ vitest run
+apps/web test$ vitest run
+apps/web test:  RUN  v5.1.0 D:/CodexData/Projects/github开源项目/PanelStudio/apps/web
+packages/layout test:  RUN  v5.1.0 D:/CodexData/Projects/github开源项目/PanelStudio/packages/layout
+packages/layout test:  Test Files  1 passed (1)
+packages/layout test:       Tests  30 passed (30)
+packages/layout test:    Start at  12:00:40
+packages/layout test:    Duration  1.31s (import 72%, tests 15%, transform 12%)
+packages/layout test: Done
+apps/web test:  Test Files  4 passed (4)
+apps/web test:       Tests  17 passed (17)
+apps/web test:    Start at  12:00:40
+apps/web test:    Duration  1.40s (import 79%, transform 11%, tests 10%, worker 1%)
+apps/web test: Done
+packages/ai test$ vitest run
+packages/ai test:  RUN  v5.1.0 D:/CodexData/Projects/github开源项目/PanelStudio/packages/ai
+packages/ai test:  Test Files  2 passed (2)
+packages/ai test:       Tests  13 passed (13)
+packages/ai test:    Start at  12:00:41
+packages/ai test:    Duration  1.31s (import 70%, tests 19%, transform 11%, worker 1%)
+packages/ai test: Done
+apps/server test$ vitest run
+apps/server test:  RUN  v5.1.0 D:/CodexData/Projects/github开源项目/PanelStudio/apps/server
+apps/server test:  Test Files  14 passed (14)
+apps/server test:       Tests  54 passed (54)
+apps/server test:    Start at  12:00:43
+apps/server test:    Duration  21.11s (tests 58%, import 41%, transform 1%)
+apps/server test: Done

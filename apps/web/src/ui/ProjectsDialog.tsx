@@ -1,0 +1,47 @@
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
+import { api } from "../api/client";
+import { errorText } from "../model/feedback";
+import { deleteCurrentProject, openListedProject, restoreListedProject } from "../state/session";
+import { useWorkspace } from "../state/store";
+import { queryClient } from "../state/query";
+import { Shell } from "./DialogShell";
+import { Button, Icon } from "./widgets";
+
+export function ProjectsDialog({ open }: { open: boolean }) {
+  const { t, i18n } = useTranslation();
+  const [search, setSearch] = useState("");
+  const [trash, setTrash] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [visibleCount, setVisibleCount] = useState(50);
+  const current = useWorkspace(s => s.projectId);
+  const projects = useQuery({ queryKey: ["project-library"], enabled: open,
+    queryFn: () => api.projects({ includeDeleted: true }), refetchOnMount: "always" });
+  const matches = [...(projects.data?.items ?? [])].filter(p => Boolean(p.deletedAt) === trash && p.title.toLocaleLowerCase().includes(search.toLocaleLowerCase()))
+    .sort((a,b) => b.updatedAt.localeCompare(a.updatedAt));
+  const items = matches.slice(0,visibleCount);
+  const date = new Intl.DateTimeFormat(i18n.language, { month: "short", day: "numeric" });
+  async function run(task: () => Promise<unknown>) {
+    setBusy(true); setError("");
+    try { await task(); await Promise.all([projects.refetch(), queryClient.invalidateQueries({ queryKey: ["start-projects"] })]); }
+    catch (err) { setError(errorText(err)); } finally { setBusy(false); }
+  }
+  return <Shell open={open} title={t("brand.allProjects")} className="projects-dialog">
+    <div className="project-library-tools"><label className="field"><span className="sr-only">{t("project.search")}</span><input data-testid="project-search" value={search} placeholder={t("project.search")} onChange={event => { setSearch(event.target.value); setVisibleCount(50); }} /></label>
+      <Button action="project-active" variant="quiet" aria-pressed={!trash} onClick={() => setTrash(false)}>{t("project.active")}</Button>
+      <Button action="project-trash" variant="quiet" aria-pressed={trash} onClick={() => setTrash(true)}>{t("project.trash")}</Button></div>
+    {(error || projects.isError) && <p role="alert">{error || t("route.offline")}</p>}
+    <div className="project-library-list">{items.map(project => <div className="project-library-row" key={project.id}>
+      <Icon name="sheets" /><button type="button" data-action="open-listed-project" disabled={busy || trash} onClick={() => void run(() => openListedProject(project.id))} title={project.title}>{project.title}</button>
+      <time dateTime={project.updatedAt}>{date.format(new Date(project.updatedAt))}</time>
+      {trash ? <Button action="restore-listed-project" variant="quiet" disabled={busy} onClick={() => void run(() => restoreListedProject(project.id))}>{t("toolbar.restoreProject")}</Button>
+        : <Button action="delete-listed-project" variant="quiet" disabled={busy} aria-label={t("toolbar.deleteProject") + ": " + project.title}
+          onClick={() => void run(() => project.id === current ? deleteCurrentProject() : api.deleteProject(project.id))}><Icon name="trash" /></Button>}
+    </div>)}</div>
+    {!items.length && !projects.isPending && <p className="muted">{t("project.noMatches")}</p>}
+    {projects.isPending && <p role="status">{t("app.opening")}</p>}
+    {matches.length > items.length && <Button action="more-projects" onClick={() => setVisibleCount(count=>count+50)}>{t("project.more")}</Button>}
+  </Shell>;
+}

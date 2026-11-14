@@ -1,0 +1,27 @@
+
+> @panelstudio/web@0.2.0 build D:\CodexData\Projects\github开源项目\PanelStudio\apps\web
+> vite build
+
+vite v8.3.7 building client environment for production...
+transforming...
+
+/fonts/NotoSansSC-Bold.ttf referenced in /fonts/NotoSansSC-Bold.ttf didn't resolve at build time, it will remain unchanged to be resolved at runtime
+
+/fonts/NotoSans-Regular.ttf referenced in /fonts/NotoSans-Regular.ttf didn't resolve at build time, it will remain unchanged to be resolved at runtime
+
+/fonts/NotoSansSC-Regular.ttf referenced in /fonts/NotoSansSC-Regular.ttf didn't resolve at build time, it will remain unchanged to be resolved at runtime
+
+/fonts/NotoSans-Bold.ttf referenced in /fonts/NotoSans-Bold.ttf didn't resolve at build time, it will remain unchanged to be resolved at runtime
+✓ 972 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                     0.60 kB │ gzip:   0.37 kB
+dist/assets/index-BHe5PGeW.css     66.61 kB │ gzip:  13.17 kB
+dist/assets/index-BrPq7env.js   1,170.06 kB │ gzip: 398.52 kB
+
+[plugin builtin:vite-reporter]
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 505ms

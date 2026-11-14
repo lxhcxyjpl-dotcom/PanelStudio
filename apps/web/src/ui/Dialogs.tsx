@@ -1,18 +1,17 @@
 import { Shell } from "./DialogShell";
 export { Shell } from "./DialogShell";
 import { SettingsDialog } from "./SettingsDialog";
+import { ExportDialog } from "./ExportDialog";
+import { ProjectsDialog } from "./ProjectsDialog";
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { DEFAULT_PNG_DPI, PNG_DPI_OPTIONS, SVG_SUPPORT, type ExportRequest } from "@panelstudio/contracts";
+import { SVG_SUPPORT } from "@panelstudio/contracts";
 import { api } from "../api/client";
 import { formatDiagnostic } from "../i18n/diagnostic";
-import { BUNDLED_FONTS } from "@panelstudio/contracts";
 import {
   discardDraft,
-  downloadAgain,
   downloadRecovery,
-  exportFigure,
   offerAssets,
   retrySave,
   transact,
@@ -29,6 +28,7 @@ export function Dialogs() {
       <SettingsDialog open={dialog === "settings" || dialog === "ai-settings"} initialSection={dialog === "ai-settings" ? "ai" : "general"} />
       <ShortcutsDialog open={dialog === "shortcuts"} />
       <ExportDialog open={dialog === "export"} />
+      <ProjectsDialog open={dialog === "projects"} />
       <SvgDialog open={dialog === "svg"} />
       <AssetDialog open={dialog === "asset"} />
       <RecoveryDialog open={dialog === "recovery"} />
@@ -122,64 +122,6 @@ function ShortcutsDialog({ open }: { open: boolean }) {
           ))}
         </tbody>
       </table>
-    </Shell>
-  );
-}
-
-function downloadFontBundle(): void {
-  const link = document.createElement("a");
-  link.href = "/api/v1/fonts/bundle";
-  link.download = "panelstudio-fonts.zip";
-  link.click();
-}
-
-function ExportDialog({ open }: { open: boolean }) {
-  const { t } = useTranslation();
-  const state = useWorkspace();
-  const [metadata, setMetadata] = useState(true);
-  const [dpi, setDpi] = useState<(typeof PNG_DPI_OPTIONS)[number]>(DEFAULT_PNG_DPI);
-  const [fonts, setFonts] = useState(true);
-  const revision = state.confirmed?.revision ?? 0;
-  const running = state.exportState?.status === "running" ? state.exportState : null;
-  return (
-    <Shell open={open} title={t("export.title")}>
-      <p className="export-fonts" data-testid="font-status">{t("export.fontList", { families: BUNDLED_FONTS.map((font) => font.family).join(", ") })}</p>
-      <Button action="download-fonts" title={t("export.fontBundleHint")} onClick={downloadFontBundle}>{t("export.downloadFonts")}</Button>
-      {running ? <p data-testid="export-phase">{t("export.running", { revision: running.revision, phase: running.phase })}</p> : null}
-      <Button action="export-svg" disabledReason={state.confirmed ? undefined : t("app.noProject")} onClick={() => void exportFigure({ revision, format: "svg", options: { includeMetadata: metadata } } satisfies ExportRequest)}>
-        {t("export.svg")}
-      </Button>
-      <label className="check">
-        <input type="checkbox" checked={metadata} onChange={(event) => setMetadata(event.target.checked)} />
-        {t("export.includeMetadata")}
-      </label>
-      <label className="field">
-        <span>{t("export.dpi")}</span>
-        <select value={dpi} onChange={(event) => setDpi(Number(event.target.value) as (typeof PNG_DPI_OPTIONS)[number])}>
-          {PNG_DPI_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
-        </select>
-      </label>
-      <Button action="export-png" disabledReason={state.confirmed ? undefined : t("app.noProject")} onClick={() => void exportFigure({ revision, format: "png", options: { dpi } })}>
-        {t("export.png")}
-      </Button>
-      <label className="check">
-        <input type="checkbox" checked={fonts} onChange={(event) => setFonts(event.target.checked)} />
-        {t("export.includeFonts")}
-      </label>
-      <Button action="export-project" disabledReason={state.confirmed ? undefined : t("app.noProject")} onClick={() => void exportFigure({ revision, format: "project", options: { includeBundledFonts: fonts } })}>
-        {t("export.project")}
-      </Button>
-      {state.exportState?.status === "ready" ? (
-        <>
-          <Button action="download-again" onClick={() => void downloadAgain()}>{t("export.downloadAgain")}</Button>
-          <ul data-testid="export-diagnostics">
-            {state.exportState.diagnostics.map((item, index) => (
-              <li key={`${item.code}-${index}`}>{formatDiagnostic(t, item)}</li>
-            ))}
-          </ul>
-        </>
-      ) : null}
-      {state.exportState?.status === "failed" ? <p>{state.exportState.message}</p> : null}
     </Shell>
   );
 }

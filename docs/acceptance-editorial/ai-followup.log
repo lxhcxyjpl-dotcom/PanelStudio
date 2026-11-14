@@ -1,0 +1,17 @@
+
+Running 10 tests using 1 worker
+
+
+(node:29668) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[1/10] [chromium] › apps\web\e2e\ai.spec.ts:72:3 › phase 5 AI › keeps import, layout, edit, and export working when AI is not configured
+[2/10] [chromium] › apps\web\e2e\ai.spec.ts:101:3 › phase 5 AI › compiles a fixture proposal, and the preview matches the accepted document
+[3/10] [chromium] › apps\web\e2e\ai.spec.ts:125:3 › phase 5 AI › refines the same draft three times, compares against the root, applies once and reconnects its history
+[4/10] [chromium] › apps\web\e2e\ai.spec.ts:174:3 › phase 5 AI › a deliberately held ten-second AI call leaves manual transactions responsive and returns a read-only result
+[5/10] [chromium] › apps\web\e2e\ai.spec.ts:205:3 › phase 5 AI › leaves the figure unchanged when the model output is invalid
+[6/10] [chromium] › apps\web\e2e\ai.spec.ts:218:3 › phase 5 AI › reports a provider test and a missing secret
+[7/10] [chromium] › apps\web\e2e\ai.spec.ts:237:3 › phase 5 AI › cancels a running request
+[8/10] [chromium] › apps\web\e2e\ai.spec.ts:252:3 › phase 5 AI › shows a stale proposal after the figure changes and stops a job when settings change
+[9/10] [chromium] › apps\web\e2e\ai.spec.ts:282:3 › phase 5 AI › chat composer handles Enter, multiline and IME input, and stays visible beside a draft
+[10/10] [chromium] › apps\web\e2e\publication.spec.ts:44:1 › new-project brief, configured vision images, editable proposal and adopted references
+  10 passed (38.4s)

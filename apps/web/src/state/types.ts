@@ -51,7 +51,7 @@ export type ExportState =
     }
   | { status: "failed"; message: string };
 
-export type DialogName = null | "settings" | "ai-settings" | "shortcuts" | "export" | "svg" | "asset" | "recovery" | "quota" | "guided" | "publication" | "onboarding";
+export type DialogName = null | "settings" | "ai-settings" | "shortcuts" | "export" | "svg" | "asset" | "recovery" | "quota" | "guided" | "publication" | "onboarding" | "projects";
 
 export type QuotaChoice = { assetIds: string[]; remaining: number };
 
@@ -73,6 +73,8 @@ export type FrozenScope = { scope: AIEditScope; selectedPanelIds: string[] };
 export type AwaitingAnswer = FrozenScope & { jobId: string; baseRevision: number; question: string; options: string[] };
 
 export type WorkspaceState = {
+  assetTab: "assets" | "panels";
+  inspectorMode: "properties" | "ai" | "layout";
   compareMode: "editing" | "original" | "draft";
   candidateRoot: { revision: number; document: FigureDocumentV1 } | null;
   aiHistory: AIHistoryTurn[];

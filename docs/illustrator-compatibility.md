@@ -1,5 +1,7 @@
 # Illustrator 实机验收 · PanelStudio 0.2.0
 
+**2026-11-14 更新：** editorial 分支重新导出的五组样稿，本次直接打开为 136/156；中文字体还原为 31/31，其他四组因当前实例缺少拉丁 Noto 字面而停止。见[本次记录](editorial-implementation.md)。下面保留 11 月 10 日的独立历史环境记录，不作为本次通过结论。
+
 2026-11-10 在 Windows 11 25H2（26200.9711，x64）上使用 Adobe Illustrator 2026 **30.7.0，build 114R**。五组 SVG 和 150 dpi 对照 PNG 均由本版应用从原始测试素材重新导出。检查脚本驱动本机 Illustrator 打开 SVG、访问和修改原生对象、另存为 `.ai`、关闭并重新打开。
 
 **安装仓库随附的四个 Noto 静态字面并刷新 Illustrator 后，直接打开通过 152/156 项。** 中文混排样稿中有三个编号被 Illustrator 读为 `NotoSansSC-Medium`。三个单项字体检查和一项重开后的汇总检查因此失败。在同一台机器上，对应用导出的编号运行字体包里的还原脚本，随后按相同步骤复测，**156/156 项通过**。五组中仅三个编号需要还原。完整数据见[直接打开记录](acceptance-v0.2/direct-open.json)和[还原后记录](acceptance-v0.2/illustrator/report.json)。

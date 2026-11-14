@@ -18,7 +18,7 @@ test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
     localStorage.setItem(
       "panelstudio.prefs",
-      JSON.stringify({ theme: "light", locale: "zh-CN", motion: "off", reduceTransparency: false, leftWidth: 240, rightWidth: 304 }),
+      JSON.stringify({ theme: "light", locale: "zh-CN", motion: "off", reduceTransparency: false, leftWidth: 240, rightWidth: 352 }),
     );
   });
 });
@@ -74,7 +74,7 @@ test.describe.serial("phase 5 AI", () => {
     page.on("request", (request) => {
       if (request.url().includes("/ai-layouts")) aiCalls.push(request.url());
     });
-    await page.goto("/");
+    await page.goto("/app");
     await importFigures(page, [raster, photo]);
     await page.getByRole("tab", { name: "AI 布局" }).click();
     await expect(page.getByTestId("ai-status")).toContainText("AI 尚未配置");
@@ -100,7 +100,7 @@ test.describe.serial("phase 5 AI", () => {
 
   test("compiles a fixture proposal, and the preview matches the accepted document", async ({ page }) => {
     mode = "fixture";
-    await page.goto("/");
+    await page.goto("/app");
     await configure(page, port);
     const stored = await page.request.get("/api/v1/settings/ai-provider");
     expect(await stored.text()).not.toContain(SECRET);
@@ -124,7 +124,7 @@ test.describe.serial("phase 5 AI", () => {
 
   test("refines the same draft three times, compares against the root, applies once and reconnects its history", async ({ page }) => {
     mode = "fixture";
-    await page.goto("/");
+    await page.goto("/app");
     await configure(page, port);
     await importFigures(page, [raster, photo]);
     await expect(page.getByTestId("panel-row")).toHaveCount(2);
@@ -164,6 +164,7 @@ test.describe.serial("phase 5 AI", () => {
     await page.locator("[data-action=tab-ai]").click();
     await expect(page.getByTestId("ai-turn")).toHaveCount(3);
     await expect(page.locator(".paper")).toHaveAttribute("data-view", "editing");
+    await page.locator("[data-action=ai-history-toggle]").click();
     await page.locator("[data-action=open-history-draft]").last().click();
     await expect(page.locator("[data-action=ai-apply]")).toBeDisabled();
     await page.locator("[data-action=compare-original]").click();
@@ -173,7 +174,7 @@ test.describe.serial("phase 5 AI", () => {
   test("a deliberately held ten-second AI call leaves manual transactions responsive and returns a read-only result", async ({ page }) => {
     mode = "hold";
     try {
-      await page.goto("/");
+      await page.goto("/app");
       await configure(page, port);
       await importFigures(page, [raster, photo]);
       await expect(page.getByTestId("panel-row")).toHaveCount(2);
@@ -196,7 +197,6 @@ test.describe.serial("phase 5 AI", () => {
       expect(await frames(page)).toEqual(edited);
       await page.locator("[data-action=compare-draft]").click();
       expect(await frames(page)).not.toEqual(edited);
-      await page.locator(".draft-actions summary").click();
       await page.locator("[data-action=ai-manual]").click();
       expect(await frames(page)).toEqual(edited);
     } finally { mode = "fixture"; release(); }
@@ -204,7 +204,7 @@ test.describe.serial("phase 5 AI", () => {
 
   test("leaves the figure unchanged when the model output is invalid", async ({ page }) => {
     mode = "invalid";
-    await page.goto("/");
+    await page.goto("/app");
     await importFigures(page, [raster, photo]);
     const original = await frames(page);
     await page.getByRole("tab", { name: "AI 布局" }).click();
@@ -217,7 +217,7 @@ test.describe.serial("phase 5 AI", () => {
 
   test("reports a provider test and a missing secret", async ({ page }) => {
     mode = "fixture";
-    await page.goto("/");
+    await page.goto("/app");
     await page.getByRole("button", { name: "设置" }).click();
     await page.locator("[data-action=settings-ai]").click();
     await page.getByRole("button", { name: "测试连接" }).click();
@@ -236,7 +236,7 @@ test.describe.serial("phase 5 AI", () => {
 
   test("cancels a running request", async ({ page }) => {
     mode = "hold";
-    await page.goto("/");
+    await page.goto("/app");
     await importFigures(page, [raster, photo]);
     await page.getByRole("tab", { name: "AI 布局" }).click();
     await page.getByTestId("ai-prompt").fill("把 A 向右移动 2 mm");
@@ -251,13 +251,12 @@ test.describe.serial("phase 5 AI", () => {
 
   test("shows a stale proposal after the figure changes and stops a job when settings change", async ({ page }) => {
     mode = "fixture";
-    await page.goto("/");
+    await page.goto("/app");
     await importFigures(page, [raster, photo]);
     await page.getByRole("tab", { name: "AI 布局" }).click();
     await page.getByTestId("ai-prompt").fill("把 A 向右移动 2 mm");
     await page.getByRole("button", { name: "发送" }).click();
     await expect(page.getByTestId("ai-proposal")).toBeVisible();
-    await page.locator(".draft-actions summary").click();
     await page.getByRole("button", { name: "继续手动编辑" }).click();
     await page.getByTestId("canvas").focus();
     await page.keyboard.press("Control+A");
@@ -282,7 +281,7 @@ test.describe.serial("phase 5 AI", () => {
 
   test("chat composer handles Enter, multiline and IME input, and stays visible beside a draft", async ({ page }) => {
     mode = "fixture";
-    await page.goto("/");
+    await page.goto("/app");
     await configure(page, port);
     await importFigures(page, [raster, photo]);
     await page.locator("[data-action=tab-ai]").click();
