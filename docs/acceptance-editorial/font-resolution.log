@@ -1,0 +1,11 @@
+
+Running 1 test using 1 worker
+
+
+(node:32436) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[1/1] [chromium] › apps\web\e2e\font-geometry.spec.ts:14:1 › registered ink and advance agree with Chromium rendering the same SVG text
+[chromium] › apps\web\e2e\font-geometry.spec.ts:14:1 › registered ink and advance agree with Chromium rendering the same SVG text
+Font advance residuals (mm): [{"text":"III","weight":400,"at20pxPerMm":0.00016855926513681396,"at100pxPerMm":0.000012633514404392088},{"text":"WWW","weight":400,"at20pxPerMm":-0.0008441314697247293,"at100pxPerMm":-0.0000621185302716043},{"text":"j","weight":400,"at20pxPerMm":-0.000012476158141927485,"at100pxPerMm":0.00014380722045914673},{"text":"AV","weight":400,"at20pxPerMm":0.000014678700765102803,"at100pxPerMm":0.000014678700765102803},{"text":"   ","weight":400,"at20pxPerMm":0.00034384536743203853,"at100pxPerMm":0.00003127861022989009},{"text":"(Aβ)","weight":700,"at20pxPerMm":-0.0005878814697251045,"at100pxPerMm":0.000037728881837395534},{"text":"Á","weight":700,"at20pxPerMm":0.0002208333333335588,"at100pxPerMm":0.00006466916402203537},{"text":"图(β)二","weight":400,"at20pxPerMm":-0.00041439259846853815,"at100pxPerMm":-0.0001025410970036944},{"text":"中文(A)","weight":700,"at20pxPerMm":-0.000946024068195328,"at100pxPerMm":-0.000008562215167984277}]
+
+  1 passed (4.9s)

@@ -53,6 +53,12 @@
 
 基线原有浏览器用例并非全部通过：实测曾有重复导入错误文件名定位、过期侧栏宽度预期与 AI 返回后的面板状态问题。本次按真实新流程迁移了入口和断言，保留功能性断言。测试过程中有 Windows 原生进程以 `0xC0000409` 退出的中断记录；这些中断不计为通过，最终验收使用新的隔离运行。
 
+### Linux CI 的字体采样检查
+
+首次 GitHub Linux 运行中，类型与逻辑检查通过，浏览器为 49/50。字体检查的 `III` 在 20 px/mm 的 SVG 显示比例下读到字宽 4.35 mm，与字体设计值 4.3053 mm 相差 0.0447 mm。该检查随后把字宽采样比例提高到 100 px/mm，以降低逐字像素取整对设计单位测量的影响；仍保留原来的 20 px/mm 墨迹栅格检查，**0.03 mm 字宽与 0.11 mm 墨迹阈值均未放宽**。字体文件、度量内核和产品图稿渲染没有为此修改。
+
+[Windows 采样对照](acceptance-editorial/font-resolution.log)记录全部九组字符在两个比例下的偏差并通过原断言。Linux 的后续结果以 [PR #9 检查](https://github.com/lxhcxyjpl-dotcom/PanelStudio/pull/9/checks)为准，首轮失败没有计入通过。Chromium 的 [Linux 字体渲染参数](https://chromium.googlesource.com/chromium/src/+/HEAD/ui/gfx/font_render_params_linux.h)区分了整数/子像素字形定位；实际误差是否收敛由运行记录确认。
+
 ## Illustrator：单独实机检查，尚有字体环境项
 
 用当前代码重新导出五组样稿，在 Illustrator **30.7.0 / 114R** 中检查画板、剪切框、原生文字和路径、独立图块移动、透明度、渐变、保存为 `.ai` 后重开。
