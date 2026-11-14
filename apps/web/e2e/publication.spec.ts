@@ -45,7 +45,7 @@ test("new-project brief, configured vision images, editable proposal and adopted
   const errors:string[]=[];
   page.on("pageerror",e=>errors.push(e.message));
   await page.addInitScript(()=>localStorage.setItem("panelstudio.prefs",JSON.stringify({theme:"light",locale:"zh-CN",motion:"off"})));
-  await page.goto("/");
+  await page.goto("/app");
   const files=[1,1,1.5].map((ratio,i)=>({
     name:["control","condition","quantification"][i]+".svg",mimeType:"image/svg+xml",
     buffer:Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 '+ratio*40+' 40"><rect width="'+ratio*40+'" height="40" fill="'+["#668977","#8a7165","#bdcaaf"][i]+'"/></svg>'),
@@ -73,12 +73,15 @@ test("new-project brief, configured vision images, editable proposal and adopted
     baseUrl:"http://127.0.0.1:"+port+"/v1",capabilities:{imageInput:true,structuredOutput:"json_object"},allowLocalEndpoint:true})).ok()).toBe(true);
   expect((await write("/api/v1/settings/ai-provider/secret",{secret:"ephemeral-browser-vision"})).ok()).toBe(true);
   await page.reload();
-  await expect(page.getByTestId("layout-button")).toHaveText("按内容排版");
-  await page.getByTestId("layout-button").click();
+  await expect(page.getByTestId("layout-button")).toHaveText("一键排版");
+  await page.locator("[data-action=tab-ai]").click();
+  await page.locator("[data-action=ai-content-layout]").click();
   await expect(page.getByTestId("ai-proposal")).toBeVisible();
   expect(seen[0]!.scene.publicationContext).toEqual(original.document.publicationContext);
   const content=seen[0]!.wire.messages.find(m=>m.role==="user")!.content;
   expect(Array.isArray(content) && content.filter(p=>p.type==="image_url").length).toBe(4);
+  await expect(page.locator("[data-action=ai-apply]")).toBeInViewport();
+  await expect(page.locator("[data-action=ai-discard]")).toBeInViewport();
   await page.screenshot({animations:"disabled",path:path.join(output,"content-proposal.png")});
   await page.locator('[data-action="ai-apply"]').click();
   await expect(page.getByTestId("save-status")).toHaveText("已保存");
@@ -89,7 +92,6 @@ test("new-project brief, configured vision images, editable proposal and adopted
   await page.locator('[data-action="ai-content-layout"]').click();
   await expect(page.getByTestId("ai-proposal")).toBeVisible();
   expect(seen.at(-1)!.scene.layoutExamples?.some(r=>r.origin==="accepted")).toBe(true);
-  await page.locator(".draft-actions summary").click();
   await page.locator('[data-action="ai-discard"]').click();
   await page.getByTestId("export-button").click();
   const pending=page.waitForEvent("download");

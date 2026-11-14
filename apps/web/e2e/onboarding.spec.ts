@@ -27,7 +27,7 @@ async function checkTypeAndBounds(page: Page) {
 test("welcome can be skipped and reopened; the tour leads to an editable sample and export", async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", error => errors.push(error.message));
-  await page.goto("/");
+  await page.goto("/app");
   await expect(page.locator("[data-action=start-onboarding]")).toBeVisible();
   await page.screenshot({ animations: "disabled", path: path.join(output, "home-desktop.png") });
   await page.locator("[data-action=start-onboarding]").click();
@@ -63,7 +63,7 @@ test("welcome can be skipped and reopened; the tour leads to an editable sample 
 });
 
 test("home brief survives import; preferences save and remain editable after reload", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/app");
   await page.locator("[data-action=start-idea-comparison]").click();
   const message = "比较处理组与对照组，突出定量结果。";
   await page.getByTestId("start-brief").fill(message);
@@ -93,7 +93,7 @@ test("home brief survives import; preferences save and remain editable after rel
 test("small dark English screens keep the guide, brief, and conversation usable with four sizes", async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 740 });
   await page.addInitScript(() => localStorage.setItem("panelstudio.prefs", JSON.stringify({ theme: "dark", locale: "en-US", motion: "off" })));
-  await page.goto("/");
+  await page.goto("/app");
   await checkTypeAndBounds(page);
   await page.screenshot({ animations: "disabled", path: path.join(output, "home-mobile-dark.png") });
   await page.locator("[data-action=open-onboarding]").click();

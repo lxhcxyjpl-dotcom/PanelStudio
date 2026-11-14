@@ -1,0 +1,8 @@
+
+Running 1 test using 1 worker
+
+
+(node:56120) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[1/1] [chromium] › apps\web\e2e\editorial.spec.ts:59:1 › real recorded geometry plays once, pauses, compares and exports the demonstrated SVG
+  1 passed (22.0s)

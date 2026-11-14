@@ -17,7 +17,7 @@ async function snapshot(page: Page): Promise<{document:FigureDocumentV1;document
 }
 test.beforeEach(async ({page}) => {
   await page.addInitScript(() => localStorage.setItem("panelstudio.prefs",JSON.stringify({locale:"zh-CN",motion:"off"})));
-  await page.goto("/");
+  await page.goto("/app");
   await page.getByTestId("import-input").setInputFiles([1,2,3].map(i => image(i+".svg",'<rect width="400" height="240" fill="#426c89"/>')));
   await expect(page.locator(".panel-frame")).toHaveCount(3);
   await expect(page.getByTestId("save-status")).toHaveText("已保存");

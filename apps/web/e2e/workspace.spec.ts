@@ -20,14 +20,14 @@ test.beforeEach(async ({ page }) => {
         motion: "off",
         reduceTransparency: false,
         leftWidth: 240,
-        rightWidth: 304,
+        rightWidth: 352,
       }),
     );
   });
 });
 
 test("imports, lays out, accepts, and exports through the real API", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/app");
   await expect(page.getByRole("heading", { name: "创建科研组图" })).toBeVisible();
   const layoutCalls: string[] = [];
   page.on("request", (request) => {
@@ -66,7 +66,7 @@ test("imports, lays out, accepts, and exports through the real API", async ({ pa
 });
 
 test("completes undo, layout, and export from the keyboard", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/app");
   await importFigures(page, [raster, photo]);
   await expect(page.getByTestId("panel-row")).toHaveCount(2);
   await page.getByTestId("canvas").focus();
@@ -90,7 +90,7 @@ test("completes undo, layout, and export from the keyboard", async ({ page }) =>
 });
 
 test("shows empty history, import failure, save failure, conflict, stale candidate, and font warning", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/app");
   await page.locator("[data-action=empty-import]").focus();
   await page.keyboard.press("Control+Z");
   await expect(page.getByTestId("live")).toContainText("没有可撤销的操作");
@@ -133,7 +133,7 @@ test("shows empty history, import failure, save failure, conflict, stale candida
 });
 
 test("reports a real layout conflict and restores the project after reload", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/app");
   await importFigures(page, [raster, photo]);
   await expect(page.getByTestId("panel-row")).toHaveCount(2);
   const minWidth = page.getByTestId("min-width");
@@ -154,17 +154,17 @@ test("reports a real layout conflict and restores the project after reload", asy
 });
 
 test("switches theme tokens and English copy", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/app");
   await expect(page.getByRole("button", { name: "导入图片" })).toBeVisible();
   const light = await token(page, "--ui-background");
-  expect(light).toBe("#FAF9F5");
+  expect(light).toBe("#F7F7F5");
   const surface = await page.locator(".toolbar").evaluate((node) => getComputedStyle(node).backgroundColor);
-  expect(surface).toBe("rgb(250, 249, 245)");
+  expect(surface).toBe("rgb(255, 255, 255)");
   await page.getByRole("button", { name: "设置" }).click();
   await page.getByLabel("主题").selectOption("dark");
-  await expect.poll(() => token(page, "--ui-background")).toBe("#22221F");
+  await expect.poll(() => token(page, "--ui-background")).toBe("#1C1C1B");
   const darkSurface = await page.locator(".toolbar").evaluate((node) => getComputedStyle(node).backgroundColor);
-  expect(darkSurface).toBe("rgb(38, 38, 34)");
+  expect(darkSurface).toBe("rgb(36, 36, 35)");
   await page.getByLabel("语言").selectOption("en-US");
   await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
   await page.getByRole("button", { name: "Close" }).click();
@@ -176,12 +176,12 @@ test("switches theme tokens and English copy", async ({ page }) => {
 });
 
 test("keeps three columns at 1440, 1280, and 1024", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/app");
   await importFigures(page, [raster, photo]);
   for (const [width, left, right] of [
-    [1440, 240, 304],
-    [1280, 240, 304],
-    [1024, 208, 280],
+    [1440, 240, 352],
+    [1280, 240, 352],
+    [1024, 208, 320],
   ] as const) {
     await page.setViewportSize({ width, height: 900 });
     await expect.poll(async () => Math.round((await page.getByTestId("left-sidebar").boundingBox())?.width ?? 0)).toBe(left);
@@ -198,10 +198,10 @@ test("zeroes spatial motion when reduced motion is on", async ({ page }) => {
   await page.addInitScript(() => {
     localStorage.setItem(
       "panelstudio.prefs",
-      JSON.stringify({ theme: "light", locale: "zh-CN", motion: "system", reduceTransparency: true, leftWidth: 240, rightWidth: 304 }),
+      JSON.stringify({ theme: "light", locale: "zh-CN", motion: "system", reduceTransparency: true, leftWidth: 240, rightWidth: 352 }),
     );
   });
-  await page.goto("/");
+  await page.goto("/app");
   await expect(page.locator("html")).toHaveAttribute("data-reduce-motion", "true");
   await expect(page.locator("html")).toHaveAttribute("data-reduce-transparency", "true");
   const spatial = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--dur-spatial").trim());
@@ -212,7 +212,7 @@ test("zeroes spatial motion when reduced motion is on", async ({ page }) => {
 
 test("opens a recent figure and uses both sidebars and the reference form on a phone", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("/");
+  await page.goto("/app");
   const pageWidth = () => page.evaluate(() => document.documentElement.scrollWidth);
   await expect(page.getByRole("heading", { name: "创建科研组图" })).toBeVisible();
   await expect.poll(pageWidth).toBe(390);

@@ -13,11 +13,15 @@ PanelStudio 是一个本地或自部署的科研多面板排版编辑器。导�
 3. 应用草案后，直接移动编号、拖动整组或多选对象，或在面板列表中调整编号顺序。选中两个或三个完整单元，可在指定区域内按原尺寸、等宽或等高排成一行。
 4. 导出可编辑 SVG。图块、支持的原生路径和文字、栅格素材保持独立。编号的屏幕预览和布局使用内置 Noto 字体的实际度量。
 
-![新版工作台中的六面板工程](docs/screenshots/studio-workspace.webp)
+![PanelStudio 品牌首页](docs/screenshots/editorial/home-desktop.png)
 
-首页可先描述图稿目标、导入图片、打开工程包，或继续最近编辑的项目。右上角书本按钮提供三步「快速上手」，首次访问也会显示入口。编辑时可从左上角 **PanelStudio → 返回工作台首页** 切回。[对话交互与新手引导](docs/v0.3-conversation-ui.md) · [参考图与偏好窗口](docs/screenshots/studio-reference.webp)
+本分支加入独立品牌首页 `/`：四类示例轮播与可暂停的编辑过程回放均来自实际导入、排版、事务和导出。`/app` 继续最近项目，`/app/:projectId` 直接打开图稿。返回首页保留编辑视图和未发送的 AI 输入。界面严格使用 **13 / 15 / 24 / 56 px** 四档字号，科研图稿内部文字保留原始文档字号。
 
-[可复现的六图工程](examples/refinement-six/) · [实机界面录像](docs/demo/v0.2-refinement.webm) · [本机 Illustrator 验收记录](docs/illustrator-compatibility.md)
+![重构后的科研组图工作区](docs/screenshots/editorial/editor-desktop.png)
+
+布局候选移到右侧，切换时不压缩画布。检查器支持单图几何与编号、多选统一字体/字号/字重/颜色；AI 展示结构化修改和折叠历史。导出窗口明确显示已保存修订号，可选择 SVG、PNG 或工程包。原有参考图、排版目标、服务连接和连续草案精修功能保留。
+
+[53 秒实际运行录像](docs/demo/editorial-studio.webm) · [设计系统](docs/editorial-design-system.md) · [逐项交付与回归记录](docs/editorial-implementation.md) · [四类原创合成示例](examples/showcase/)
 
 工具栏的 **参考图与偏好** 支持上传期刊组图、写下构图要求，或同时使用两者。可以指定主图、相邻对比、画布方向与面板间距，再预览候选。参考图在浏览器内识别，识别框可手动调整。参见[六图排版对照、工程包与 Illustrator 样稿](examples/reference-preferences/)。
 
@@ -25,7 +29,7 @@ v0.3 开发中的 **按内容排版** 支持填写目标期刊、研究领域、
 
 在 **设置 → AI 连接** 中选择服务商，填写服务地址、模型与 API 密钥，可一次保存并测试。支持 DeepSeek、OpenAI、OpenRouter、Ollama 快捷项及自定义 Chat Completions 兼容服务；协议细节与本地地址选项收在高级设置中。[连接方式、内页调整与验证范围](docs/v0.3-connection-ui.md)。
 
-在本机 Illustrator 30.7 中，中文混排样稿直接打开时出现字重替换。若遇到同一情况，可运行导出字体包中的编号字体还原脚本，再保存为 .ai。五组样稿的复测结果见上方实机验收记录。
+本次 Illustrator 30.7 实机直接打开通过 136/156 项，剩余项涉及编号字体替换；中文样稿经还原为 31/31，其余四组还原因当前实例缺少拉丁 Noto 字面而停止。浏览器与导出回归和原生字体环境分开报告，详见[本次实测记录](docs/editorial-implementation.md)。
 
 ## 运行
 

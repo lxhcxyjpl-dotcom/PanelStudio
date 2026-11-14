@@ -18,12 +18,13 @@ import {
 } from "../state/session";
 import { patch, useWorkspace } from "../state/store";
 import { baseDocument } from "../state/types";
-import { Button, Icon } from "./widgets";
+import { Button, Icon, TabBar } from "./widgets";
 
 export function LeftSidebar() {
   const { t } = useTranslation();
   const state = useWorkspace();
-  const [tab, setTab] = useState<"assets" | "panels">("assets");
+  const tab = state.assetTab;
+  const setTab = (assetTab: "assets" | "panels") => patch({ assetTab });
   const [openPanels, setOpenPanels] = useState<Record<string, boolean>>({});
   const width = sidebarWidth("left", state.mode, state.leftWidth);
   const assets = useQuery({
@@ -32,7 +33,8 @@ export function LeftSidebar() {
     queryFn: () => api.assets(state.projectId ?? ""),
   });
   const document = baseDocument(state);
-  const visible = (assets.data?.items ?? []).filter((asset) => !asset.removedFromLibraryAt);
+  const visible = (assets.data?.items ?? []).filter((asset) => !asset.removedFromLibraryAt &&
+    !(asset.status === "failed" && state.imports.some(row => row.status === "failed" && row.filename === asset.originalFilename)));
   const completed = state.imports.filter((row) => row.status === "ready").length;
   const pending = state.imports.filter((row) => row.status !== "ready");
   return (
@@ -43,17 +45,12 @@ export function LeftSidebar() {
       style={{ width }}
       aria-label={t("a11y.left")}
     >
-      <div className="tabs" role="tablist">
-        <button type="button" data-action="tab-assets" role="tab" aria-selected={tab === "assets"} onClick={() => setTab("assets")}>
-          <Icon name="image" />{t("assets.tab")}
-        </button>
-        <button type="button" data-action="tab-panels" role="tab" aria-selected={tab === "panels"} onClick={() => setTab("panels")}>
-          <Icon name="layers" />{t("panels.tab")}
-        </button>
-      </div>
+      <TabBar id="asset-tabs" value={tab} onChange={setTab} label={t("a11y.left")} items={[
+        { value: "assets", label: t("assets.tab"), action: "tab-assets" }, { value: "panels", label: t("panels.tab"), action: "tab-panels" },
+      ]} />
       <Button action="close-assets" className="drawer-close" variant="quiet" aria-label={t("a11y.close")}
         onClick={() => patch({leftOpen:false})}><Icon name="close" /></Button>
-      <div className="side-scroll">
+      <div className="side-scroll" role="tabpanel" id="asset-tabs-panel" aria-labelledby={"asset-tabs-" + tab}>
         {tab === "assets" ? (
           <section className="section asset-library">
             <div className="library-title"><h2>{t("assets.available")}</h2><span>{visible.length}</span></div>
@@ -232,7 +229,7 @@ function PanelList({ openPanels, onToggle }: { openPanels: Record<string, boolea
               </button>
               {state.projectId ? <img className="row-thumb" alt="" draggable={false} src={thumbnailUrl(state.projectId, panel.assetId)} /> : null}
               <span className="row-label">{label?.text ?? "–"}</span>
-              <span className="row-name">{panel.name}</span>
+              <span className="row-name" title={panel.name}>{panel.name}</span>
               <Button
                 action="expand-panel"
                 aria-label={expanded ? t("panels.collapse") : t("panels.expand")}

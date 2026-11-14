@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import type { AIHistoryTurn, PromptPreset } from "@panelstudio/contracts";
 import { api } from "../api/client";
 import { formatDiagnostic } from "../i18n/diagnostic";
-import { labelName, proposalChanges, type ProposalChange } from "../model/changes";
+import { labelName, proposalChanges, unchangedPanelCount, type ProposalChange } from "../model/changes";
 import { localizedSummary } from "../model/chrome";
 import { acceptCandidate, sendAiPrompt } from "../state/session";
 import { activeScope, cancelAiPrompt, continueEditing, dismissCandidates, openHistoryTurn, refreshAiHistory, selectCandidate, setPrompt, setScope } from "../state/candidate-session";
@@ -21,6 +21,8 @@ function savedPresets(): PromptPreset[] {
 }
 function changeLine(t: ReturnType<typeof useTranslation>["t"], line: ProposalChange) {
   if (line.kind === "lock") return t(line.locked ? "ai.changeLock" : "ai.changeUnlock", { label: line.label });
+  if (line.kind === "labelSize" || line.kind === "labelColor") return (line.label ? `${line.label} · ` : "") + t("refine." + line.kind, { ...line });
+  if (line.kind === "crop" || line.kind === "order") return t("refine." + line.kind, { ...line });
   const key = { canvas: "changeCanvas", gutter: "changeGutter", labels: "changeLabels", move: "changeMove", size: "changeSize", text: "renumber",
     style: "changeStyle", labelPosition: "changeLabelPosition", labelVisibility: "changeLabelVisibility", layoutSettings: "changeLayoutSettings", canvasSettings: "changeCanvasSettings" }[line.kind];
   return t("ai." + key, { ...line });
@@ -50,6 +52,7 @@ export function AiPanel() {
   const stale = candidatesStale(state) || Boolean(state.awaitingAnswer && state.awaitingAnswer.baseRevision !== state.confirmed?.revision);
   const clarification = state.awaitingAnswer;
   const changes = parent && state.candidateRoot ? proposalChanges(state.candidateRoot.document, parent.previewDocument) : [];
+  const unchanged = parent && state.candidateRoot ? unchangedPanelCount(state.candidateRoot.document, parent.previewDocument) : 0;
   const prompt = state.aiPrompt;
   const reason = !configured ? t("ai.notConfigured") : running ? t("ai.running") : !prompt.trim() ? t("ai.prompt") :
     frozen.scope === "selection" && !frozen.selectedPanelIds.length ? t("reason.empty-selection") : undefined;
@@ -69,7 +72,7 @@ export function AiPanel() {
     if (olderPosition.current) {
       element.scrollTop = olderPosition.current.top + element.scrollHeight - olderPosition.current.height;
       olderPosition.current = null;
-    } else if (atEnd.current) element.scrollTop = state.aiHistory.length || parent || running || clarification ? element.scrollHeight : 0;
+    } else if (atEnd.current) element.scrollTop = 0;
   }, [state.aiHistory, state.aiStatus.phase, parent?.id, clarification]);
   const send = (fromCurrent: boolean) => {
     if (!reason) { goToEnd(); void sendAiPrompt(prompt, { includePreviewImage: imageInput && includePreview, visualReview: imageInput && review, fromCurrent }); }
@@ -79,6 +82,7 @@ export function AiPanel() {
   const empty = !state.aiHistory.length && !parent && !clarification && !running;
 
   return <section className="section ai-panel" data-testid="ai-panel">
+    <div className="refine-scope"><span>{t("refine.scope")}</span><strong>{frozen.scope === "selection" ? scopeNames || t("reason.empty-selection") : t("ai.scopeAll", { count: scopeDoc?.panelOrder.length ?? 0 })}</strong></div>
     <div className="ai-context">
       <Button action="publication-context" variant="quiet" className="ai-brief" onClick={() => patch({ dialog: "publication" })}>
         <span className="ai-brief-icon"><Icon name="sliders" /></span>
@@ -103,8 +107,7 @@ export function AiPanel() {
         });
       }}>{t("ai.older")}</Button>}
       {empty && <div className="ai-welcome">
-        <span className="assistant-emblem"><Icon name="spark" /></span>
-        <h2>{t("ai.welcome")}</h2><p>{t("ai.welcomeHint")}</p>
+        <p>{t("ai.welcomeHint")}</p>
         {!configured ? <div className="ai-connection">
           <p data-testid="ai-status">{provider.isError ? t("ai.connectionError") : t("ai.connectHint")}</p>
           <Button action="ai-settings" onClick={() => patch({ dialog: "ai-settings" })}><Icon name="settings" />{t("ai.connect")}</Button>
@@ -113,7 +116,40 @@ export function AiPanel() {
           {examples.slice(0, 3).map(key => <Button key={key} action="fill-example" variant="quiet" onClick={() => fill(t("example." + key))}>{t("example." + key)}<Icon name="arrowRight" /></Button>)}
         </div>
       </div>}
-      {state.aiHistory.length > 0 && <ol className="ai-timeline" aria-label={t("ai.history")}>
+      {!empty && !configured && <div className="ai-connection"><p data-testid="ai-status">{t("ai.notConfigured")}</p>
+        <Button action="ai-settings" onClick={() => patch({ dialog: "ai-settings" })}>{t("ai.connect")}</Button></div>}
+      {state.aiStatus.phase === "running" && <div className="ai-progress" role="status" data-testid="ai-status">
+        {!state.aiHistory.some(turn => turn.jobId === (state.aiStatus.phase === "running" ? state.aiStatus.jobId : null)) && <div className="chat-user"><p>{state.aiStatus.prompt}</p></div>}
+        <span className="assistant-signature"><Icon name="spark" />PanelStudio</span><p className="thinking-label"><span className="thinking-dot" />{state.aiStatus.label}</p>
+      </div>}
+      {state.aiStatus.phase === "failed" && <p className="ai-notice" role="status" data-testid="ai-status">{state.aiStatus.message}</p>}
+      {state.aiStatus.phase === "cancelled" && <p className="ai-notice" role="status" data-testid="ai-status">{t("ai.cancelled")}</p>}
+      {state.aiStatus.phase === "unsupported" && <p className="ai-notice" role="status" data-testid="ai-status">{state.aiStatus.reason}</p>}
+      {clarification && !running && <div className="ai-question" data-testid="ai-question">
+        <p>{clarification.question}</p>
+        <div className="answer-options">{clarification.options.map(option => <Button key={option} action="ai-option" disabled={stale} onClick={() => fill(option)}>{option}</Button>)}</div>
+      </div>}
+      {parent && <div className="ai-preview" data-testid="ai-proposal">
+        <div className="draft-heading"><Icon name="sheets" /><h2>{t("ai.proposalTitle")}</h2><span>{t("ai.notApplied")}</span></div>
+        <p data-testid="ai-summary">{localizedSummary(parent.summary, state.locale)}</p>
+        <div className="compare-tabs" aria-label={t("ai.compare")}>
+          <Button action="compare-original" aria-pressed={state.compareMode === "original"} onClick={() => selectCandidate(parent.id, "original")}>{t("ai.original")}</Button>
+          <Button action="compare-draft" aria-pressed={state.compareMode === "draft"} onClick={() => selectCandidate(parent.id, "draft")}>{t("ai.draft")}</Button>
+        </div>
+        <div className="proposal-primary-actions"><Button action="ai-apply" variant="primary" disabledReason={stale ? t("ai.stale") : running ? t("ai.running") : undefined} onClick={() => void acceptCandidate()}><Icon name="check" />{t("ai.apply")}</Button>
+          <Button action="ai-discard" variant="quiet" disabled={running} onClick={dismissCandidates}>{t("ai.discard")}</Button></div>
+        <div className="draft-details"><ul className="change-list">{changes.map((line, i) => <li key={i} data-testid="ai-change"><span>{changeLine(t, line)}</span>
+          {line.kind === "move" && <span className="change-values numeric-text">{line.dx !== 0 && <>X {line.beforeX} → {line.afterX} mm</>}{line.dx !== 0 && line.dy !== 0 && <br />}{line.dy !== 0 && <>Y {line.beforeY} → {line.afterY} mm</>}</span>}
+        </li>)}</ul>{!changes.length && <p>{t("refine.noChanges")}</p>}
+          {unchanged > 0 && <p className="unchanged-summary">{t("refine.unchanged", { count: unchanged })}</p>}
+        </div>
+        {parent.diagnostics.map((d, i) => <p className="muted" key={i}>{formatDiagnostic(t, d)}</p>)}
+        <div className="ai-actions draft-actions">
+          <Button action="ai-refine" variant="quiet" disabled={running || stale} onClick={() => fill("")}>{t("ai.refine")}</Button>
+          <Button action="ai-manual" variant="quiet" onClick={continueEditing}>{t("layout.manual")}</Button>
+        </div>
+      </div>}
+      {state.aiHistory.length > 0 && <details className="refine-history"><summary data-action="ai-history-toggle">{t("refine.history")} · {state.aiHistory.length}</summary><ol className="ai-timeline" aria-label={t("ai.history")}>
         {[...state.aiHistory].reverse().map(turn => {
           const current = parent?.sourceJobId === turn.jobId;
           const historic = turnStale(turn);
@@ -133,41 +169,7 @@ export function AiPanel() {
             </div>}
           </li>;
         })}
-      </ol>}
-      {!empty && !configured && <div className="ai-connection"><p data-testid="ai-status">{t("ai.notConfigured")}</p>
-        <Button action="ai-settings" onClick={() => patch({ dialog: "ai-settings" })}>{t("ai.connect")}</Button></div>}
-      {state.aiStatus.phase === "running" && <div className="ai-progress" role="status" data-testid="ai-status">
-        {!state.aiHistory.some(turn => turn.jobId === (state.aiStatus.phase === "running" ? state.aiStatus.jobId : null)) && <div className="chat-user"><p>{state.aiStatus.prompt}</p></div>}
-        <span className="assistant-signature"><Icon name="spark" />PanelStudio</span><p className="thinking-label"><span className="thinking-dot" />{state.aiStatus.label}</p>
-      </div>}
-      {state.aiStatus.phase === "failed" && <p className="ai-notice" role="status" data-testid="ai-status">{state.aiStatus.message}</p>}
-      {state.aiStatus.phase === "cancelled" && <p className="ai-notice" role="status" data-testid="ai-status">{t("ai.cancelled")}</p>}
-      {state.aiStatus.phase === "unsupported" && <p className="ai-notice" role="status" data-testid="ai-status">{state.aiStatus.reason}</p>}
-      {clarification && !running && <div className="ai-question" data-testid="ai-question">
-        <p>{clarification.question}</p>
-        <div className="answer-options">{clarification.options.map(option => <Button key={option} action="ai-option" disabled={stale} onClick={() => fill(option)}>{option}</Button>)}</div>
-      </div>}
-      {parent && <div className="ai-preview" data-testid="ai-proposal">
-        <div className="draft-heading"><Icon name="sheets" /><h2>{t("ai.proposalTitle")}</h2><span>{t("ai.notApplied")}</span></div>
-        {card?.previewUrl && <img className="draft-thumbnail" src={card.previewUrl} alt={t("ai.previewAlt")} onLoad={() => { if (atEnd.current) goToEnd(); }} />}
-        <p data-testid="ai-summary">{localizedSummary(parent.summary, state.locale)}</p>
-        {changes.length > 0 && <details className="draft-details"><summary>{t("ai.changeCount", { count: changes.length })}</summary>
-          <ul className="change-list">{changes.map((line, i) => <li key={i} data-testid="ai-change">{changeLine(t, line)}</li>)}</ul>
-        </details>}
-        {parent.diagnostics.map((d, i) => <p className="muted" key={i}>{formatDiagnostic(t, d)}</p>)}
-        <div className="compare-tabs" aria-label={t("ai.compare")}>
-          <Button action="compare-original" aria-pressed={state.compareMode === "original"} onClick={() => selectCandidate(parent.id, "original")}>{t("ai.original")}</Button>
-          <Button action="compare-draft" aria-pressed={state.compareMode === "draft"} onClick={() => selectCandidate(parent.id, "draft")}>{t("ai.draft")}</Button>
-        </div>
-        <Button action="ai-apply" variant="primary" disabledReason={stale ? t("ai.stale") : running ? t("ai.running") : undefined} onClick={() => void acceptCandidate()}><Icon name="check" />{t("ai.apply")}</Button>
-        <div className="ai-actions draft-actions">
-          <Button action="ai-refine" variant="quiet" disabled={running || stale} onClick={() => fill("")}>{t("ai.refine")}</Button>
-          <details><summary aria-label={t("ai.draftOptions")}><Icon name="more" /></summary>
-            <Button action="ai-manual" variant="quiet" onClick={continueEditing}>{t("layout.manual")}</Button>
-            <Button action="ai-discard" variant="quiet" disabled={running} onClick={dismissCandidates}>{t("ai.discard")}</Button>
-          </details>
-        </div>
-      </div>}
+      </ol></details>}
     </div>
     {awayFromEnd && <Button action="ai-latest" className="latest-message" onClick={goToEnd}><Icon name="import" />{t("ai.latest")}</Button>}
     <div className="ai-compose-dock">

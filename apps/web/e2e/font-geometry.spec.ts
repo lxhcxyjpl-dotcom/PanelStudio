@@ -12,7 +12,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../.
 const metricsUrl = "/@fs/" + path.join(root, "packages/text-metrics/src/index.ts").replaceAll("\\", "/");
 
 test("registered ink and advance agree with Chromium rendering the same SVG text", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/app");
   const cases = await page.evaluate(async (url) => {
     const metrics: typeof import("../../../packages/text-metrics/src/index.js") = await import(url);
     await metrics.initializeLabelFonts();

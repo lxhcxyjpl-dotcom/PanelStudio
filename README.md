@@ -13,15 +13,19 @@ PanelStudio is a local or self-hosted editor for multi-panel scientific figures.
 3. Drag individual labels, rigid groups or selected panels. Reorder the panel list to change lettering. Arrange two or three selected units into a row, preserving their sizes or using a common width or height.
 4. Export editable SVG. The editor uses the bundled Noto faces to measure label ink and keeps text, supported vectors and raster images editable in their respective forms.
 
-![Six-panel project in the studio workspace](docs/screenshots/studio-workspace.webp)
+![PanelStudio editorial homepage](docs/screenshots/editorial/home-desktop.png)
 
-Import images, open a project file, or resume a recent project from the start screen. Choose **PanelStudio → Back to workspace home** to return there. The editorial image on the start screen is AI-generated. [Start screen](docs/screenshots/studio-home.webp) · [Reference & preferences](docs/screenshots/studio-reference.webp)
+The editorial branch adds a dedicated homepage at `/`, with a four-example carousel and a pausable replay built from real import, layout, transaction and export states. `/app` resumes the last project; `/app/:projectId` opens a figure directly. Returning home keeps the editing view and unsent AI input. The UI uses only 13 / 15 / 24 / 56 px type roles; scientific artwork keeps its document typography.
 
-[Reproducible project](examples/refinement-six/) · [Recorded walkthrough](docs/demo/v0.2-refinement.webm) · [Illustrator acceptance](docs/illustrator-compatibility.md)
+![Scientific figure in the redesigned workspace](docs/screenshots/editorial/editor-desktop.png)
+
+Layout candidates now occupy the right inspector without shrinking the canvas. The inspector includes single-panel labels and common multi-selection typography; AI presents structured changes and collapsed history. Export identifies the saved revision and selects SVG, PNG or a project package. Existing reference layouts, publication briefs, provider settings and continuous draft refinement remain available.
+
+[53-second running-product recording](docs/demo/editorial-studio.webm) · [Design system](docs/editorial-design-system.md) · [Delivery and regression evidence](docs/editorial-implementation.md) · [Four original synthetic examples](examples/showcase/)
 
 Use **Reference & preferences** to upload a reference figure, describe your preferred composition, or combine both. Review the detected regions and adjust the emphasis, pairings, canvas shape and panel gap before previewing candidates. Image analysis runs in the browser. See the [six-panel comparison and editable files](examples/reference-preferences/).
 
-On the tested Illustrator 30.7 installation, direct SVG import substituted a Medium face for three labels in the bold CJK sample. The font download includes a label-only restoration script. All five sets passed the native checks with the intended fonts after restoration.
+The latest native Illustrator run passed 136/156 direct-open checks; the remaining checks concern substituted label fonts. CJK restoration passed 31/31, while four other restoration cases stopped because this instance lacked the requested Latin Noto faces. This is separate from browser/export regression and from the historical fully provisioned-font run. See the [current native results and prerequisite](docs/editorial-implementation.md#illustrator单独实机检查尚有字体环境项).
 
 ## Run
 

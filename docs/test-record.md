@@ -1,5 +1,11 @@
 # Test record
 
+## Editorial Studio · 14 November 2026
+
+Based on local checkpoint `c3d15b4`, on independent branch `design/editorial-studio`. Type checking passed across nine packages/apps; **179 logic tests passed**; the full browser run passed **50/50**; the final AI button placement passed an additional **10/10** targeted cases. Production build passed. Real browser zoom at 200% completed SVG download with no horizontal overflow.
+
+[Delivery, screenshots, recording, commands, native Illustrator limitations and logs](editorial-implementation.md) are recorded separately from the historical versions below. The native run was **136/156 direct-open checks**, not a full pass; CJK restoration passed 31/31, while four other restoration cases stopped for missing Latin Noto faces in the current Illustrator instance. No live paid model or user project database was used.
+
 ## v0.2.0 · 10 November 2026
 
 Windows 11 25H2, build 26200.9711, Node.js 24.15.0, pnpm 10.33.4, Playwright 1.65.0 with Chromium 158.0.8127.18. Every integration or browser run used a dedicated development database. A repository checkout at `47a7011` provided the 0.1 comparison.

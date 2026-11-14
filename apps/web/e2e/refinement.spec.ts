@@ -7,7 +7,7 @@ test.beforeEach(async ({ page }) => {
     await page.locator('[data-action="skip-publication"]').click();
   });
   await page.addInitScript(() => localStorage.setItem("panelstudio.prefs", JSON.stringify({ theme: "light", motion: "on", locale: "zh-CN" })));
-  await page.goto("/");
+  await page.goto("/app");
   const files = [2, 1, 1.5].map((ratio, i) => ({
     name: `panel-${i + 1}.svg`, mimeType: "image/svg+xml",
     buffer: Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${40 * ratio} 40"><rect width="${40 * ratio}" height="40" fill="#777"/></svg>`),

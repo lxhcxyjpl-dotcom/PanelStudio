@@ -37,7 +37,7 @@ for (const { width, locale } of [{ width: 1440, locale: "zh-CN" }, { width: 320,
     await page.setViewportSize({ width, height: 900 });
     await page.addInitScript(locale => localStorage.setItem("panelstudio.prefs",
       JSON.stringify({ locale, theme: locale === "en-US" ? "dark" : "light", motion: "off" })), locale);
-    await page.goto("/");
+    await page.goto("/app");
     const title = page.getByRole("heading", { level: 1 });
     const headingSize = width < 760 ? uiFontSizes.heading : uiFontSizes.display;
     await expect(title).toHaveCSS("font-size", headingSize + "px");

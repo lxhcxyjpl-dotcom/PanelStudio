@@ -19,7 +19,7 @@ import { api, ApiClientError, newKey, thumbnailUrl, waitForJob, type AssetPage }
 import { i18n } from "../i18n";
 import { cropInvalid, geometryLocked, groupForPanel, mergedOverrides, panelIdsOf } from "../model/document-ui";
 import { placePanelCommands } from "../model/place";
-import { readProjectId, writeProjectId } from "../prefs";
+import { writeProjectId } from "../prefs";
 import { clearRecovery, readRecovery, writeRecovery, type RecoveryDraft } from "./drafts";
 import { queryClient } from "./query";
 import { patch, syncChrome, useWorkspace } from "./store";
@@ -27,6 +27,8 @@ import { errorText } from "../model/feedback";
 import { resolvePanelLabel } from "@panelstudio/core/labels";
 import { belongsToProject, dismissCandidates, generateAi, generateLayout, projectEpoch, refreshAiHistory, resetCandidateSession } from "./candidate-session";
 import { baseDocument, candidatesStale, type Confirmed, type ImportRow, type PendingDraft } from "./types";
+import { adoptProjectPath, commitPath, navigate, projectPath, useNavigation } from "../navigation";
+import { cancelGesture } from "../ui/gesture";
 
 import rasterUrl from "../../../../fixtures/mixed/raster.png";
 import photoUrl from "../../../../fixtures/mixed/photo.jpg";
@@ -34,7 +36,9 @@ import vectorUrl from "../../../../fixtures/mixed/panel-vector.svg";
 
 let chain: Promise<void> = Promise.resolve();
 const activeImports = new Set<Promise<void>>();
-let bootStarted = false;
+let bootPromise: Promise<void> | null = null;
+let loadingProject = 0;
+let creatingProject: Promise<string | null> | null = null;
 let nudgeTimer = 0;
 let nudge: { ids: string[]; dx: number; dy: number; kind: "panels" | "label"; projectId: string; epoch: number } | null = null;
 
@@ -99,9 +103,11 @@ async function remember(draft: PendingDraft | null, projectId: string | null): P
   await writeRecovery(recoveryOf(draft, projectId));
 }
 
-export async function boot(): Promise<void> {
-  if (bootStarted) return;
-  bootStarted = true;
+export function boot(): Promise<void> {
+  return bootPromise ??= initializeSession();
+}
+
+async function initializeSession(): Promise<void> {
   const state = useWorkspace.getState();
   syncChrome(state);
   const media = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -113,24 +119,16 @@ export async function boot(): Promise<void> {
     patch({ backend: "down", booting: false, saveState: "offline" });
     return;
   }
-  const projectId = readProjectId();
-  if (!projectId) {
-    patch({ booting: false });
-    return;
-  }
-  try {
-    await loadProject(projectId, true);
-  } catch {
-    writeProjectId(null);
-    patch({ projectId: null, booting: false, liveMessage: i18n.t("app.projectMissing") });
-  }
+  patch({ booting: false });
 }
 
-export async function loadProject(projectId: string, fromBoot = false): Promise<void> {
+export async function loadProject(projectId: string, isCurrent: () => boolean = () => true): Promise<void> {
+  const ticket = ++loadingProject;
+  const [project, document, assets] = await Promise.all([api.project(projectId), api.document(projectId), api.assets(projectId)]);
+  if (ticket !== loadingProject || !isCurrent()) return;
+  if (project.deletedAt) throw new Error(i18n.t("route.deleted"));
   cancelNudge();
   const epoch = resetCandidateSession(projectId);
-  const [project, document, assets] = await Promise.all([api.project(projectId), api.document(projectId), api.assets(projectId)]);
-  if (epoch !== projectEpoch()) return;
   queryClient.setQueryData(["assets", projectId], assets);
   writeProjectId(projectId);
   const confirmed: Confirmed = {
@@ -160,7 +158,6 @@ export async function loadProject(projectId: string, fromBoot = false): Promise<
     dialog: null,
   });
   void refreshAiHistory(true);
-  if (!fromBoot) return;
   const saved = await readRecovery(projectId).catch(() => null);
   if (!belongsToProject(projectId, epoch) || !saved || saved.pendingCommands.length === 0) return;
   patch({
@@ -176,6 +173,47 @@ export async function loadProject(projectId: string, fromBoot = false): Promise<
     dialog: "recovery",
     liveMessage: i18n.t(saved.baseRevision === confirmed.revision ? "save.failed" : "save.conflict"),
   });
+}
+
+/** Settle edits before leaving; keep the original session if recovery is needed. */
+export async function prepareNavigation(): Promise<boolean> {
+  if (typeof document !== "undefined" && document.activeElement instanceof HTMLElement) document.activeElement.blur();
+  cancelGesture();
+  if (useWorkspace.getState().crop) {
+    useNavigation.setState({ notice: i18n.t("route.finishCrop") });
+    return false;
+  }
+  while (activeImports.size) await Promise.allSettled([...activeImports]);
+  const epoch = projectEpoch();
+  if (nudge) await flushNudge();
+  await chain;
+  if (epoch !== projectEpoch()) return false;
+  const state = useWorkspace.getState();
+  if (state.draft) {
+    await remember(state.draft, state.projectId);
+    patch({ dialog: "recovery", liveMessage: i18n.t("save.failed") });
+    return false;
+  }
+  return true;
+}
+
+export function hasUnsettledEdits(): boolean {
+  const state = useWorkspace.getState();
+  return activeImports.size > 0 || Boolean(nudge || state.draft || state.optimistic || state.interaction || state.crop) || state.saveState === "saving";
+}
+
+export function newProject(askForContext = false): Promise<string | null> {
+  if (creatingProject) return creatingProject;
+  creatingProject = (async () => {
+    if (!await prepareNavigation()) return null;
+    const title = i18n.t("project.untitled");
+    const created = await api.createProject(title, newKey());
+    await loadProject(created.project.id);
+    patch({ imports: [], startMessage: "", ...(askForContext ? { dialog: "publication" as const } : {}) });
+    adoptProjectPath(created.project.id);
+    return created.project.id;
+  })().finally(() => { creatingProject = null; });
+  return creatingProject;
 }
 
 export async function ensureProject(askForContext = true): Promise<string> {
@@ -201,6 +239,7 @@ export async function ensureProject(askForContext = true): Promise<string> {
     selection: { kind: "none" },
     ...(askForContext ? { dialog: "publication" as const } : {}),
   });
+  adoptProjectPath(created.project.id, true);
   return created.project.id;
 }
 
@@ -215,13 +254,9 @@ export function reloadFromServer(): Promise<void> {
 }
 
 export function openListedProject(projectId: string): Promise<void> {
-  const state = useWorkspace.getState();
-  if (state.draft && state.projectId && state.projectId !== projectId) {
-    patch({ dialog: "recovery", liveMessage: i18n.t("save.conflict") });
-    return Promise.resolve();
-  }
-  if (state.projectId === projectId) return reloadFromServer();
-  return loadProject(projectId);
+  return navigate(projectPath(projectId)).then(opened => {
+    if (opened && useWorkspace.getState().dialog === "projects") patch({ dialog: null });
+  });
 }
 
 export async function deleteCurrentProject(): Promise<void> {
@@ -236,18 +271,11 @@ export async function deleteCurrentProject(): Promise<void> {
   await clearRecovery(projectId);
   if (useWorkspace.getState().projectId !== projectId) return;
   showStart(i18n.t("toolbar.projectDeleted"));
+  commitPath("/app", "replace");
 }
 
 export async function returnToStart(): Promise<void> {
-  const epoch = projectEpoch();
-  await Promise.allSettled([...activeImports]);
-  if (epoch !== projectEpoch()) return;
-  if (nudge) await flushNudge();
-  await chain;
-  if (epoch !== projectEpoch()) return;
-  const state = useWorkspace.getState();
-  if (state.draft) return patch({ dialog: "recovery", liveMessage: i18n.t("save.failed") });
-  showStart(i18n.t("toolbar.home"));
+  await navigate("/");
 }
 
 function showStart(message: string): void {
@@ -292,7 +320,7 @@ export async function restoreListedProject(projectId: string): Promise<void> {
     return;
   }
   await api.restoreProject(projectId, newKey());
-  await loadProject(projectId);
+  await openListedProject(projectId);
   patch({ liveMessage: i18n.t("toolbar.projectRestored") });
 }
 
@@ -380,6 +408,7 @@ export function placeAssets(assetIds: string[]): Promise<void> {
 }
 
 export async function openSample(): Promise<void> {
+  if (useWorkspace.getState().confirmed && !await newProject(false)) return;
   patch({ startMessage: "" });
   await ensureProject(false);
   const files = await Promise.all([
@@ -680,6 +709,7 @@ async function flushNudge(): Promise<void> {
 }
 
 export async function requestLayout(request: LayoutRequest = { family: "auto" }) {
+  patch({ inspectorMode: "layout", rightOpen: true });
   const epoch = projectEpoch();
   if (nudge) await flushNudge();
   await chain;
@@ -736,10 +766,12 @@ export function acceptCandidate(): Promise<void> {
 export async function exportFigure(request: ExportRequest): Promise<void> {
   const state = useWorkspace.getState();
   if (!state.projectId || !state.confirmed) return;
+  const epoch = projectEpoch();
   patch({ exportState: { status: "running", revision: request.revision, phase: "export" }, dialog: "export" });
   try {
     const accepted = await api.exportFigure(state.projectId, request, newKey());
     const job = await waitForJob(accepted.jobId);
+    if (!belongsToProject(state.projectId, epoch)) return;
     patch({ exportState: { status: "running", revision: request.revision, phase: job.phase } });
     if (job.status !== "succeeded" || !job.result || !("artifactId" in job.result)) {
       patch({
@@ -751,6 +783,7 @@ export async function exportFigure(request: ExportRequest): Promise<void> {
       return;
     }
     const file = await api.download(`/artifacts/${job.result.artifactId}/download`);
+    if (!belongsToProject(state.projectId, epoch)) return;
     clickDownload(file.blob, file.filename);
     const diagnostics = "diagnostics" in job.result ? job.result.diagnostics : [];
     patch({
@@ -765,6 +798,7 @@ export async function exportFigure(request: ExportRequest): Promise<void> {
       liveMessage: i18n.t("export.downloadAgain"),
     });
   } catch (error) {
+    if (!belongsToProject(state.projectId, epoch)) return;
     patch({ exportState: { status: "failed", message: errorText(error) } });
   }
 }
@@ -808,16 +842,27 @@ export async function removeAsset(assetId: string): Promise<void> {
 }
 
 export async function importPackage(file: File): Promise<void> {
+  if (!await prepareNavigation()) return;
+  const pending = importPackageNow(file);
+  activeImports.add(pending);
+  return pending.finally(() => activeImports.delete(pending));
+}
+
+async function importPackageNow(file: File): Promise<void> {
   try {
     const accepted = await api.importPackage(file, newKey());
     const job = await waitForJob(accepted.jobId);
     if (job.status !== "succeeded" || !job.result || !("projectId" in job.result)) {
-      say(job.status === "failed" ? job.error.message : i18n.t("errors.generic"));
+      const message = job.status === "failed" ? job.error.message : i18n.t("errors.generic");
+      say(message);
+      useNavigation.setState({ notice: message });
       return;
     }
     await loadProject(job.result.projectId);
+    adoptProjectPath(job.result.projectId);
   } catch (error) {
     say(errorText(error));
+    useNavigation.setState({ notice: errorText(error) });
   }
 }
 
@@ -946,6 +991,7 @@ export function activeGroupId(document: FigureDocumentV1, panelId: string): stri
 }
 
 export async function sendAiPrompt(prompt: string, options: Parameters<typeof generateAi>[1]) {
+  patch({ inspectorMode: "ai", rightOpen: true });
   if (["撤销", "撤消", "undo"].includes(prompt.trim().toLowerCase())) return undo();
   const epoch = projectEpoch();
   if (nudge) await flushNudge();

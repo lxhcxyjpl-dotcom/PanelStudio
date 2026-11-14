@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, type CSSProperties, type PointerEvent as ReactPointerEvent, type RefObject } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ARTWORK_COLOR_PRESETS, type DomainCommand, type FigureDocumentV1 } from "@panelstudio/contracts";
+import { type DomainCommand, type FigureDocumentV1 } from "@panelstudio/contracts";
 import { applyCommands } from "@panelstudio/core/apply";
 import { scalePanel, translateSelection } from "@panelstudio/core/arrange";
 import { contentPlacement, type FrameAnchor } from "@panelstudio/core/geometry";
@@ -136,7 +136,7 @@ export function CanvasStage() {
                   transform: `translate(${panel.frameMm.x * px}px, ${panel.frameMm.y * px}px)`,
                   width: panel.frameMm.width * px,
                   height: panel.frameMm.height * px,
-                  boxShadow: selected ? `0 0 0 1px ${ARTWORK_COLOR_PRESETS[1]}, 0 0 0 2px var(--document-paper)` : undefined,
+                  boxShadow: selected ? "0 0 0 1px var(--ui-accent), 0 0 0 2px var(--document-paper)" : undefined,
                 }}
                 onPointerDown={(event) => {
                   event.stopPropagation();

@@ -33,8 +33,8 @@ describe("theme tokens", () => {
     const rendered = renderThemeCss();
     if (process.env.WRITE_TOKENS === "1") writeFileSync(cssPath, rendered);
     expect(readFileSync(cssPath, "utf8")).toBe(rendered);
-    expect(rendered).toContain("--ui-background: #FAF9F5;");
-    expect(rendered).toContain("--ui-surfaceElevated: #30302A;");
+    expect(rendered).toContain("--ui-background: #F7F7F5;");
+    expect(rendered).toContain("--ui-surfaceElevated: #2C2C2A;");
     expect(rendered).toContain("--document-labelDefault: #000000;");
   });
 });
@@ -42,10 +42,10 @@ describe("theme tokens", () => {
 describe("design metrics", () => {
   it("keeps the editor sizes, type, and motion", () => {
     expect(metrics.designReferencePx).toEqual({ width: 1440, height: 900 });
-    expect(metrics.topBarHeightPx).toBe(64);
+    expect(metrics.topBarHeightPx).toBe(60);
     expect(metrics.leftSidebarPx).toEqual({ default: 240, min: 208, max: 320 });
     expect(metrics.rightSidebarPx).toEqual({ default: 352, min: 320, max: 420 });
-    expect(metrics.radiusPx).toEqual({ input: 7, button: 8, menu: 12, dialog: 16 });
+    expect(metrics.radiusPx).toEqual({ input: 6, button: 6, menu: 8, dialog: 12 });
     expect(motion.easing).toBe("cubic-bezier(0.2, 0, 0, 1)");
     expect(motion.durationMs.buttonPress).toBe(70);
     expect(motion.buttonPressScale).toBe(0.985);

@@ -1,0 +1,19 @@
+Scope: 9 of 10 workspace projects
+packages/contracts typecheck$ tsc --noEmit -p tsconfig.json
+packages/ui typecheck$ tsc --noEmit -p tsconfig.json
+packages/ui typecheck: Done
+packages/contracts typecheck: Done
+packages/svg typecheck$ tsc --noEmit -p tsconfig.json
+packages/text-metrics typecheck$ tsc --noEmit -p tsconfig.json
+packages/svg typecheck: Done
+packages/text-metrics typecheck: Done
+packages/core typecheck$ tsc --noEmit -p tsconfig.json
+packages/core typecheck: Done
+packages/layout typecheck$ tsc --noEmit -p tsconfig.json
+apps/web typecheck$ tsc --noEmit -p tsconfig.json
+packages/layout typecheck: Done
+apps/web typecheck: Done
+packages/ai typecheck$ tsc --noEmit -p tsconfig.json
+packages/ai typecheck: Done
+apps/server typecheck$ tsc --noEmit -p tsconfig.json
+apps/server typecheck: Done

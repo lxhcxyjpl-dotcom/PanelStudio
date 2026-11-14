@@ -1,0 +1,1060 @@
+{
+  "version": 1,
+  "examples": [
+    {
+      "id": "single-cell",
+      "synthetic": true,
+      "replay": "recorded-domain-commands",
+      "source": "examples/showcase/generate.py",
+      "states": {
+        "imported": {
+          "revision": 1,
+          "documentHash": "26a6f45be142886c28702ecba9e678d39b48fb65798908fd36be5e05c3586fe9",
+          "width": 180,
+          "height": 120,
+          "panels": [
+            {
+              "id": "91ec5af6-378b-410e-8cac-38ab0a2c6f63",
+              "src": "/showcase/single-cell-0.svg",
+              "frame": {
+                "x": 4,
+                "y": 4,
+                "width": 42,
+                "height": 30.081081081081084
+              },
+              "label": {
+                "text": "A",
+                "x": 4,
+                "y": 3,
+                "size": 3.175,
+                "font": "Noto Sans",
+                "weight": 700,
+                "color": "#000000"
+              }
+            },
+            {
+              "id": "0039d166-caec-48be-b96e-d2ea06b4b3da",
+              "src": "/showcase/single-cell-1.svg",
+              "frame": {
+                "x": 50,
+                "y": 4,
+                "width": 42,
+                "height": 30.081081081081084
+              },
+              "label": {
+                "text": "B",
+                "x": 50,
+                "y": 3,
+                "size": 3.175,
+                "font": "Noto Sans",
+                "weight": 700,
+                "color": "#000000"
+              }
+            },
+            {
+              "id": "681bb109-8760-4da6-ad70-f014e07ec257",
+              "src": "/showcase/single-cell-2.svg",
+              "frame": {
+                "x": 96,
+                "y": 4,
+                "width": 42,
+                "height": 30.081081081081084
+              },
+              "label": {
+                "text": "C",
+                "x": 96,
+                "y": 3,
+                "size": 3.175,
+                "font": "Noto Sans",
+                "weight": 700,
+                "color": "#000000"
+              }
+            },
+            {
+              "id": "37c388ea-7e89-4a56-83fd-f03891101dbb",
+              "src": "/showcase/single-cell-3.svg",
+              "frame": {
+                "x": 4,
+                "y": 38.08108108108108,
+                "width": 42,
+                "height": 30.081081081081084
+              },
+              "label": {
+                "text": "D",
+                "x": 4,
+                "y": 37.08108108108108,
+                "size": 3.175,
+                "font": "Noto Sans",
+                "weight": 700,
+                "color": "#000000"
+              }
+            },
+            {
+              "id": "984a6e40-3784-4365-ac18-03f384737dfb",
+              "src": "/showcase/single-cell-4.svg",
+              "frame": {
+                "x": 50,
+                "y": 38.08108108108108,
+                "width": 42,
+                "height": 30.081081081081084
+              },
+              "label": {
+                "text": "E",
+                "x": 50,
+                "y": 37.08108108108108,
+                "size": 3.175,
+                "font": "Noto Sans",
+                "weight": 700,
+                "color": "#000000"
+              }
+            },
+            {
+              "id": "ffbf367b-f0d2-4995-88f8-622a62084d0c",
+              "src": "/showcase/single-cell-5.svg",
+              "frame": {
+                "x": 96,
+                "y": 38.08108108108108,
+                "width": 42,
+                "height": 30.081081081081084
+              },
+              "label": {
+                "text": "F",
+                "x": 96,
+                "y": 37.08108108108108,
+                "size": 3.175,
+                "font": "Noto Sans",
+                "weight": 700,
+                "color": "#000000"
+              }
+            }
+          ]
+        },
+        "arranged": {
+          "revision": 2,
+          "documentHash": "ccff50d38acd548b35ba016e079d39b09cea0fdd699d57e4a59ecf6e0aba9b6f",
+          "width": 180,
+          "height": 93.60500630630631,
+          "panels": [
+            {
+              "id": "91ec5af6-378b-410e-8cac-38ab0a2c6f63",
+              "src": "/showcase/single-cell-0.svg",
+              "frame": {
+                "x": 4,
+                "y": 7.2987,
+                "width": 54.666666666666664,
+                "height": 39.153153153153156
+              },
+              "label": {
+                "text": "A",
+                "x": 4,
+                "y": 6.2987,
+                "size": 3.175,
+                "font": "Noto Sans",
+                "weight": 700,
+                "color": "#000000"
+              }
+            },
+            {
+              "id": "0039d166-caec-48be-b96e-d2ea06b4b3da",
+              "src": "/showcase/single-cell-1.svg",
+              "frame": {
+                "x": 62.666666666666664,
+                "y": 7.2987,
+                "width": 54.666666666666664,
+                "height": 39.153153153153156
+              },
+              "label": {
+                "text": "B",
+                "x": 62.666666666666664,
+                "y": 6.2987,
+                "size": 3.175,
+                "font": "Noto Sans",
+                "weight": 700,
+                "color": "#000000"
+              }
+            },
+            {
+              "id": "681bb109-8760-4da6-ad70-f014e07ec257",
+              "src": "/showcase/single-cell-2.svg",
+              "frame": {
+                "x": 121.33333333333333,
+                "y": 7.2987,
+                "width": 54.666666666666664,
+                "height": 39.153153153153156
+              },
+              "label": {
+                "text": "C",
+                "x": 121.33333333333333,
+                "y": 6.2987,
+                "size": 3.175,
+                "font": "Noto Sans",
+                "weight": 700,
+                "color": "#000000"
+              }
+            },
+            {
+              "id": "37c388ea-7e89-4a56-83fd-f03891101dbb",
+              "src": "/showcase/single-cell-3.svg",
+              "frame": {
+                "x": 4,
+                "y": 50.45185315315315,
+                "width": 54.666666666666664,
+                "height": 39.153153153153156
+              },
+              "label": {
+                "text": "D",
+                "x": 4,
+                "y": 49.45185315315315,
+                "size": 3.175,
+                "font": "Noto Sans",
+                "weight": 700,
+                "color": "#000000"
+              }
+            },
+            {
+              "id": "984a6e40-3784-4365-ac18-03f384737dfb",
+              "src": "/showcase/single-cell-4.svg",
+              "frame": {
+                "x": 62.666666666666664,
+                "y": 50.45185315315315,
+                "width": 54.666666666666664,
+                "height": 39.153153153153156
+              },
+              "label": {
+                "text": "E",
+                "x": 62.666666666666664,
+                "y": 49.45185315315315,
+                "size": 3.175,
+                "font": "Noto Sans",
+                "weight": 700,
+                "color": "#000000"
+              }
+            },
+            {
+              "id": "ffbf367b-f0d2-4995-88f8-622a62084d0c",
+              "src": "/showcase/single-cell-5.svg",
+              "frame": {
+                "x": 121.33333333333333,
+                "y": 50.45185315315315,
+                "width": 54.666666666666664,
+                "height": 39.153153153153156
+              },
+              "label": {
+                "text": "F",
+                "x": 121.33333333333333,
+                "y": 49.45185315315315,
+                "size": 3.175,
+                "font": "Noto Sans",
+                "weight": 700,
+                "color": "#000000"
+              }
+            }
+          ]
+        },
+        "refined": {
+          "revision": 3,
+          "documentHash": "6b5a0c76ddfd367b71ff8f14e8045b1e076ed94caa6cf09353b7012445c76963",
+          "width": 180,
+          "height": 93.60500630630631,
+          "panels": [
+            {
+              "id": "91ec5af6-378b-410e-8cac-38ab0a2c6f63",
+              "src": "/showcase/single-cell-0.svg",
+              "frame": {
+                "x": 4,
+                "y": 7.2987,
+                "width": 54.666666666666664,
+                "height": 39.153153153153156
+              },
+              "label": {
+                "text": "A",
+                "x": 4,
+                "y": 6.2987,
+                "size": 3.175,
+                "font": "Noto Sans",
+                "weight": 700,
+                "color": "#000000"
+              }
+            },
+            {
+              "id": "0039d166-caec-48be-b96e-d2ea06b4b3da",
+              "src": "/showcase/single-cell-1.svg",
+              "frame": {
+                "x": 64.66666666666666,
+                "y": 7.2987,
+                "width": 54.666666666666664,
+                "height": 39.153153153153156
+              },
+              "label": {
+                "text": "B",
+                "x": 64.66666666666666,
+                "y": 6.2987,
+                "size": 3.175,
+                "font": "Noto Sans",
+                "weight": 700,
+                "color": "#000000"
+              }
+            },
+            {
+              "id": "681bb109-8760-4da6-ad70-f014e07ec257",
+              "src": "/showcase/single-cell-2.svg",
+              "frame": {
+                "x": 123.33333333333333,
+                "y": 7.2987,
+                "width": 54.666666666666664,
+                "height": 39.153153153153156
+              },
+              "label": {
+                "text": "C",
+                "x": 123.33333333333333,
+                "y": 6.2987,
+                "size": 3.175,
+                "font": "Noto Sans",
+                "weight": 700,
+                "color": "#000000"
+              }
+            },
+            {
+              "id": "37c388ea-7e89-4a56-83fd-f03891101dbb",
+              "src": "/showcase/single-cell-3.svg",
+              "frame": {
+                "x": 4,
+                "y": 50.45185315315315,
+                "width": 54.666666666666664,
+                "height": 39.153153153153156
+              },
+              "label": {
+                "text": "D",
+                "x": 4,
+                "y": 49.45185315315315,
+                "size": 3.175,
+                "font": "Noto Sans",
+                "weight": 700,
+                "color": "#000000"
+              }
+            },
+            {
+              "id": "984a6e40-3784-4365-ac18-03f384737dfb",
+              "src": "/showcase/single-cell-4.svg",
+              "frame": {
+                "x": 62.666666666666664,
+                "y": 50.45185315315315,
+                "width": 54.666666666666664,
+                "height": 39.153153153153156
+              },
+              "label": {
+                "text": "E",
+                "x": 62.666666666666664,
+                "y": 49.45185315315315,
+                "size": 3.175,
+                "font": "Noto Sans",
+                "weight": 700,
+                "color": "#000000"
+              }
+            },
+            {
+              "id": "ffbf367b-f0d2-4995-88f8-622a62084d0c",
+              "src": "/showcase/single-cell-5.svg",
+              "frame": {
+                "x": 121.33333333333333,
+                "y": 50.45185315315315,
+                "width": 54.666666666666664,
+                "height": 39.153153153153156
+              },
+              "label": {
+                "text": "F",
+                "x": 121.33333333333333,
+                "y": 49.45185315315315,
+                "size": 3.175,
+                "font": "Noto Sans",
+                "weight": 700,
+                "color": "#000000"
+              }
+            }
+          ]
+        }
+      },
+      "exports": {
+        "svg": {
+          "url": "/showcase/single-cell.svg",
+          "sha256": "579dd4c5ef91596722c190ee0503bec0ea571093a5bc3efab66bd3f8ad4c3d42",
+          "diagnostics": []
+        },
+        "png": {
+          "url": "/showcase/single-cell.png",
+          "sha256": "6f7ceaea871f031a489b6cc7d2e3b57000a6db811efb19b0f389c6362e7a656f",
+          "diagnostics": []
+        },
+        "project": {
+          "url": "/showcase/single-cell.figurezip",
+          "sha256": "2b38e9491bd0311680aff23aab0605e88b1a60d9fb002bfc9972d173d09f5ae5",
+          "diagnostics": []
+        }
+      },
+      "roundTripHash": "6b5a0c76ddfd367b71ff8f14e8045b1e076ed94caa6cf09353b7012445c76963"
+    },
+    {
+      "id": "molecular",
+      "synthetic": true,
+      "replay": "recorded-domain-commands",
+      "source": "examples/showcase/generate.py",
+      "states": {
+        "imported": {
+          "revision": 1,
+          "documentHash": "6f79786adb367a22215a0edff8c5828d265ce1bda79f745b631b1cff717015ac",
+          "width": 180,
+          "height": 120,
+          "panels": [
+            {
+              "id": "4c3355ee-5daa-4aed-9c06-836ef9f10b1a",
+              "src": "/showcase/molecular-0.svg",
+              "frame": {
+                "x": 4,
+                "y": 4,
+                "width": 42,
+                "height": 30.081081081081084
+              },
+              "label": {
+                "text": "A",
+                "x": 4,
+                "y": 3,
+                "size": 3.175,
+                "font": "Noto Sans",
+                "weight": 700,
+                "color": "#000000"
+              }
+            },
+            {
+              "id": "bec251a9-54b1-47ce-a02b-382215b85b46",
+              "src": "/showcase/molecular-1.svg",
+              "frame": {
+                "x": 50,
+                "y": 4,
+                "width": 42,
+                "height": 30.081081081081084
+              },
+              "label": {
+                "text": "B",
+                "x": 50,
+                "y": 3,
+                "size": 3.175,
+                "font": "Noto Sans",
+                "weight": 700,
+                "color": "#000000"
+              }
+            },
+            {
+              "id": "ab82a39c-fa03-47a6-894b-10f67655ffb3",
+              "src": "/showcase/molecular-2.svg",
+              "frame": {
+                "x": 96,
+                "y": 4,
+                "width": 42,
+                "height": 30.081081081081084
+              },
+              "label": {
+                "text": "C",
+                "x": 96,
+                "y": 3,
+                "size": 3.175,
+                "font": "Noto Sans",
+                "weight": 700,
+                "color": "#000000"
+              }
+            }
+          ]
+        },
+        "arranged": {
+          "revision": 2,
+          "documentHash": "3d77fe08e2132272223363869d62e606f785980ebf97d1db843ce23768353b13",
+          "width": 180,
+          "height": 50.45185315315315,
+          "panels": [
+            {
+              "id": "4c3355ee-5daa-4aed-9c06-836ef9f10b1a",
+              "src": "/showcase/molecular-0.svg",
+              "frame": {
+                "x": 4,
+                "y": 7.2987,
+                "width": 54.666666666666664,
+                "height": 39.153153153153156
+              },
+              "label": {
+                "text": "A",
+                "x": 4,
+                "y": 6.2987,
+                "size": 3.175,
+                "font": "Noto Sans",
+                "weight": 700,
+                "color": "#000000"
+              }
+            },
+            {
+              "id": "bec251a9-54b1-47ce-a02b-382215b85b46",
+              "src": "/showcase/molecular-1.svg",
+              "frame": {
+                "x": 62.666666666666664,
+                "y": 7.2987,
+                "width": 54.666666666666664,
+                "height": 39.153153153153156
+              },
+              "label": {
+                "text": "B",
+                "x": 62.666666666666664,
+                "y": 6.2987,
+                "size": 3.175,
+                "font": "Noto Sans",
+                "weight": 700,
+                "color": "#000000"
+              }
+            },
+            {
+              "id": "ab82a39c-fa03-47a6-894b-10f67655ffb3",
+              "src": "/showcase/molecular-2.svg",
+              "frame": {
+                "x": 121.33333333333333,
+                "y": 7.2987,
+                "width": 54.666666666666664,
+                "height": 39.153153153153156
+              },
+              "label": {
+                "text": "C",
+                "x": 121.33333333333333,
+                "y": 6.2987,
+                "size": 3.175,
+                "font": "Noto Sans",
+                "weight": 700,
+                "color": "#000000"
+              }
+            }
+          ]
+        },
+        "refined": {
+          "revision": 3,
+          "documentHash": "b18cc4586440b51e2ddd6b94a2b3de417f3d3b12a0990e3df0104747b12e3ddb",
+          "width": 180,
+          "height": 50.45185315315315,
+          "panels": [
+            {
+              "id": "4c3355ee-5daa-4aed-9c06-836ef9f10b1a",
+              "src": "/showcase/molecular-0.svg",
+              "frame": {
+                "x": 4,
+                "y": 7.2987,
+                "width": 54.666666666666664,
+                "height": 39.153153153153156
+              },
+              "label": {
+                "text": "A",
+                "x": 4,
+                "y": 6.2987,
+                "size": 3.175,
+                "font": "Noto Sans",
+                "weight": 700,
+                "color": "#000000"
+              }
+            },
+            {
+              "id": "bec251a9-54b1-47ce-a02b-382215b85b46",
+              "src": "/showcase/molecular-1.svg",
+              "frame": {
+                "x": 64.66666666666666,
+                "y": 7.2987,
+                "width": 54.666666666666664,
+                "height": 39.153153153153156
+              },
+              "label": {
+                "text": "B",
+                "x": 64.66666666666666,
+                "y": 6.2987,
+                "size": 3.175,
+                "font": "Noto Sans",
+                "weight": 700,
+                "color": "#000000"
+              }
+            },
+            {
+              "id": "ab82a39c-fa03-47a6-894b-10f67655ffb3",
+              "src": "/showcase/molecular-2.svg",
+              "frame": {
+                "x": 123.33333333333333,
+                "y": 7.2987,
+                "width": 54.666666666666664,
+                "height": 39.153153153153156
+              },
+              "label": {
+                "text": "C",
+                "x": 123.33333333333333,
+                "y": 6.2987,
+                "size": 3.175,
+                "font": "Noto Sans",
+                "weight": 700,
+                "color": "#000000"
+              }
+            }
+          ]
+        }
+      },
+      "exports": {
+        "svg": {
+          "url": "/showcase/molecular.svg",
+          "sha256": "f69ced65191a416d6d1ff20437fc9483ec51e8ff83261c9618f461759101862b",
+          "diagnostics": []
+        },
+        "png": {
+          "url": "/showcase/molecular.png",
+          "sha256": "2305b269c6731e560ca34fba6d7716acb6365508129129a20781cf4fee86c487",
+          "diagnostics": []
+        },
+        "project": {
+          "url": "/showcase/molecular.figurezip",
+          "sha256": "ed1257145ad287c036c4e05d9f24661209a2262fc8b5bb08a5890e23c94b25d7",
+          "diagnostics": []
+        }
+      },
+      "roundTripHash": "b18cc4586440b51e2ddd6b94a2b3de417f3d3b12a0990e3df0104747b12e3ddb"
+    },
+    {
+      "id": "microscopy",
+      "synthetic": true,
+      "replay": "recorded-domain-commands",
+      "source": "examples/showcase/generate.py",
+      "states": {
+        "imported": {
+          "revision": 1,
+          "documentHash": "442bbd6845b7d3a25ae68a5f5cf8078e4de4259e8af014c2e22beac0d630a061",
+          "width": 180,
+          "height": 120,
+          "panels": [
+            {
+              "id": "e22609d5-023f-4ff9-8334-56f259a8349c",
+              "src": "/showcase/microscopy-0.png",
+              "frame": {
+                "x": 4,
+                "y": 4,
+                "width": 42,
+                "height": 31.5
+              },
+              "label": {
+                "text": "A",
+                "x": 4,
+                "y": 3,
+                "size": 3.175,
+                "font": "Noto Sans",
+                "weight": 700,
+                "color": "#000000"
+              }
+            },
+            {
+              "id": "ec756de7-7291-47f9-a119-a23be4df9c71",
+              "src": "/showcase/microscopy-1.png",
+              "frame": {
+                "x": 50,
+                "y": 4,
+                "width": 42,
+                "height": 31.5
+              },
+              "label": {
+                "text": "B",
+                "x": 50,
+                "y": 3,
+                "size": 3.175,
+                "font": "Noto Sans",
+                "weight": 700,
+                "color": "#000000"
+              }
+            },
+            {
+              "id": "d0440d47-1dff-4d21-8cf0-1655763b6497",
+              "src": "/showcase/microscopy-2.png",
+              "frame": {
+                "x": 96,
+                "y": 4,
+                "width": 42,
+                "height": 31.5
+              },
+              "label": {
+                "text": "C",
+                "x": 96,
+                "y": 3,
+                "size": 3.175,
+                "font": "Noto Sans",
+                "weight": 700,
+                "color": "#000000"
+              }
+            }
+          ]
+        },
+        "arranged": {
+          "revision": 2,
+          "documentHash": "802ebbd1ac743817291579082a31dfc98ab1b3b8ca6e711b78cdae10da2004ec",
+          "width": 180,
+          "height": 52.2987,
+          "panels": [
+            {
+              "id": "e22609d5-023f-4ff9-8334-56f259a8349c",
+              "src": "/showcase/microscopy-0.png",
+              "frame": {
+                "x": 4,
+                "y": 7.2987,
+                "width": 54.666666666666664,
+                "height": 41
+              },
+              "label": {
+                "text": "A",
+                "x": 4,
+                "y": 6.2987,
+                "size": 3.175,
+                "font": "Noto Sans",
+                "weight": 700,
+                "color": "#000000"
+              }
+            },
+            {
+              "id": "ec756de7-7291-47f9-a119-a23be4df9c71",
+              "src": "/showcase/microscopy-1.png",
+              "frame": {
+                "x": 62.666666666666664,
+                "y": 7.2987,
+                "width": 54.666666666666664,
+                "height": 41
+              },
+              "label": {
+                "text": "B",
+                "x": 62.666666666666664,
+                "y": 6.2987,
+                "size": 3.175,
+                "font": "Noto Sans",
+                "weight": 700,
+                "color": "#000000"
+              }
+            },
+            {
+              "id": "d0440d47-1dff-4d21-8cf0-1655763b6497",
+              "src": "/showcase/microscopy-2.png",
+              "frame": {
+                "x": 121.33333333333333,
+                "y": 7.2987,
+                "width": 54.666666666666664,
+                "height": 41
+              },
+              "label": {
+                "text": "C",
+                "x": 121.33333333333333,
+                "y": 6.2987,
+                "size": 3.175,
+                "font": "Noto Sans",
+                "weight": 700,
+                "color": "#000000"
+              }
+            }
+          ]
+        },
+        "refined": {
+          "revision": 3,
+          "documentHash": "ffb0cec477c065f5cb1e95d7e6326ea1e64e993a1553bf2b79182bf3d5428f4f",
+          "width": 180,
+          "height": 52.2987,
+          "panels": [
+            {
+              "id": "e22609d5-023f-4ff9-8334-56f259a8349c",
+              "src": "/showcase/microscopy-0.png",
+              "frame": {
+                "x": 4,
+                "y": 7.2987,
+                "width": 54.666666666666664,
+                "height": 41
+              },
+              "label": {
+                "text": "A",
+                "x": 4,
+                "y": 6.2987,
+                "size": 3.175,
+                "font": "Noto Sans",
+                "weight": 700,
+                "color": "#000000"
+              }
+            },
+            {
+              "id": "ec756de7-7291-47f9-a119-a23be4df9c71",
+              "src": "/showcase/microscopy-1.png",
+              "frame": {
+                "x": 64.66666666666666,
+                "y": 7.2987,
+                "width": 54.666666666666664,
+                "height": 41
+              },
+              "label": {
+                "text": "B",
+                "x": 64.66666666666666,
+                "y": 6.2987,
+                "size": 3.175,
+                "font": "Noto Sans",
+                "weight": 700,
+                "color": "#000000"
+              }
+            },
+            {
+              "id": "d0440d47-1dff-4d21-8cf0-1655763b6497",
+              "src": "/showcase/microscopy-2.png",
+              "frame": {
+                "x": 123.33333333333333,
+                "y": 7.2987,
+                "width": 54.666666666666664,
+                "height": 41
+              },
+              "label": {
+                "text": "C",
+                "x": 123.33333333333333,
+                "y": 6.2987,
+                "size": 3.175,
+                "font": "Noto Sans",
+                "weight": 700,
+                "color": "#000000"
+              }
+            }
+          ]
+        }
+      },
+      "exports": {
+        "svg": {
+          "url": "/showcase/microscopy.svg",
+          "sha256": "b0d6504621d38b3674bf7e2addbef6a8544a0a198090952f3adca6c377224593",
+          "diagnostics": []
+        },
+        "png": {
+          "url": "/showcase/microscopy.png",
+          "sha256": "0192da7afe8dada9ffcd0ce24c8758782b0189dddfb07feaeaa3ca42ed04f76e",
+          "diagnostics": []
+        },
+        "project": {
+          "url": "/showcase/microscopy.figurezip",
+          "sha256": "3b4a415d65a71fc5cba130ebecc42dfa62e78f42c447ef8803bfa5ebef06577a",
+          "diagnostics": []
+        }
+      },
+      "roundTripHash": "ffb0cec477c065f5cb1e95d7e6326ea1e64e993a1553bf2b79182bf3d5428f4f"
+    },
+    {
+      "id": "experimental",
+      "synthetic": true,
+      "replay": "recorded-domain-commands",
+      "source": "examples/showcase/generate.py",
+      "states": {
+        "imported": {
+          "revision": 1,
+          "documentHash": "15e8295ea2fe4913c869f07fc0e9bac12ee60bb802f24c20dc2504a6a17ecc71",
+          "width": 180,
+          "height": 120,
+          "panels": [
+            {
+              "id": "00d775be-16c0-4924-90c7-e4647f3c393f",
+              "src": "/showcase/experimental-0.png",
+              "frame": {
+                "x": 4,
+                "y": 4,
+                "width": 42,
+                "height": 24
+              },
+              "label": {
+                "text": "A",
+                "x": 4,
+                "y": 3,
+                "size": 3.175,
+                "font": "Noto Sans",
+                "weight": 700,
+                "color": "#000000"
+              }
+            },
+            {
+              "id": "3a23a9da-1074-44ac-b394-74d61ee77466",
+              "src": "/showcase/experimental-1.svg",
+              "frame": {
+                "x": 50,
+                "y": 4,
+                "width": 42,
+                "height": 30.081081081081084
+              },
+              "label": {
+                "text": "B",
+                "x": 50,
+                "y": 3,
+                "size": 3.175,
+                "font": "Noto Sans",
+                "weight": 700,
+                "color": "#000000"
+              }
+            },
+            {
+              "id": "eaba9099-b01b-45b3-8b9e-63b0e431279e",
+              "src": "/showcase/experimental-2.svg",
+              "frame": {
+                "x": 96,
+                "y": 4,
+                "width": 42,
+                "height": 30.081081081081084
+              },
+              "label": {
+                "text": "C",
+                "x": 96,
+                "y": 3,
+                "size": 3.175,
+                "font": "Noto Sans",
+                "weight": 700,
+                "color": "#000000"
+              }
+            }
+          ]
+        },
+        "arranged": {
+          "revision": 2,
+          "documentHash": "afaa6a7bdbc7934eeb59caabeed0c3f77f38cc2541c2e263227167a66a890d08",
+          "width": 180,
+          "height": 47.40254215991692,
+          "panels": [
+            {
+              "id": "00d775be-16c0-4924-90c7-e4647f3c393f",
+              "src": "/showcase/experimental-0.png",
+              "frame": {
+                "x": 4,
+                "y": 7.2987,
+                "width": 63.181723779854615,
+                "height": 36.10384215991692
+              },
+              "label": {
+                "text": "A",
+                "x": 4,
+                "y": 6.2987,
+                "size": 3.175,
+                "font": "Noto Sans",
+                "weight": 700,
+                "color": "#000000"
+              }
+            },
+            {
+              "id": "3a23a9da-1074-44ac-b394-74d61ee77466",
+              "src": "/showcase/experimental-1.svg",
+              "frame": {
+                "x": 71.18172377985462,
+                "y": 7.2987,
+                "width": 50.40913811007268,
+                "height": 36.10384215991692
+              },
+              "label": {
+                "text": "B",
+                "x": 71.18172377985462,
+                "y": 6.2987,
+                "size": 3.175,
+                "font": "Noto Sans",
+                "weight": 700,
+                "color": "#000000"
+              }
+            },
+            {
+              "id": "eaba9099-b01b-45b3-8b9e-63b0e431279e",
+              "src": "/showcase/experimental-2.svg",
+              "frame": {
+                "x": 125.59086188992731,
+                "y": 7.2987,
+                "width": 50.40913811007268,
+                "height": 36.10384215991692
+              },
+              "label": {
+                "text": "C",
+                "x": 125.59086188992731,
+                "y": 6.2987,
+                "size": 3.175,
+                "font": "Noto Sans",
+                "weight": 700,
+                "color": "#000000"
+              }
+            }
+          ]
+        },
+        "refined": {
+          "revision": 3,
+          "documentHash": "3fc508b87f2c45e5cc730702d2db92166ad0ce239e71803a005dad3b13d53186",
+          "width": 180,
+          "height": 47.40254215991692,
+          "panels": [
+            {
+              "id": "00d775be-16c0-4924-90c7-e4647f3c393f",
+              "src": "/showcase/experimental-0.png",
+              "frame": {
+                "x": 4,
+                "y": 7.2987,
+                "width": 63.181723779854615,
+                "height": 36.10384215991692
+              },
+              "label": {
+                "text": "A",
+                "x": 4,
+                "y": 6.2987,
+                "size": 3.175,
+                "font": "Noto Sans",
+                "weight": 700,
+                "color": "#000000"
+              }
+            },
+            {
+              "id": "3a23a9da-1074-44ac-b394-74d61ee77466",
+              "src": "/showcase/experimental-1.svg",
+              "frame": {
+                "x": 73.18172377985462,
+                "y": 7.2987,
+                "width": 50.40913811007268,
+                "height": 36.10384215991692
+              },
+              "label": {
+                "text": "B",
+                "x": 73.18172377985462,
+                "y": 6.2987,
+                "size": 3.175,
+                "font": "Noto Sans",
+                "weight": 700,
+                "color": "#000000"
+              }
+            },
+            {
+              "id": "eaba9099-b01b-45b3-8b9e-63b0e431279e",
+              "src": "/showcase/experimental-2.svg",
+              "frame": {
+                "x": 127.59086188992731,
+                "y": 7.2987,
+                "width": 50.40913811007268,
+                "height": 36.10384215991692
+              },
+              "label": {
+                "text": "C",
+                "x": 127.59086188992731,
+                "y": 6.2987,
+                "size": 3.175,
+                "font": "Noto Sans",
+                "weight": 700,
+                "color": "#000000"
+              }
+            }
+          ]
+        }
+      },
+      "exports": {
+        "svg": {
+          "url": "/showcase/experimental.svg",
+          "sha256": "f005a471486bb68e9de188310c24237af76ae50ea95151c2bd1082f4704c1387",
+          "diagnostics": []
+        },
+        "png": {
+          "url": "/showcase/experimental.png",
+          "sha256": "4fd5628188ad93bbc7c09557290fddcf4fc9190483b9fbd5f4fd71d8f6cae4fb",
+          "diagnostics": []
+        },
+        "project": {
+          "url": "/showcase/experimental.figurezip",
+          "sha256": "6ac785b5f58a4e4615e0c3c75c3840b4b230e598ccf9be6ca83257860832963f",
+          "diagnostics": []
+        }
+      },
+      "roundTripHash": "3fc508b87f2c45e5cc730702d2db92166ad0ce239e71803a005dad3b13d53186"
+    }
+  ]
+}

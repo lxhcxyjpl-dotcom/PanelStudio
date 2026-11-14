@@ -8,6 +8,8 @@ const prefs = readPrefs();
 
 export const useWorkspace = create<WorkspaceState>(() => ({
   ...prefs,
+  assetTab: "assets",
+  inspectorMode: "properties",
   compareMode: "editing",
   candidateRoot: null,
   aiScope: "document",

@@ -1,36 +1,27 @@
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { useEffect, useRef, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { RESOURCE_LIMITS, type Project } from "@panelstudio/contracts";
 import { api, ApiClientError } from "../api/client";
-import { writeProjectId } from "../prefs";
 import {
   cancelCrop,
   commitCrop,
   deleteCurrentProject,
-  ensureProject,
-  importFiles,
-  importPackage,
+  newProject,
   openListedProject,
   reloadFromServer,
   renameTitle,
   requestLayout,
   restoreListedProject,
   returnToStart,
-  sendAiPrompt,
 } from "../state/session";
 import { patch, useWorkspace } from "../state/store";
-import { resetCandidateSession, setScope } from "../state/candidate-session";
 import { cropInvalid } from "../model/document-ui";
 import { Button, Icon } from "./widgets";
 
 export function Toolbar({ inert }: { inert: boolean }) {
   const { t } = useTranslation();
   const state = useWorkspace();
-  const provider = useQuery({ queryKey: ["ai-provider"], queryFn: () => api.providerSettings() });
-  const contentLayout = Boolean(state.confirmed?.document.publicationContext &&
-    provider.data?.hasSecret && provider.data.config?.capabilities.imageInput);
   const count = state.confirmed?.document.panelOrder.length ?? 0;
   const importPrimary = count === 0;
   const layoutReason = !state.confirmed
@@ -62,10 +53,10 @@ export function Toolbar({ inert }: { inert: boolean }) {
         </DropdownMenu.Trigger>
         <DropdownMenu.Portal>
           <DropdownMenu.Content className="menu" align="start" sideOffset={4}>
-            {state.projectId && <DropdownMenu.Item className="menu-item" onSelect={() => void returnToStart()}>
+            {state.projectId && <DropdownMenu.Item className="menu-item" data-action="return-home" onSelect={() => void returnToStart()}>
               {t("toolbar.home")}
             </DropdownMenu.Item>}
-            <DropdownMenu.Item className="menu-item" onSelect={() => void newProject()}>
+            <DropdownMenu.Item className="menu-item" onSelect={() => void newProject().catch((error: unknown) => patch({ liveMessage: error instanceof Error ? error.message : t("errors.generic") }))}>
               {t("toolbar.newProject")}
             </DropdownMenu.Item>
             <ProjectSubmenu
@@ -121,17 +112,13 @@ export function Toolbar({ inert }: { inert: boolean }) {
           <Icon name="import" />{t("toolbar.import")}
         </Button>
         <Button action="auto-layout" data-testid="layout-button" disabledReason={layoutReason}
-          title={contentLayout ? t("ai.contentDisclosure") : undefined} onClick={() => {
-            if (contentLayout) {
-              setScope("document");
-              void sendAiPrompt(t("ai.contentPrompt"), { includePreviewImage: true, visualReview: false, fromCurrent: true });
-            } else void requestLayout();
-          }}>
-          <Icon name="layout" />{t(contentLayout ? "ai.contentLayout" : "toolbar.autoLayout")}
+          onClick={() => void requestLayout()}>
+          <Icon name="layout" />{t("toolbar.autoLayout")}
         </Button>
         <Button action="guided-layout" className="guided-action" disabledReason={layoutReason} onClick={() => patch({ dialog: "guided" })}>
           <Icon name="reference" />{t("layout.guide")}
         </Button>
+        <Button action="open-refine" variant="quiet" onClick={() => patch({ inspectorMode: "ai", rightOpen: true, leftOpen: false })}><Icon name="sliders" />{t("ai.tab")}</Button>
       </div> : <Button action="start-open-package" variant="quiet" aria-label={t("app.openBundle")} title={t("app.openBundle")} onClick={() => document.getElementById("package-input")?.click()}>
         <Icon name="sheets" /><span className="bundle-label">{t("app.openBundle")}</span>
       </Button>}
@@ -176,34 +163,6 @@ export function Toolbar({ inert }: { inert: boolean }) {
         <Icon name="export" />
         {t("toolbar.export")}
       </Button>}
-      <input
-        id="import-input"
-        data-testid="import-input"
-        className="hidden-input"
-        type="file"
-        multiple
-        accept="image/png,image/jpeg,image/webp,image/svg+xml,.png,.jpg,.jpeg,.webp,.svg"
-        aria-hidden="true"
-        tabIndex={-1}
-        onChange={(event) => {
-          const files = [...(event.target.files ?? [])];
-          event.target.value = "";
-          void importFiles(files);
-        }}
-      />
-      <input
-        id="package-input"
-        className="hidden-input"
-        type="file"
-        accept=".figurezip,application/zip"
-        aria-hidden="true"
-        tabIndex={-1}
-        onChange={(event) => {
-          const file = event.target.files?.[0];
-          event.target.value = "";
-          if (file) void importPackage(file);
-        }}
-      />
       {state.compareMode !== "editing" ? (
         <span className="sr-only">{t("layout.preview")}</span>
       ) : null}
@@ -299,21 +258,4 @@ function saveLabel(saveState: string, backend: string, t: (key: string) => strin
   if (saveState === "conflict") return t("save.conflict");
   if (saveState === "saved") return t("save.saved");
   return t("app.noProject");
-}
-
-async function newProject(): Promise<void> {
-  resetCandidateSession(null);
-  writeProjectId(null);
-  patch({
-    startMessage: "",
-    projectId: null,
-    confirmed: null,
-    title: "",
-    draft: null,
-    cards: [],
-    activeCandidateId: null,
-    selection: { kind: "none" },
-    imports: [],
-  });
-  await ensureProject();
 }

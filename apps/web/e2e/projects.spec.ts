@@ -18,14 +18,14 @@ test.beforeEach(async ({ page }) => {
         motion: "off",
         reduceTransparency: false,
         leftWidth: 240,
-        rightWidth: 304,
+        rightWidth: 352,
       }),
     );
   });
 });
 
 test("opens, soft-deletes, and restores a project from the project menu", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/app");
   await page.getByTestId("import-input").setInputFiles([raster]);
   await page.getByRole("tab", { name: "面板" }).click();
   await expect(page.getByTestId("panel-row")).toHaveCount(1);
