@@ -7,6 +7,7 @@ async function preferences(page: Page, locale = "zh-CN", theme = "light", motion
   await page.addInitScript(prefs => localStorage.setItem("panelstudio.prefs", JSON.stringify(prefs)), { locale, theme, motion });
 }
 async function sample(page: Page, index = 0) {
+  await action(page, "home-gallery").click();
   await action(page, "open-scientific-example").nth(index).click();
   await expect(page.locator(".panel-frame").first()).toBeVisible();
   await expect(page).toHaveURL(/\/app\/[0-9a-f-]{36}$/);
@@ -34,11 +35,12 @@ for (const [width, height, locale, theme] of [[1440,900,"zh-CN","light"], [1280,
     await preferences(page, locale, theme); await page.setViewportSize({ width, height });
     await page.goto("/");
     await expect(page.getByTestId("home-page")).toBeVisible();
-    await expect(page.getByTestId("demo-stage")).toHaveAttribute("data-step", "7");
-    await expect(action(page, "hero-playback")).toHaveCount(0);
+    const papers = page.getByTestId("hero-showcase").locator(".hero-paper");
+    await expect(papers).toHaveCount(3);
+    await expect(papers.locator("img")).toHaveCount(3);
+    await expect(page.getByTestId("demo-stage")).toBeHidden();
     await expect(page.locator(".brand-intro h1")).toHaveCSS("font-size", width < 768 ? "24px" : "56px");
-    await page.locator("#examples").scrollIntoViewIfNeeded();
-    await expect.poll(() => page.locator(".brand-example-image img").evaluateAll(images => images.every(img => (img as HTMLImageElement).complete && (img as HTMLImageElement).naturalWidth > 0))).toBe(true);
+    await expect.poll(() => papers.locator("img").evaluateAll(images => images.every(img => (img as HTMLImageElement).complete && (img as HTMLImageElement).naturalWidth > 0))).toBe(true);
     await boundsAndType(page);
     await page.evaluate(() => window.scrollTo(0, 0));
     await page.screenshot({ path: info.outputPath("home.png"), fullPage: true });
@@ -63,6 +65,7 @@ test("real recorded geometry plays once, pauses, compares and exports the demons
   await expect(choices.nth(1)).toHaveAttribute("aria-pressed","true", {timeout:9000});
   await action(page,"hero-playback").click();
   await page.waitForTimeout(5700); await expect(choices.nth(1)).toHaveAttribute("aria-pressed","true");
+  await action(page,"home-gallery").click();
   await page.locator("#laboratory").scrollIntoViewIfNeeded();
   await action(page,"demo-step").nth(0).click();
   await expect(page.getByTestId("demo-source-panels").locator("img")).toHaveCount(6);

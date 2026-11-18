@@ -16,7 +16,7 @@ import {
   retrySave,
   transact,
 } from "../state/session";
-import { patch, useWorkspace } from "../state/store";
+import { patch, useWorkspace, useWorkspaceFields } from "../state/store";
 import { Button, Icon } from "./widgets";
 import { baseDocument } from "../state/types";
 import type { PublicationContext } from "@panelstudio/contracts";
@@ -40,7 +40,7 @@ export function Dialogs() {
 
 function PublicationDialog({ open }: { open: boolean }) {
   const { t } = useTranslation();
-  const state = useWorkspace();
+  const state = useWorkspaceFields("projectId", "draft");
   const [value, setValue] = useState<PublicationContext>({ journal: "", field: "", message: "", preference: "auto" });
   const [busy, setBusy] = useState(false);
   useEffect(() => {
@@ -152,9 +152,13 @@ function AssetDialog({ open }: { open: boolean }) {
       {asset ? (
         <dl>
           <div><dt>{t("panels.name")}</dt><dd>{asset.originalFilename}</dd></div>
-          <div><dt>{t("assets.original")}</dt><dd>{asset.originalMediaType}</dd></div>
+          <div><dt>{t("assets.mediaType")}</dt><dd>{asset.originalMediaType}</dd></div>
+          {asset.normalized && (asset.normalized.rasterPixelSize
+            ? <div><dt>{t("assets.pixelDimensions")}</dt><dd>{asset.normalized.rasterPixelSize.width} × {asset.normalized.rasterPixelSize.height} px</dd></div>
+            : <div><dt>{t("assets.viewport")}</dt><dd>{asset.normalized.viewport.width} × {asset.normalized.viewport.height}</dd></div>)}
+          <div><dt>{t("assets.fileSize")}</dt><dd>{asset.originalByteLength.toLocaleString()} B</dd></div>
+          <div><dt>{t("assets.status")}</dt><dd>{t("assets." + asset.status)}</dd></div>
           <div><dt>SHA-256</dt><dd>{asset.originalSha256}</dd></div>
-          <div><dt>{asset.originalByteLength}</dt><dd>{asset.status}</dd></div>
           {asset.diagnostics.map((item, index) => <div key={`${item.code}-${index}`}><dt>{formatDiagnostic(t, item)}</dt><dd>{item.severity}</dd></div>)}
           {asset.status === "ready" ? asset.normalized.normalizationNotes.map((note) => <p key={note}>{note}</p>) : null}
         </dl>
@@ -165,7 +169,7 @@ function AssetDialog({ open }: { open: boolean }) {
 
 function RecoveryDialog({ open }: { open: boolean }) {
   const { t } = useTranslation();
-  const state = useWorkspace();
+  const state = useWorkspaceFields("saveState", "serverSnapshot");
   return (
     <Shell open={open} title={t("dialog.recoveryTitle")}>
       <p>{state.saveState === "offline" ? t("save.offline") : state.saveState === "conflict" ? t("save.conflict") : t("save.failed")}</p>

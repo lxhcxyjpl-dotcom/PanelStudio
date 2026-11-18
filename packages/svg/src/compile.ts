@@ -100,8 +100,10 @@ function fontFamilies(svg: string, panels: ExportPanel[]): string[] {
   for (const match of svg.matchAll(/font-family="([^"]+)"/gu)) {
     const value = match[1];
     if (!value) continue;
-    for (const family of value.split(",")) {
-      const name = family.trim().replace(/^'|'$/gu, "");
+    // escapeAttr encoded the DOM value when the vector fragment was serialized.
+    const decoded = value.replaceAll("&quot;", '"').replaceAll("&lt;", "<").replaceAll("&gt;", ">").replaceAll("&amp;", "&");
+    for (const family of decoded.split(",")) {
+      const name = family.trim().replace(/^['"]|['"]$/gu, "");
       if (name) families.add(name);
     }
   }

@@ -32,7 +32,7 @@ export { DiagnosticParamsSchema, DiagnosticSchema } from "./diagnostics.js";
 export type { Diagnostic } from "./diagnostics.js";
 export { ERROR_CODES, ApiErrorDetailsSchema, ApiErrorSchema, ErrorCodeSchema } from "./errors.js";
 export type { ApiError, ErrorCode } from "./errors.js";
-export { UNITS, fontSizePtToSvgUserUnits, pngPixelsFromMm } from "./units.js";
+export { UNITS, fontSizePtToSvgUserUnits, pngPixelsFromMm, rasterPpi } from "./units.js";
 export { DOCUMENT_INVARIANTS } from "./invariants.js";
 export {
   CanvasSchema,

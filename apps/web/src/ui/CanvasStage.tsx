@@ -35,11 +35,30 @@ export function CanvasStage() {
   useEffect(() => {
     const node = viewportRef.current;
     if (!node) return;
-    const observer = new ResizeObserver(() => {
-      patch({ viewport: { width: node.clientWidth, height: node.clientHeight } });
-    });
+    const measure = () => {
+      const viewport = { width: node.clientWidth, height: node.clientHeight };
+      if (!viewport.width || !viewport.height) return;
+      const current = useWorkspace.getState();
+      const previous = current.viewport;
+      const canvas = current.confirmed?.document.canvas;
+      if (viewport.width === previous.width && viewport.height === previous.height) return;
+      if (current.mode === "phone" && canvas && previous.width && previous.height && current.fittedProjectId === current.projectId) {
+        const size = { width: canvas.widthMm, height: canvas.heightMm };
+        const oldFit = fitCamera(previous, size);
+        const camera = current.camera;
+        const wasFitted = Math.abs(oldFit.zoom - camera.zoom) < 0.001 &&
+          Math.abs(oldFit.panX - camera.panX) < 1 && Math.abs(oldFit.panY - camera.panY) < 1;
+        patch({ viewport, camera: wasFitted ? fitCamera(viewport, size) : {
+          ...camera, panX: camera.panX + (viewport.width - previous.width) / 2,
+          panY: camera.panY + (viewport.height - previous.height) / 2,
+        } });
+      } else {
+        patch({ viewport });
+      }
+    };
+    const observer = new ResizeObserver(measure);
     observer.observe(node);
-    patch({ viewport: { width: node.clientWidth, height: node.clientHeight } });
+    measure();
     return () => observer.disconnect();
   }, []);
 
@@ -87,7 +106,7 @@ export function CanvasStage() {
 
   const px = PX_PER_MM;
   return <>
-    <CanvasTools art={art} />
+    <CanvasTools widthMm={art.canvas.widthMm} heightMm={art.canvas.heightMm} />
     <div
       ref={viewportRef}
       className="canvas-viewport"
@@ -369,7 +388,7 @@ function beginMove(event: ReactPointerEvent, paper: HTMLDivElement | null, docum
   trackGesture(event, {
     drag(pointer) {
       if (locked) return patch({ liveMessage: i18n.t("errors.LOCKED_ELEMENT") });
-      patch({ selection: selected });
+      if (useWorkspace.getState().selection !== selected) patch({ selection: selected });
       previewCommand(document, () => make(pointer));
     },
     finish(pointer, dragged) {

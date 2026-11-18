@@ -1,4 +1,4 @@
-import { ENGINE_VERSIONS, type AIHistoryTurn, type AIEditScope, type Candidate, type Diagnostic, type DomainCommand, type FigureDocumentV1, type LayoutRequest } from "@panelstudio/contracts";
+import { ENGINE_VERSIONS, type AIHistoryTurn, type AIEditScope, type Candidate, type Diagnostic, type DomainCommand, type ExportRequest, type FigureDocumentV1, type LayoutRequest } from "@panelstudio/contracts";
 import type { Guide } from "../model/snap";
 import type { Camera } from "../model/view";
 import type { LocaleName, MotionPreference, ThemeName } from "../prefs";
@@ -40,7 +40,7 @@ export type LayoutCard = {
 
 export type ExportState =
   | null
-  | { status: "running"; revision: number; phase: string }
+  | { status: "running"; request: ExportRequest; source: Confirmed; phase: string }
   | {
       status: "ready";
       revision: number;
@@ -134,7 +134,7 @@ export function baseDocument(state: WorkspaceState): FigureDocumentV1 | null {
   return state.draft?.document ?? state.optimistic ?? state.confirmed?.document ?? null;
 }
 
-export function candidatesStale(state: WorkspaceState): boolean {
+export function candidatesStale(state: Pick<WorkspaceState, "cards" | "confirmed" | "draft">): boolean {
   const base = state.cards[0]?.candidate.baseRevision;
   if (base === undefined || !state.confirmed) return false;
   return base !== state.confirmed.revision || state.draft !== null || state.cards.some(({ candidate }) =>

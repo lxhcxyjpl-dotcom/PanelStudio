@@ -100,6 +100,7 @@ test("edits only the label baseline, batches nudge keys and keeps lettering auto
 
 test("keeps an empty numeric field and IME Enter from issuing transactions, and commits a color once", async ({ page }) => {
   const root = await snapshot(page);
+  await page.getByTestId("default-label-settings").locator("summary").click();
   const size = page.getByTestId("label-size");
   const value = await size.inputValue();
   await size.fill(""); await size.press("Tab");

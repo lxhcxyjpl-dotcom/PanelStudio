@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { useShallow } from "zustand/react/shallow";
 import { i18n } from "../i18n";
 import { workspaceMode } from "../model/chrome";
 import { readPrefs, writePrefs, type Preferences } from "../prefs";
@@ -58,6 +59,15 @@ export const useWorkspace = create<WorkspaceState>(() => ({
   serverSnapshot: null,
   aiStatus: { phase: "idle" },
 }));
+
+/** Only re-render a view when one of the fields it displays changes. */
+export function useWorkspaceFields<K extends keyof WorkspaceState>(...keys: K[]): Pick<WorkspaceState, K> {
+  return useWorkspace(useShallow((state) => {
+    const fields = {} as Pick<WorkspaceState, K>;
+    for (const key of keys) fields[key] = state[key];
+    return fields;
+  }));
+}
 
 export function patch(partial: Partial<WorkspaceState>): void {
   useWorkspace.setState(partial);

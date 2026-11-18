@@ -89,6 +89,60 @@ describe("SVG normalize", () => {
 });
 
 describe("editable SVG compile", () => {
+  it.each([
+    ["ggplot2-scatter.svg", "41.67px", "spacingAndGlyphs"],
+    ["ggplot2-scatter-natural-width.svg", null, null],
+  ])("keeps the editable axes, legend and data in %s", (filename, length, adjust) => {
+    const source = readFileSync(new URL(`../../../fixtures/scientific-svg/${filename}`, import.meta.url), "utf8");
+    const normalized = normalizeSvg(source);
+    expect(normalized.viewport).toEqual({ width: 307.2, height: 211.2 });
+    const compiled = compileFigureSvg({
+      widthMm: 85, heightMm: 65, revision: 1, includeMetadata: false,
+      panels: [{
+        panelId: PANEL_A, kind: "vector", frame: { x: 2, y: 3, width: 76.8, height: 52.8 },
+        x: 2, y: 3, scale: 0.25, normalizedSvg: normalized.svg, label: null,
+      }],
+    });
+    expect(compiled.fontFamilies).toEqual(["Arial"]);
+    const document = parseSvgDocument(compiled.svg);
+    const labels = Array.from(document.getElementsByTagName("text"));
+    expect(labels.map(label => label.textContent)).toEqual([
+      "10", "15", "20", "25", "30", "35", "2", "3", "4", "5", "Weight", "Mileage", "Cylinders", "4", "6", "8",
+    ]);
+    const legend = labels.find(label => label.textContent === "Cylinders")!;
+    expect(legend.getAttribute("x")).toBe("178.77");
+    expect(legend.getAttribute("y")).toBe("42.54");
+    expect(legend.getAttribute("textLength")).toBe(length);
+    expect(legend.getAttribute("lengthAdjust")).toBe(adjust);
+    expect(legend.getAttribute("xml:space")).toBe("preserve");
+    expect(labels.find(label => label.textContent === "Mileage")?.getAttribute("transform"))
+      .toBe("translate(12.15,67.37) rotate(-90)");
+    const points = document.getElementsByTagName("circle");
+    expect(points.length).toBe(35);
+    expect(points.item(0)?.getAttribute("fill")).toBe("#00BA38");
+    expect(document.getElementsByTagName("image").length).toBe(0);
+    expect(document.getElementById(`panel-${PANEL_A}--cpMzAuMTN8MTYzLjgyfDQuOTh8MTI5Ljc2`)).not.toBeNull();
+  });
+
+  it("preserves explicit text spacing through a root and a use instance", () => {
+    const normalized = normalizeSvg(`<svg xmlns="http://www.w3.org/2000/svg" width="100" height="30" style="white-space:pre">
+      <defs><text id="label"><tspan textLength="20" lengthAdjust="spacing">A  B</tspan></text></defs>
+      <use href="#label" style="white-space:pre"/>
+    </svg>`);
+    const instance = instantiateSvg(normalized.svg, PANEL_A);
+    expect(instance.match(/xml:space="preserve"/gu)).toHaveLength(2);
+    expect(instance).toContain('textLength="20" lengthAdjust="spacing">A  B</tspan>');
+  });
+
+  it.each([
+    '<text textLength="-1">Bad length</text>', '<text textLength="1e999">Overflow</text>',
+    '<text textLength="50%">Viewport dependent</text>', '<text lengthAdjust="stretch">Bad mode</text>',
+    '<rect textLength="10"/>', '<text style="white-space:pre-wrap">Wrapped</text>',
+  ])("rejects unsupported text layout %s", fragment => {
+    expect(() => normalizeSvg(`<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10">${fragment}</svg>`))
+      .toThrow(SvgImportError);
+  });
+
   it("emits live text and namespaces two instances of one asset", () => {
     const normalized = normalizeSvg(gradient);
     const vector = {

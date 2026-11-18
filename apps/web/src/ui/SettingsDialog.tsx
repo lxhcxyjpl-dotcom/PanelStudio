@@ -5,7 +5,7 @@ import type { AIProviderConfig, AIProviderSettings } from "@panelstudio/contract
 import { api, newKey, waitForJob } from "../api/client";
 import { addressProblem, defaultProviderForm, endpointIdentity, inferProvider, knownVision, providerPresets, type ProviderPreset } from "../model/provider-form";
 import { queryClient } from "../state/query";
-import { patch, useWorkspace } from "../state/store";
+import { patch, useWorkspaceFields } from "../state/store";
 import { Shell } from "./DialogShell";
 import { Button, Icon } from "./widgets";
 
@@ -26,7 +26,7 @@ export function SettingsDialog({ open, initialSection }: { open: boolean; initia
 
 function GeneralSettings() {
   const { t, i18n } = useTranslation();
-  const state = useWorkspace();
+  const state = useWorkspaceFields("theme", "locale", "motion", "reduceTransparency");
   return <section className="general-settings">
     <h3>{t("connection.general")}</h3>
     <label className="settings-row"><span>{t("settings.theme")}</span>

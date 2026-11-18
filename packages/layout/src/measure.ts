@@ -1,5 +1,4 @@
 import {
-  MM_PER_INCH,
   TOLERANCES,
   type FigureDocumentV1,
   type LayoutRequest,
@@ -135,17 +134,6 @@ export function croppedAspect(
   const height = asset.viewport.height * panel.cropNormalized.height;
   if (!(width > 0) || !(height > 0) || !Number.isFinite(width) || !Number.isFinite(height)) return null;
   return width / height;
-}
-
-export function rasterPpi(
-  frameWidthMm: number,
-  cropWidth: number,
-  rasterWidth: number,
-): number | null {
-  if (!(frameWidthMm > 0) || !(rasterWidth > 0) || !(cropWidth > 0)) return null;
-  const inches = frameWidthMm / MM_PER_INCH;
-  if (!(inches > 0)) return null;
-  return (rasterWidth * cropWidth) / inches;
 }
 
 export function parseUnitId(value: string): { kind: "panel" | "group"; id: string } | null {

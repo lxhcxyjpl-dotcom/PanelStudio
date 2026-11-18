@@ -4,11 +4,17 @@ import {
   ARTWORK_COLOR_PRESETS,
   BUNDLED_FONTS,
   CANVAS_WIDTH_PRESETS_MM,
+  RESOURCE_LIMITS,
+  resolveLabelText,
   type FigureDocumentV1,
   type LabelOverrides,
 } from "@panelstudio/contracts";
 import { scalePanel, translateSelection } from "@panelstudio/core/arrange";
+import { DocumentCommandError } from "@panelstudio/core/apply";
 import { resolvePanelLabel } from "@panelstudio/core/labels";
+import { ApiClientError } from "../api/client";
+import { labelName } from "../model/changes";
+import { errorText } from "../model/feedback";
 import { sidebarWidth } from "../model/chrome";
 import { geometryLocked, mergedOverrides } from "../model/document-ui";
 import {
@@ -19,11 +25,13 @@ import {
   distribute,
   enterCrop,
   equalSize,
+  requestLayout,
+  resizeCanvas,
   restoreFullCrop,
   transact,
   updateCrop,
 } from "../state/session";
-import { patch, useWorkspace } from "../state/store";
+import { patch, useWorkspace, useWorkspaceFields } from "../state/store";
 import { baseDocument } from "../state/types";
 import { AiPanel } from "./AiPanel";
 import { ArrangeInspector } from "./ArrangeInspector";
@@ -32,14 +40,17 @@ import { Button, Icon, NumberField, SelectField, TabBar, TextField } from "./wid
 
 export function Inspector() {
   const { t } = useTranslation();
-  const state = useWorkspace();
+  const state = useWorkspaceFields(
+    "inspectorMode", "mode", "rightWidth", "rightOpen", "compareMode", "candidateRoot", "activeCandidateId", "cards",
+  );
   const tab = state.inspectorMode;
   const setTab = (inspectorMode: typeof tab) => patch({ inspectorMode });
   const width = sidebarWidth("right", state.mode, state.rightWidth);
   const previewing = state.compareMode !== "editing";
-  const document = state.compareMode === "original" ? state.candidateRoot?.document ?? baseDocument(state)
-    : state.compareMode === "draft" ? state.cards.find(card => card.candidate.id === state.activeCandidateId)?.candidate.previewDocument ?? baseDocument(state)
-    : baseDocument(state);
+  const base = useWorkspace(baseDocument);
+  const document = state.compareMode === "original" ? state.candidateRoot?.document ?? base
+    : state.compareMode === "draft" ? state.cards.find(card => card.candidate.id === state.activeCandidateId)?.candidate.previewDocument ?? base
+    : base;
   return (
     <aside
       className="sidebar right-sidebar" id="studio-inspector"
@@ -65,7 +76,7 @@ export function Inspector() {
 }
 
 function Properties({ document }: { document: FigureDocumentV1 }) {
-  const state = useWorkspace();
+  const state = useWorkspaceFields("crop", "selection");
   if (state.crop) return <CropFields document={document} />;
   if (state.selection.kind === "none") return <CanvasFields document={document} />;
   if (state.selection.kind === "label") return <LabelFields document={document} panelId={state.selection.panelId} />;
@@ -76,27 +87,63 @@ function Properties({ document }: { document: FigureDocumentV1 }) {
   return <PanelFields document={document} panelId={panelId} />;
 }
 
+function CanvasDimensions({ document }: { document: FigureDocumentV1 }) {
+  const { t } = useTranslation();
+  type Dimension = "widthMm" | "heightMm";
+  const [rejection, setRejection] = useState<{
+    dimension: Dimension; value: number; error: unknown; source: FigureDocumentV1; attempt: number;
+  } | null>(null);
+  const issue = rejection?.source === document ? rejection : null;
+  const error = issue?.error instanceof DocumentCommandError || issue?.error instanceof ApiClientError ? issue.error : null;
+  const outside = error?.code === "OUTSIDE_CANVAS";
+  const lockedPanels = (error?.details.panelIds ?? []).filter(id => geometryLocked(document, id) === "lock");
+  const canReflow = issue?.dimension === "widthMm" && outside &&
+    document.panelOrder.length >= RESOURCE_LIMITS.minAutoLayoutPanels;
+  const canvas = document.canvas;
+  function change(dimension: Dimension, value: number) {
+    if (canvas[dimension] === value) { setRejection(null); return; }
+    void resizeCanvas(dimension, value, (error, source) => {
+      setRejection(previous => ({ dimension, value, error, source, attempt: (previous?.attempt ?? 0) + 1 }));
+    });
+  }
+  return <>
+    <div className="preset-row width-presets">
+      {CANVAS_WIDTH_PRESETS_MM.map(width => <Button key={width} action={`width-${width}`}
+        aria-pressed={canvas.widthMm === width} onClick={() => change("widthMm", width)}>{width} mm</Button>)}
+    </div>
+    <div className="field-pair">
+      <NumberField key={issue?.dimension === "widthMm" ? `width-${issue.attempt}` : "width"} label={t("inspector.width") + " (mm)"}
+        value={canvas.widthMm} min={0.1} onCommit={value => change("widthMm", value)} />
+      <NumberField key={issue?.dimension === "heightMm" ? `height-${issue.attempt}` : "height"} label={t("inspector.height") + " (mm)"}
+        value={canvas.heightMm} min={0.1} onCommit={value => change("heightMm", value)} />
+    </div>
+    {issue && <div className="field-group canvas-resize-feedback">
+      <p role="alert" className="task-warning">{t(issue.dimension === "widthMm" ? "inspector.widthRejected" : "inspector.heightRejected",
+        { value: issue.value, reason: errorText(issue.error) })}</p>
+      {outside && lockedPanels.length ? <p>{t("inspector.resizeLocked", {
+        panels: lockedPanels.map(id => labelName(document, id)).join(", "),
+      })}</p> : canReflow ? <Button action="preview-canvas-width" onClick={() =>
+        void requestLayout({ family: "auto", canvasOverride: { widthMm: issue.value } })}>
+        {t("inspector.previewWidth", { width: issue.value })}</Button>
+        : outside && <p>{t("inspector.resizeManually")}</p>}
+    </div>}
+  </>;
+}
+
 function CanvasFields({ document }: { document: FigureDocumentV1 }) {
   const { t } = useTranslation();
   const canvas = document.canvas;
   const settings = document.layoutSettings;
   const style = document.labelStyle;
+  const labelExamples = [0, 1, 2].map(index => resolveLabelText({
+    index, sequence: style.sequence, format: style.format, textOverride: null,
+  })).join(" ");
   const ungrouped = document.panelOrder.filter((id) => !Object.values(document.groups).some((group) => group.panelIds.includes(id)));
   return (
     <>
       <section className="section canvas-fields">
         <h2 className="inspector-section-title"><Icon name="reference" />{t("inspector.canvas")}</h2>
-        <div className="preset-row width-presets">
-          {CANVAS_WIDTH_PRESETS_MM.map((width) => (
-            <Button key={width} action={`width-${width}`} aria-pressed={canvas.widthMm === width} onClick={() => void transact([{ type: "canvas.set", canvas: { ...canvas, widthMm: width } }])}>
-              {width} mm
-            </Button>
-          ))}
-        </div>
-        <div className="field-pair">
-          <NumberField label={t("inspector.width") + " (mm)"} value={canvas.widthMm} min={0.1} onCommit={(widthMm) => void transact([{ type: "canvas.set", canvas: { ...canvas, widthMm } }])} />
-          <NumberField label={t("inspector.height") + " (mm)"} value={canvas.heightMm} min={0.1} onCommit={(heightMm) => void transact([{ type: "canvas.set", canvas: { ...canvas, heightMm } }])} />
-        </div>
+        <CanvasDimensions document={document} />
         <details className="inspector-disclosure"><summary>{t("inspector.canvasDetails")}<Icon name="chevron" /></summary><div>
         <SelectField
           label={t("inspector.heightMode")}
@@ -117,10 +164,10 @@ function CanvasFields({ document }: { document: FigureDocumentV1 }) {
         </div></details>
       </section>
       <section className="section canvas-fields">
-        <h2 className="inspector-section-title"><Icon name="layout" />{t("inspector.gutter")}</h2>
-        <div className="field-pair">
-          <NumberField label={t("inspector.gutterX") + " (mm)"} value={settings.gutterMm.horizontal} onCommit={(horizontal) => void transact([{ type: "layout.setSettings", layoutSettings: { ...settings, gutterMm: { ...settings.gutterMm, horizontal } } }])} />
-          <NumberField label={t("inspector.gutterY") + " (mm)"} value={settings.gutterMm.vertical} onCommit={(vertical) => void transact([{ type: "layout.setSettings", layoutSettings: { ...settings, gutterMm: { ...settings.gutterMm, vertical } } }])} />
+        <h2 className="inspector-section-title" id="canvas-gutters"><Icon name="layout" />{t("inspector.gutter")} (mm)</h2>
+        <div className="field-pair" role="group" aria-labelledby="canvas-gutters">
+          <NumberField label={t("inspector.gutterX")} value={settings.gutterMm.horizontal} onCommit={(horizontal) => void transact([{ type: "layout.setSettings", layoutSettings: { ...settings, gutterMm: { ...settings.gutterMm, horizontal } } }])} />
+          <NumberField label={t("inspector.gutterY")} value={settings.gutterMm.vertical} onCommit={(vertical) => void transact([{ type: "layout.setSettings", layoutSettings: { ...settings, gutterMm: { ...settings.gutterMm, vertical } } }])} />
         </div>
         <SelectField
           label={t("inspector.primary")}
@@ -139,8 +186,10 @@ function CanvasFields({ document }: { document: FigureDocumentV1 }) {
         </details>
       </section>
       <section className="section canvas-fields">
-        <h2 className="inspector-section-title"><Icon name="edit" />{t("inspector.labels")}</h2>
-        <LabelStyleFields style={style} />
+        <details className="inspector-disclosure" data-testid="default-label-settings">
+          <summary><span>{t("panels.label")}　{labelExamples} · {style.fontSizePt} pt</span><Icon name="chevron" /></summary>
+          <LabelStyleFields style={style} />
+        </details>
       </section>
     </>
   );

@@ -24,13 +24,13 @@ async function checkTypeAndBounds(page: Page) {
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 }
 
-test("welcome can be skipped and reopened; the tour leads to an editable sample and export", async ({ page }) => {
+test("the toolbar guide can be skipped and reopened and leads to an editable sample and export", async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", error => errors.push(error.message));
   await page.goto("/app");
-  await expect(page.locator("[data-action=start-onboarding]")).toBeVisible();
+  await expect(page.locator(".welcome-guide")).toHaveCount(0);
   await page.screenshot({ animations: "disabled", path: path.join(output, "home-desktop.png") });
-  await page.locator("[data-action=start-onboarding]").click();
+  await page.locator("[data-action=open-onboarding]").click();
   await expect(page.getByRole("heading", { name: "把你的图稿放进来" })).toBeVisible();
   await checkTypeAndBounds(page);
   await page.screenshot({ animations: "disabled", path: path.join(output, "onboarding-desktop.png") });
@@ -64,7 +64,12 @@ test("welcome can be skipped and reopened; the tour leads to an editable sample 
 
 test("home brief survives import; preferences save and remain editable after reload", async ({ page }) => {
   await page.goto("/app");
-  await page.locator("[data-action=start-idea-comparison]").click();
+  const suggestion = page.locator("[data-action=start-idea-comparison]");
+  await expect(suggestion).toBeHidden();
+  await page.getByTestId("start-brief").focus();
+  await suggestion.click();
+  await expect(page.getByTestId("start-brief")).not.toHaveValue("");
+  await expect(suggestion).toBeHidden();
   const message = "比较处理组与对照组，突出定量结果。";
   await page.getByTestId("start-brief").fill(message);
   // A composing Enter must never create a project or dismiss the input.

@@ -1,11 +1,12 @@
 import {
   ENGINE_VERSIONS,
   LAYOUT_SCORE_WEIGHTS,
+  rasterPpi,
   type Diagnostic,
   type FigureDocumentV1,
   type LayoutScore,
 } from "@panelstudio/contracts";
-import { rasterPpi, type LayoutAssetFacts } from "./measure.js";
+import type { LayoutAssetFacts } from "./measure.js";
 
 export type ConcreteFamily = "rows" | "hero-top" | "hero-left";
 type ScoringFamily = ConcreteFamily | "guided";

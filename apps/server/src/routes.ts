@@ -429,8 +429,11 @@ function sendBytes(
   reply: { header: (name: string, value: string) => unknown; send: (payload: Buffer) => unknown },
   file: { bytes: Buffer; mediaType: string; filename: string },
 ) {
-  const filename = file.filename.replace(/["\r\n]/gu, "");
+  const filename = file.filename.replace(/["\\/\r\n]/gu, "");
+  const fallback = filename.replace(/[^\x20-\x7e]+/gu, "_");
+  const disposition = 'attachment; filename="' + fallback + '"';
   reply.header("content-type", file.mediaType);
-  reply.header("content-disposition", `attachment; filename="${filename}"`);
+  const encoded = encodeURIComponent(filename).replace(/['()*]/gu, char => "%" + char.charCodeAt(0).toString(16).toUpperCase());
+  reply.header("content-disposition", filename === fallback ? disposition : disposition + "; filename*=UTF-8''" + encoded);
   return reply.send(file.bytes);
 }

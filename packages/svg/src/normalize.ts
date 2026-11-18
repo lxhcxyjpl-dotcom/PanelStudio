@@ -51,6 +51,7 @@ const INHERITED = new Set([
   "font-weight",
   "font-style",
   "text-anchor",
+  "xml:space",
   "color",
   "visibility",
   "display",

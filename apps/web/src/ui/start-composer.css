@@ -1,0 +1,47 @@
+.start-brief-input {
+  display: grid;
+  min-width: 0;
+}
+
+.start-brief-input > textarea,
+.start-brief-input > .home-suggestions {
+  grid-area: 1 / 1;
+}
+
+.start-brief-input > .home-suggestions {
+  align-self: end;
+  justify-self: stretch;
+  justify-content: flex-start;
+  margin: 40px 6px 6px;
+}
+
+.start-brief-input:not(:focus-within) > .home-suggestions,
+.start-composer-tools > .home-formats {
+  visibility: hidden;
+}
+
+.start-composer-tools > button:is(:hover, :focus-visible) + .home-formats {
+  visibility: visible;
+}
+
+@media (max-width: 520px) {
+  .start-brief-input .home-suggestions .icon {
+    display: none;
+  }
+
+  .start-composer-tools {
+    position: relative;
+  }
+
+  .start-composer-tools > .home-formats {
+    display: block;
+    position: absolute;
+    inset-inline-start: 0;
+    bottom: 100%;
+    padding: 4px 8px;
+    border: 1px solid var(--ui-borderSubtle);
+    border-radius: 4px;
+    background: var(--ui-surfaceElevated);
+    pointer-events: none;
+  }
+}

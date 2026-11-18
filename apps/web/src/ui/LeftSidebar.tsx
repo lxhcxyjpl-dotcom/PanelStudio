@@ -16,13 +16,13 @@ import {
   reorderLabels,
   transact,
 } from "../state/session";
-import { patch, useWorkspace } from "../state/store";
+import { patch, useWorkspace, useWorkspaceFields } from "../state/store";
 import { baseDocument } from "../state/types";
 import { Button, Icon, TabBar } from "./widgets";
 
 export function LeftSidebar() {
   const { t } = useTranslation();
-  const state = useWorkspace();
+  const state = useWorkspaceFields("assetTab", "mode", "leftWidth", "leftOpen", "projectId", "imports");
   const tab = state.assetTab;
   const setTab = (assetTab: "assets" | "panels") => patch({ assetTab });
   const [openPanels, setOpenPanels] = useState<Record<string, boolean>>({});
@@ -32,7 +32,7 @@ export function LeftSidebar() {
     enabled: Boolean(state.projectId),
     queryFn: () => api.assets(state.projectId ?? ""),
   });
-  const document = baseDocument(state);
+  const document = useWorkspace(baseDocument);
   const visible = (assets.data?.items ?? []).filter((asset) => !asset.removedFromLibraryAt &&
     !(asset.status === "failed" && state.imports.some(row => row.status === "failed" && row.filename === asset.originalFilename)));
   const completed = state.imports.filter((row) => row.status === "ready").length;
@@ -46,14 +46,14 @@ export function LeftSidebar() {
       aria-label={t("a11y.left")}
     >
       <TabBar id="asset-tabs" value={tab} onChange={setTab} label={t("a11y.left")} items={[
-        { value: "assets", label: t("assets.tab"), action: "tab-assets" }, { value: "panels", label: t("panels.tab"), action: "tab-panels" },
+        { value: "assets", label: assets.data ? t("assets.tabCount", { count: visible.length }) : t("assets.tab"), action: "tab-assets" },
+        { value: "panels", label: t("panels.tab"), action: "tab-panels" },
       ]} />
       <Button action="close-assets" className="drawer-close" variant="quiet" aria-label={t("a11y.close")}
         onClick={() => patch({leftOpen:false})}><Icon name="close" /></Button>
       <div className="side-scroll" role="tabpanel" id="asset-tabs-panel" aria-labelledby={"asset-tabs-" + tab}>
         {tab === "assets" ? (
           <section className="section asset-library">
-            <div className="library-title"><h2>{t("assets.available")}</h2><span>{visible.length}</span></div>
             {completed > 0 && <p className="import-summary" role="status"><Icon name="check" />{t("assets.importedCount",{count:completed})}</p>}
             {pending.length > 0 ? (
               <ul className="import-log">
@@ -61,12 +61,16 @@ export function LeftSidebar() {
                   <li key={row.id} data-status={row.status}>
                     <strong>{row.filename}</strong>
                     <span>
-                      {row.status === "importing" ? t("assets.importing", { name: row.filename }) : row.message}
+                      {row.status === "importing" ? t("assets.importing", { name: row.filename }) :
+                        row.code === "SVG_UNSUPPORTED_FEATURE" ? t("assets.unsupportedDetail", { detail: row.message }) : row.message}
                     </span>
                     {row.code === "SVG_UNSUPPORTED_FEATURE" ? (
-                      <Button action="svg-help" onClick={() => patch({ dialog: "svg" })}>
-                        {t("assets.formatHelp")}
-                      </Button>
+                      <>
+                        <span>{t("assets.svgRecovery")}</span>
+                        <Button action="svg-help" onClick={() => patch({ dialog: "svg" })}>
+                          {t("assets.formatHelp")}
+                        </Button>
+                      </>
                     ) : null}
                   </li>
                 ))}
@@ -110,7 +114,7 @@ function AssetCard({ asset, count }: { asset: Asset; count: number }) {
         {asset.status !== "ready" && <span className="asset-status">{t(asset.status === "failed" ? "assets.failed" : "assets.processing")}</span>}
       </div>
       <div className="asset-tools">
-        <Button action="add-asset" variant="quiet" aria-label={t("assets.add")} title={t("assets.add")}
+        <Button action="add-asset" variant="quiet" aria-label={t(count ? "assets.addCopy" : "assets.add")} title={t(count ? "assets.addCopy" : "assets.add")}
           disabledReason={asset.status === "ready" ? undefined : t("assets.processing")} onClick={() => void offerAssets([asset.id])}><Icon name="plus" /></Button>
         <DropdownMenu.Root>
           <DropdownMenu.Trigger asChild><Button action="asset-menu" variant="quiet" aria-label={t("assets.actions",{name:asset.originalFilename})} title={t("toolbar.more")}><Icon name="more" /></Button></DropdownMenu.Trigger>
@@ -131,8 +135,8 @@ function AssetCard({ asset, count }: { asset: Asset; count: number }) {
 
 function PanelList({ openPanels, onToggle }: { openPanels: Record<string, boolean>; onToggle: (panelId: string) => void }) {
   const { t } = useTranslation();
-  const state = useWorkspace();
-  const document = baseDocument(state);
+  const state = useWorkspaceFields("selection", "projectId");
+  const document = useWorkspace(baseDocument);
   const [dragId, setDragId] = useState<string | null>(null);
   const [slot, setSlot] = useState<number | null>(null);
   const list = useRef<HTMLDivElement>(null);

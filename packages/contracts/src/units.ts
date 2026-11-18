@@ -8,6 +8,13 @@ export const UNITS = {
   svgUserUnit: "mm",
 } as const;
 
+/** Source pixels retained by the crop per inch of printed panel width. */
+export function rasterPpi(frameWidthMm: number, cropWidth: number, rasterWidth: number): number | null {
+  if (!(frameWidthMm > 0) || !(rasterWidth > 0) || !(cropWidth > 0)) return null;
+  const ppi = (rasterWidth * cropWidth) / (frameWidthMm / MM_PER_INCH);
+  return Number.isFinite(ppi) ? ppi : null;
+}
+
 /** pt → SVG user units when one user unit is one millimeter. */
 export function fontSizePtToSvgUserUnits(fontSizePt: number): number {
   if (!Number.isFinite(fontSizePt)) {

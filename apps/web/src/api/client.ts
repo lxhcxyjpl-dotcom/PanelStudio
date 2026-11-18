@@ -226,9 +226,14 @@ export const api = {
     }
     const header = response.headers.get("content-disposition") ?? "";
     const matched = /filename="([^"]*)"/.exec(header);
+    const encoded = /(?:^|;)\s*filename\*=UTF-8''([^;\s]+)/i.exec(header);
+    let filename = matched?.[1] || "download";
+    if (encoded?.[1]) {
+      try { filename = decodeURIComponent(encoded[1]); } catch { /* Keep the ASCII fallback. */ }
+    }
     return {
       blob: await response.blob(),
-      filename: matched?.[1] || "download",
+      filename,
       mediaType: response.headers.get("content-type") ?? "application/octet-stream",
     };
   },

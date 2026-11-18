@@ -25,20 +25,27 @@ function historyEntry(next: number) { return { ...history.state, panelstudioInde
 export function adoptProjectPath(id: string, replace = false): void {
   commitPath(projectPath(id), replace ? "replace" : "push");
 }
-export function commitPath(path: string, mode: "push" | "replace" = "push", popIndex?: number): void {
+export function commitPath(path: string, mode: "push" | "replace" = "push", popIndex?: number, initialHash = ""): void {
   if (typeof window === "undefined") return;
   scroll.set(index, window.scrollY);
   if (popIndex !== undefined) {
     index = popIndex;
     if (location.pathname !== path) history.replaceState(historyEntry(index), "", path);
   } else if (mode === "replace" || location.pathname === path) {
-    history.replaceState(historyEntry(index), "", path);
+    history.replaceState(historyEntry(index), "", path + initialHash);
   } else {
     index += 1;
     history.pushState(historyEntry(index), "", path);
   }
   useNavigation.setState({ path, error: null, notice: null, loading: false });
-  requestAnimationFrame(() => window.scrollTo({ top: popIndex === undefined ? 0 : scroll.get(index) ?? 0, behavior: "instant" }));
+  requestAnimationFrame(() => {
+    const section = initialHash && document.getElementById(initialHash.slice(1));
+    if (section) {
+      section.scrollIntoView();
+    } else {
+      window.scrollTo({ top: popIndex === undefined ? 0 : scroll.get(index) ?? 0, behavior: "instant" });
+    }
+  });
 }
 export async function navigate(path: string, options: { replace?: boolean; popIndex?: number; initial?: boolean } = {}): Promise<boolean> {
   const ticket = ++sequence;
@@ -55,7 +62,8 @@ export async function navigate(path: string, options: { replace?: boolean; popIn
     if (ticket !== sequence) return false;
     const canonical = await resolveRoute(parseRoute(path), () => ticket === sequence);
     if (ticket !== sequence) return false;
-    commitPath(canonical ?? path, options.replace ? "replace" : "push", options.popIndex);
+    commitPath(canonical ?? path, options.replace ? "replace" : "push", options.popIndex,
+      options.initial && path === "/" ? location.hash : "");
     return true;
   } catch (error) {
     if (ticket !== sequence) return false;

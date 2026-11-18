@@ -429,7 +429,21 @@ export function transact(commands: DomainCommand[]): Promise<void> {
   return later(() => transactNow(commands));
 }
 
-async function transactNow(commands: DomainCommand[]): Promise<void> {
+export function resizeCanvas(
+  dimension: "widthMm" | "heightMm", value: number,
+  onRejected: (error: unknown, source: FigureDocumentV1) => void,
+): Promise<void> {
+  return later(async () => {
+    const document = useWorkspace.getState().confirmed?.document;
+    if (!document || document.canvas[dimension] === value) return;
+    await transactNow(
+      [{ type: "canvas.set", canvas: { ...document.canvas, [dimension]: value } }],
+      error => onRejected(error, document),
+    );
+  });
+}
+
+async function transactNow(commands: DomainCommand[], onRejected?: (error: unknown) => void): Promise<void> {
   const state = useWorkspace.getState();
   if (!state.projectId || !state.confirmed) return;
   if (state.draft) {
@@ -441,6 +455,7 @@ async function transactNow(commands: DomainCommand[]): Promise<void> {
     next = applyCommands(state.confirmed.document, commands, lookupFor(state.projectId));
   } catch (error) {
     say(errorText(error));
+    onRejected?.(error);
     return;
   }
   const idempotencyKey = newKey();
@@ -464,6 +479,7 @@ async function transactNow(commands: DomainCommand[]): Promise<void> {
     await remember(null, state.projectId);
   } catch (error) {
     if (!belongsToProject(state.projectId, epoch)) return;
+    onRejected?.(error);
     await keepFailedCommand(error, {
       baseRevision: state.confirmed.revision,
       commands,
@@ -763,16 +779,16 @@ export function acceptCandidate(): Promise<void> {
   });
 }
 
-export async function exportFigure(request: ExportRequest): Promise<void> {
+export async function exportFigure(request: ExportRequest, source: Confirmed): Promise<void> {
   const state = useWorkspace.getState();
-  if (!state.projectId || !state.confirmed) return;
+  if (!state.projectId || !state.confirmed || state.exportState?.status === "running") return;
   const epoch = projectEpoch();
-  patch({ exportState: { status: "running", revision: request.revision, phase: "export" }, dialog: "export" });
+  patch({ exportState: { status: "running", request, source, phase: "export" }, dialog: "export" });
   try {
     const accepted = await api.exportFigure(state.projectId, request, newKey());
     const job = await waitForJob(accepted.jobId);
     if (!belongsToProject(state.projectId, epoch)) return;
-    patch({ exportState: { status: "running", revision: request.revision, phase: job.phase } });
+    patch({ exportState: { status: "running", request, source, phase: job.phase } });
     if (job.status !== "succeeded" || !job.result || !("artifactId" in job.result)) {
       patch({
         exportState: {
@@ -806,8 +822,12 @@ export async function exportFigure(request: ExportRequest): Promise<void> {
 export async function downloadAgain(): Promise<void> {
   const current = useWorkspace.getState().exportState;
   if (!current || current.status !== "ready") return;
-  const file = await api.download(`/artifacts/${current.artifactId}/download`);
-  clickDownload(file.blob, current.filename || file.filename);
+  try {
+    const file = await api.download(`/artifacts/${current.artifactId}/download`);
+    if (useWorkspace.getState().exportState === current) clickDownload(file.blob, current.filename || file.filename);
+  } catch (error) {
+    if (useWorkspace.getState().exportState === current) patch({ exportState: { status: "failed", message: errorText(error) } });
+  }
 }
 
 export async function downloadOriginal(assetId: string): Promise<void> {

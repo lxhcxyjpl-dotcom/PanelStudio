@@ -74,7 +74,7 @@ import {
 import { buildProjectPackage, readProjectPackage, type PackagedAsset } from "./figure-package.js";
 import { packagedFontFiles } from "./fonts.js";
 import { ApiException } from "./http.js";
-import { normalizeRaster, rasterizeSvg, sniffMediaType, type RasterMediaType } from "./raster.js";
+import { normalizeRaster, pngWithDensity, rasterizeSvg, sniffMediaType, type RasterMediaType } from "./raster.js";
 import { PNG_RENDERER, type RenderPool } from "./render-pool.js";
 import { compileSnapshot, type RenderSnapshot } from "./render-task.js";
 import { queueRenderJob } from "./render-jobs.js";
@@ -1027,7 +1027,7 @@ async function produceExport(
   }
   if (request.format === "png") {
     const image = await ctx.renders.render(snapshot, pngPixelsFromMm(document.canvas.widthMm, request.options.dpi));
-    return { bytes: Buffer.from(image.bytes), mediaType: "image/png", filename: stem + ".png",
+    return { bytes: pngWithDensity(image.bytes, request.options.dpi), mediaType: "image/png", filename: stem + ".png",
       rendererVersion: PNG_RENDERER, diagnostics: image.diagnostics };
   }
   const assets = packageAssets(ctx, project.id);
@@ -1392,6 +1392,6 @@ function isTitle(value: unknown): value is string {
 }
 
 function fileStem(title: string): string {
-  const cleaned = title.replace(/[^\w.-]+/gu, "-").replace(/^-+|-+$/gu, "");
-  return (cleaned.length > 0 ? cleaned : "figure").slice(0, 80);
+  const cleaned = title.normalize("NFC").replace(/[^\p{L}\p{M}\p{N}_.-]+/gu, "-").replace(/^[-.]+|[-.]+$/gu, "");
+  return Array.from(cleaned || "figure").slice(0, 80).join("");
 }

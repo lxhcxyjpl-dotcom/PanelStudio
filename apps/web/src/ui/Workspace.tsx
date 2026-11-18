@@ -23,7 +23,7 @@ import {
   selectAll,
   undo,
 } from "../state/session";
-import { patch, useWorkspace } from "../state/store";
+import { patch, useWorkspace, useWorkspaceFields } from "../state/store";
 import { baseDocument } from "../state/types";
 import { CanvasStage } from "./CanvasStage";
 import { labelName } from "../model/changes";
@@ -37,9 +37,12 @@ import { Button } from "./widgets";
 
 export function Workspace({ active = true }: { active?: boolean }) {
   const { t } = useTranslation();
-  const state = useWorkspace();
+  const state = useWorkspaceFields(
+    "confirmed", "mode", "leftOpen", "rightOpen", "leftWidth", "rightWidth", "booting", "draggingFiles", "liveMessage",
+  );
   const drawerSide = state.confirmed && (state.mode === "drawer" || state.mode === "phone")
     ? state.leftOpen ? "assets" : state.rightOpen ? "inspector" : null : null;
+  const overlayDrawer = Boolean(drawerSide) && state.mode === "drawer";
   useEffect(() => {
     if (!active || !drawerSide) return;
     const trigger = document.querySelector<HTMLButtonElement>('[data-action="drawer-' + drawerSide + '"]');
@@ -204,17 +207,17 @@ export function Workspace({ active = true }: { active?: boolean }) {
   const right = sidebarWidth("right", state.mode, state.rightWidth);
   return (
     <div className="app" data-testid="workspace" data-editor={Boolean(state.confirmed)}>
-      <Toolbar inert={Boolean(drawerSide)} />
+      <Toolbar inert={overlayDrawer} />
       <div className={"workspace" + (state.confirmed ? "" : " home-workspace")}>
-        <div className="editor-panes" hidden={!state.confirmed}>
+        <div className="editor-panes" data-open-panel={drawerSide ?? undefined} hidden={!state.confirmed}>
           <LeftSidebar />
           {state.mode === "full" ? <Divider side="left" width={left} /> : <div className="divider" />}
-          <div className="canvas-column" inert={Boolean(drawerSide)}>
+          <div className="canvas-column" inert={overlayDrawer}>
             {state.confirmed && <><Banners /><CanvasStage /></>}
           </div>
           {state.mode === "full" ? <Divider side="right" width={right} /> : <div className="divider" />}
           <Inspector />
-          {drawerSide &&
+          {overlayDrawer &&
             <button className="drawer-backdrop" type="button" tabIndex={-1} data-action="close-drawer" aria-label={t("a11y.close")}
               onClick={() => patch({ leftOpen: false, rightOpen: false })} />}
         </div>
@@ -237,13 +240,13 @@ export function Workspace({ active = true }: { active?: boolean }) {
 
 function Banners() {
   const { t } = useTranslation();
-  const state = useWorkspace();
+  const state = useWorkspaceFields("projectId", "backend", "saveState");
   const assets = useQuery({
     queryKey: ["assets", state.projectId],
     enabled: Boolean(state.projectId),
     queryFn: () => api.assets(state.projectId ?? ""),
   });
-  const art = baseDocument(state);
+  const art = useWorkspace(baseDocument);
   const missing = (assets.data?.items ?? []).flatMap((asset) => asset.diagnostics.filter((item) => item.code === "FONT_MISSING"));
   const labelIssues = art ? labelDiagnostics(art) : [];
   return (

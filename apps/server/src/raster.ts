@@ -1,5 +1,6 @@
 import { RESOURCE_LIMITS, type NormalizedAsset } from "@panelstudio/contracts";
 import { Resvg } from "@resvg/resvg-js";
+import { crc32 } from "node:zlib";
 import sharp, { type Metadata } from "sharp";
 import { resvgFontOptions } from "./fonts.js";
 import { ApiException } from "./http.js";
@@ -121,4 +122,27 @@ export function rasterizeSvg(svg: string, pixelWidth: number): Buffer {
     font: resvgFontOptions(),
   });
   return Buffer.from(resvg.render().asPng());
+}
+
+/** Tag the final PNG without decoding or recompressing the renderer's pixels. */
+export function pngWithDensity(rendered: Uint8Array, dpi: number): Buffer {
+  const png = Buffer.from(rendered.buffer, rendered.byteOffset, rendered.byteLength);
+  const pixelsPerMetre = Math.round(dpi / 0.0254);
+  const chunk = Buffer.alloc(21);
+  chunk.writeUInt32BE(9);
+  chunk.write("pHYs", 4, "ascii");
+  chunk.writeUInt32BE(pixelsPerMetre, 8);
+  chunk.writeUInt32BE(pixelsPerMetre, 12);
+  chunk[16] = 1; // PNG unit specifier for metres.
+  chunk.writeUInt32BE(crc32(chunk.subarray(4, 17)), 17);
+  // Replace any density emitted by the renderer, otherwise insert before IDAT.
+  for (let offset = 8; offset + 12 <= png.length;) {
+    const end = offset + 12 + png.readUInt32BE(offset);
+    const type = png.toString("ascii", offset + 4, offset + 8);
+    if (type === "pHYs" || type === "IDAT") {
+      return Buffer.concat([png.subarray(0, offset), chunk, png.subarray(type === "pHYs" ? end : offset)]);
+    }
+    offset = end;
+  }
+  throw new Error("Rendered PNG contains no image data.");
 }

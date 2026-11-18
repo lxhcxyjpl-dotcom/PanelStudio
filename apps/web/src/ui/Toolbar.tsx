@@ -15,13 +15,15 @@ import {
   restoreListedProject,
   returnToStart,
 } from "../state/session";
-import { patch, useWorkspace } from "../state/store";
+import { patch, useWorkspace, useWorkspaceFields } from "../state/store";
 import { cropInvalid } from "../model/document-ui";
 import { Button, Icon } from "./widgets";
 
 export function Toolbar({ inert }: { inert: boolean }) {
   const { t } = useTranslation();
-  const state = useWorkspace();
+  const state = useWorkspaceFields(
+    "projectId", "confirmed", "draft", "crop", "backend", "saveState", "mode", "exportState", "compareMode",
+  );
   const count = state.confirmed?.document.panelOrder.length ?? 0;
   const importPrimary = count === 0;
   const layoutReason = !state.confirmed
@@ -115,8 +117,8 @@ export function Toolbar({ inert }: { inert: boolean }) {
           onClick={() => void requestLayout()}>
           <Icon name="layout" />{t("toolbar.autoLayout")}
         </Button>
-        <Button action="guided-layout" className="guided-action" disabledReason={layoutReason} onClick={() => patch({ dialog: "guided" })}>
-          <Icon name="reference" />{t("layout.guide")}
+        <Button action="guided-layout" className="guided-action" aria-label={t("layout.guide")} disabledReason={layoutReason} onClick={() => patch({ dialog: "guided" })}>
+          <Icon name="reference" />{t(state.mode === "phone" ? "layout.mobileGuide" : "layout.guide")}
         </Button>
         <Button action="open-refine" variant="quiet" onClick={() => patch({ inspectorMode: "ai", rightOpen: true, leftOpen: false })}><Icon name="sliders" />{t("ai.tab")}</Button>
       </div> : <Button action="start-open-package" variant="quiet" aria-label={t("app.openBundle")} title={t("app.openBundle")} onClick={() => document.getElementById("package-input")?.click()}>
@@ -158,7 +160,7 @@ export function Toolbar({ inert }: { inert: boolean }) {
         data-testid="export-button"
         variant={importPrimary ? "default" : "primary"}
         disabledReason={state.confirmed ? undefined : t("app.noProject")}
-        onClick={() => patch({ dialog: "export", exportState: null })}
+        onClick={() => patch({ dialog: "export", exportState: state.exportState?.status === "running" ? state.exportState : null })}
       >
         <Icon name="export" />
         {t("toolbar.export")}

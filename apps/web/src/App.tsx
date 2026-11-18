@@ -10,7 +10,7 @@ import { FileInputs } from "./ui/FileInputs";
 import { Button } from "./ui/widgets";
 import { connectNavigation, navigate, parseRoute, projectPath, useNavigation } from "./navigation";
 import { boot, hasUnsettledEdits, loadProject, newProject, prepareNavigation } from "./state/session";
-import { useWorkspace } from "./state/store";
+import { useWorkspace, useWorkspaceFields } from "./state/store";
 import { readProjectId } from "./prefs";
 import { ensureEditorFonts } from "./editor-fonts";
 import { ApiClientError } from "./api/client";
@@ -38,7 +38,7 @@ async function resolveRoute(route: ReturnType<typeof parseRoute>, isCurrent: () 
 export function App() {
   const { t } = useTranslation();
   const nav = useNavigation();
-  const state = useWorkspace();
+  const state = useWorkspaceFields("dialog", "confirmed", "projectId", "liveMessage");
   const route = parseRoute(nav.path);
   const [editorReady, setEditorReady] = useState(false);
   const [fontError, setFontError] = useState(false);

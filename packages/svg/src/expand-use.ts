@@ -21,6 +21,7 @@ const PRESENTATION = new Set([
   "font-size",
   "font-weight",
   "font-style",
+  "xml:space",
   "display",
   "visibility",
   "color",
