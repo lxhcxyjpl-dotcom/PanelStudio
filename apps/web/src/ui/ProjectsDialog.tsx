@@ -19,9 +19,12 @@ export function ProjectsDialog({ open }: { open: boolean }) {
   const current = useWorkspace(s => s.projectId);
   const projects = useQuery({ queryKey: ["project-library"], enabled: open,
     queryFn: () => api.projects({ includeDeleted: true }), refetchOnMount: "always" });
-  const matches = [...(projects.data?.items ?? [])].filter(p => Boolean(p.deletedAt) === trash && p.title.toLocaleLowerCase().includes(search.toLocaleLowerCase()))
-    .sort((a,b) => b.updatedAt.localeCompare(a.updatedAt));
+  const sectionItems = (projects.data?.items ?? []).filter(project => Boolean(project.deletedAt) === trash);
+  const term = search.trim().toLocaleLowerCase();
+  const matches = sectionItems.filter(project => project.title.toLocaleLowerCase().includes(term))
+    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   const items = matches.slice(0,visibleCount);
+  const emptyMessage = sectionItems.length ? "project.noMatches" : trash ? "project.emptyTrash" : "project.empty";
   const date = new Intl.DateTimeFormat(i18n.language, { month: "short", day: "numeric" });
   async function run(task: () => Promise<unknown>) {
     setBusy(true); setError("");
@@ -40,7 +43,7 @@ export function ProjectsDialog({ open }: { open: boolean }) {
         : <Button action="delete-listed-project" variant="quiet" disabled={busy} aria-label={t("toolbar.deleteProject") + ": " + project.title}
           onClick={() => void run(() => project.id === current ? deleteCurrentProject() : api.deleteProject(project.id))}><Icon name="trash" /></Button>}
     </div>)}</div>
-    {!items.length && !projects.isPending && <p className="muted">{t("project.noMatches")}</p>}
+    {projects.isSuccess && !items.length && <p className="muted" role="status">{t(emptyMessage)}</p>}
     {projects.isPending && <p role="status">{t("app.opening")}</p>}
     {matches.length > items.length && <Button action="more-projects" onClick={() => setVisibleCount(count=>count+50)}>{t("project.more")}</Button>}
   </Shell>;

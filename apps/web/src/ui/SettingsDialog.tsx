@@ -27,8 +27,7 @@ export function SettingsDialog({ open, initialSection }: { open: boolean; initia
 function GeneralSettings() {
   const { t, i18n } = useTranslation();
   const state = useWorkspaceFields("theme", "locale", "motion", "reduceTransparency");
-  return <section className="general-settings">
-    <h3>{t("connection.general")}</h3>
+  return <section aria-label={t("connection.general")}>
     <label className="settings-row"><span>{t("settings.theme")}</span>
       <select aria-label={t("settings.theme")} value={state.theme} onChange={event => patch({ theme: event.target.value === "dark" ? "dark" : "light" })}>
         <option value="light">{t("settings.light")}</option><option value="dark">{t("settings.dark")}</option>
@@ -74,6 +73,8 @@ function ProviderConnection() {
   const keepSecret = Boolean(sameEndpoint && settings.data?.hasSecret);
   const localOllama = preset === "ollama" && inferProvider(config.baseUrl) === "ollama" && config.allowLocalEndpoint;
   const urlError = addressProblem(config.baseUrl, config.allowLocalEndpoint);
+  const addressError = attempted || config.baseUrl ? urlError : null;
+  const addressHint = addressError ?? (preset === "custom" ? "connection.compatibility" : null);
   const keyError = /[\r\n]/u.test(secret.trim()) ? "connection.keyInvalid" : !secret.trim() && !keepSecret && !localOllama ? "connection.keyRequired" : null;
   const dirty = secret.length > 0 || JSON.stringify(config) !== JSON.stringify(settings.data?.config);
   const verified = !dirty && testedRevision !== null && testedRevision === settings.data?.configRevision;
@@ -127,23 +128,22 @@ function ProviderConnection() {
     } catch (error) { setMessage({ kind: "error", text: error instanceof Error ? error.message : t("ai.jobFailed") }); }
     finally { setBusy(null); }
   }
-  return <section className="provider-connection" data-testid="ai-settings">
-    <div className="connection-heading"><div><h3>{t("connection.heading")}</h3><p>{t("connection.compatibility")}</p></div>
-      <span className="connection-badge" data-verified={verified}>{t(verified ? "connection.verified" : keepSecret && !dirty ? "connection.configured" : "connection.notConnected")}</span>
-    </div>
+  return <section className="provider-connection" data-testid="ai-settings" aria-label={t("connection.title")}>
     <form noValidate onSubmit={event => { event.preventDefault(); if (!busy) void persist(false); }}>
       <fieldset disabled={Boolean(busy) || settings.isPending} className="connection-fields">
-        <label className="field"><span>{t("connection.service")}</span><select aria-label={t("connection.service")} data-testid="ai-service" value={preset} onChange={event => choose(event.target.value as ProviderPreset)}>
-          <option value="custom">{t("connection.custom")}</option><option value="deepseek">DeepSeek</option><option value="openai">OpenAI</option>
-          <option value="openrouter">OpenRouter</option><option value="ollama">Ollama</option>
-        </select></label>
+        <div className="field connection-service">
+          <label htmlFor="connection-service">{t("connection.service")}</label>
+          <span className="connection-badge" data-verified={verified}>{t(verified ? "connection.verified" : keepSecret && !dirty ? "connection.configured" : "connection.notConnected")}</span>
+          <select id="connection-service" data-testid="ai-service" value={preset} onChange={event => choose(event.target.value as ProviderPreset)}>
+            <option value="custom">{t("connection.custom")}</option><option value="deepseek">DeepSeek</option><option value="openai">OpenAI</option>
+            <option value="openrouter">OpenRouter</option><option value="ollama">Ollama</option>
+          </select>
+        </div>
         <label className="field"><span>{t("connection.address")}</span>
           <input ref={address} aria-label={t("connection.address")} data-testid="ai-base-url" value={form.baseUrl} placeholder="https://api.example.com/v1" inputMode="url" autoCapitalize="none" autoCorrect="off" spellCheck={false}
-            aria-invalid={Boolean(urlError && (attempted || form.baseUrl.trim()))} aria-describedby="connection-address-hint"
+            aria-invalid={Boolean(addressError)} aria-describedby={addressHint ? "connection-address-hint" : undefined}
             onChange={event => { const baseUrl = event.target.value; edit({ ...form, baseUrl, capabilities: { ...form.capabilities, imageInput: knownVision(baseUrl, form.model) ?? false } }); }} />
-          <small id="connection-address-hint" className={urlError && (attempted || form.baseUrl.trim()) ? "field-error" : "field-hint"}>
-            {t(urlError && (attempted || form.baseUrl.trim()) ? urlError : "connection.addressHint")}
-          </small>
+          {addressHint && <small id="connection-address-hint" className={addressError ? "field-error" : "field-hint"}>{t(addressHint)}</small>}
         </label>
         <label className="field"><span>{t("settings.model")}</span>
           <input ref={modelInput} aria-label={t("settings.model")} data-testid="ai-model" value={form.model} autoCapitalize="none" spellCheck={false} placeholder={t("connection.modelPlaceholder")}

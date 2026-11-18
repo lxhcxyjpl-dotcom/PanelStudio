@@ -1,6 +1,7 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { expect, test, type Page } from "@playwright/test";
+import type { Project } from "@panelstudio/contracts";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
 const raster = path.join(root, "fixtures/mixed/raster.png");
@@ -22,6 +23,42 @@ test.beforeEach(async ({ page }) => {
       }),
     );
   });
+});
+
+test("distinguishes empty collections, an unmatched search and a failed project request", async ({ page }) => {
+  const date = "2026-11-18T00:00:00.000Z";
+  const project: Project = { id: crypto.randomUUID(), title: "免疫荧光", createdAt: date, updatedAt: date, deletedAt: null, currentRevision: 0 };
+  let items: Project[] = [];
+  let available = true;
+  await page.route(url => url.pathname === "/api/v1/projects" && url.searchParams.get("includeDeleted") === "true", route =>
+    available ? route.fulfill({ json: { items, nextCursor: null } }) : route.fulfill({ status: 503, json: {} }));
+  await page.setViewportSize({ width: 390, height: 844 });
+  const open = page.getByRole("button", { name: "所有项目", exact: true });
+  const dialog = page.getByRole("dialog", { name: "所有项目" });
+  const search = dialog.getByRole("textbox", { name: "搜索项目" });
+  const empty = dialog.getByRole("status");
+  const trash = dialog.getByRole("button", { name: "回收站", exact: true });
+  await page.goto("/");
+  await open.click();
+  await expect(empty).toHaveText("暂无项目");
+  await trash.click();
+  await expect(empty).toHaveText("回收站为空");
+
+  items = [project];
+  await page.reload();
+  await open.click();
+  await search.fill("  免疫荧光  ");
+  await expect(dialog.getByRole("button", { name: project.title, exact: true })).toBeVisible();
+  await search.fill("找不到的图稿");
+  await expect(empty).toHaveText("没有匹配的项目");
+  await trash.click();
+  await expect(empty).toHaveText("回收站为空");
+
+  available = false;
+  await page.reload();
+  await open.click();
+  await expect(dialog.getByRole("alert")).toContainText("无法连接项目服务");
+  await expect(empty).toHaveCount(0);
 });
 
 test("opens, soft-deletes, and restores a project from the project menu", async ({ page }) => {
