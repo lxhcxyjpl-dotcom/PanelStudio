@@ -13,15 +13,15 @@ PanelStudio 是一个本地或自部署的科研多面板排版编辑器。导�
 3. 应用草案后，直接移动编号、拖动整组或多选对象，或在面板列表中调整编号顺序。选中两个或三个完整单元，可在指定区域内按原尺寸、等宽或等高排成一行。
 4. 导出可编辑 SVG。图块、支持的原生路径和文字、栅格素材保持独立。编号的屏幕预览和布局使用内置 Noto 字体的实际度量。
 
-![PanelStudio 品牌首页](docs/screenshots/editorial/home-desktop.png)
+![PanelStudio 首页展示同一组科研图稿的三种版式](docs/screenshots/editorial/home-first-pass.png)
 
-本分支加入独立品牌首页 `/`：四类示例轮播与可暂停的编辑过程回放均来自实际导入、排版、事务和导出。`/app` 继续最近项目，`/app/:projectId` 直接打开图稿。返回首页保留编辑视图和未发送的 AI 输入。界面严格使用 **13 / 15 / 24 / 56 px** 四档字号，科研图稿内部文字保留原始文档字号。
+首页 `/` 展示同一组科研图稿的三种版式，每 5 秒轮换一次，可点选或暂停。顶栏「作品与演示」提供四类可编辑示例、编辑过程回放和 SVG 下载。「开始排版」进入 `/app` 创建或继续图稿。返回首页会保留编辑视图和未发送的 AI 输入。界面使用 **13 / 15 / 24 / 56 px** 四档字号，科研图稿使用文档自己的字号。
 
-![重构后的科研组图工作区](docs/screenshots/editorial/editor-desktop.png)
+![默认编号收起后的科研组图工作区](docs/screenshots/editorial/editor-first-pass.png)
 
 布局候选移到右侧，切换时不压缩画布。检查器支持单图几何与编号、多选统一字体/字号/字重/颜色；AI 展示结构化修改和折叠历史。导出窗口明确显示已保存修订号，可选择 SVG、PNG 或工程包。原有参考图、排版目标、服务连接和连续草案精修功能保留。
 
-[53 秒实际运行录像](docs/demo/editorial-studio.webm) · [设计系统](docs/editorial-design-system.md) · [逐项交付与回归记录](docs/editorial-implementation.md) · [四类原创合成示例](examples/showcase/)
+[首页与工作台实际运行录像](docs/demo/first-pass.mp4) · [设计系统](docs/editorial-design-system.md) · [上一阶段交付与回归记录](docs/editorial-implementation.md) · [四类原创合成示例](examples/showcase/)
 
 工具栏的 **参考图与偏好** 支持上传期刊组图、写下构图要求，或同时使用两者。可以指定主图、相邻对比、画布方向与面板间距，再预览候选。参考图在浏览器内识别，识别框可手动调整。参见[六图排版对照、工程包与 Illustrator 样稿](examples/reference-preferences/)。
 

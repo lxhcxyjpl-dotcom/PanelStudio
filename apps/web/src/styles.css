@@ -609,7 +609,22 @@ html[data-reduce-motion="true"] .button:active:not(:disabled) {
 .guide-unresolved { border-left: 2px solid #b67535; padding-left: 8px; font-size: var(--ui-type-caption); }
 .guide-controls, .guide-pair, .guide-coordinates { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; }
 .guide-coordinates { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.guide-section-heading { display: flex; align-items: center; gap: 7px; }
+.guide-section-heading .icon, .guide-file > .icon { flex-shrink: 0; }
+.guide-file { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; align-content: center; gap: 8px; min-height: 82px; background: var(--ui-surfaceInset); }
+.guide-file.has-reference small { flex-basis: 100%; text-align: center; }
+.guide-section textarea { min-height: 82px; }
+.guide-manual { min-width: 0; border-top: 1px solid var(--ui-borderSubtle); }
+.guide-manual summary { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 4px 8px; padding: 10px 0; cursor: pointer; list-style: none; font-size: var(--ui-type-caption); }
+.guide-manual summary::-webkit-details-marker { display: none; }
+.guide-manual summary .icon { height: 14px; width: 14px; }
+.guide-manual[open] summary .icon { transform: rotate(180deg); }
+.guide-manual-value { grid-column: 1/-1; color: var(--ui-textSecondary); line-height: 1.5; overflow-wrap: anywhere; }
+.guide-manual[open] .guide-manual-value { display: none; }
+.guide-manual-fields { display: grid; gap: 10px; }
 .guide-submit { border-top: 1px solid var(--ui-borderSubtle); padding-top: 12px; }
+.guide-submit > .button { flex-shrink: 0; margin-left: auto; }
+@media (max-width: 680px) { .guide-manual summary { min-height: 44px; } }
 
 @media (max-width: 680px) { .guide-columns { grid-template-columns: minmax(0, 1fr); } .dialog.guide-dialog { padding: 14px; } }
 

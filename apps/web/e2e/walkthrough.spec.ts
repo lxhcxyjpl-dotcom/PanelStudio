@@ -52,7 +52,7 @@ test("imports six drawings, lays them out, applies one sentence, and exports SVG
     await expect(page.getByTestId("candidate-card").first().locator("img")).toBeVisible();
     await beat(page);
     await shot(page, "03-layout");
-    await page.getByRole("button", { name: "使用此布局" }).click();
+    await page.getByRole("button", { name: "应用此版" }).click();
     await expect(page.getByTestId("save-status")).toHaveText("已保存");
     await beat(page);
     await shot(page, "04-laid-out");

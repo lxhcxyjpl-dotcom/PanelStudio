@@ -96,6 +96,7 @@ test("a failed target width cannot apply a previous layout", async ({ page }) =>
   await action(page, "preview-canvas-width").click();
   await expect(page.getByText(/布局约束无解/).first()).toBeVisible();
   await expect(page.getByTestId("candidate-card")).toHaveCount(0);
-  await expect(action(page, "apply-layout")).toBeDisabled();
+  await expect(action(page, "apply-layout")).toHaveCount(0);
+  await expect(action(page, "cancel-layout")).toHaveText("返回编辑");
   expect((await snapshot()).documentHash).toBe(original.documentHash);
 });

@@ -35,24 +35,27 @@ export function ExportDialog({ open }: { open: boolean }) {
   const request = (): ExportRequest => format === "svg" ? { revision, format, options: { includeMetadata: metadata } }
     : format === "png" ? { revision, format, options: { dpi } } : { revision, format, options: { includeBundledFonts: fonts } };
   return <Shell open={open} title={t("export.title")} className="export-dialog">
-    <p className="export-context" data-testid="export-revision">{state.title} · {t("export.revision", { revision })}</p>
-    {state.cards.length > 0 && <p className="export-advice" role="status">{t("export.pendingDraft", { revision })}</p>}
+    {state.cards.length > 0 ? <>
+      <p className="export-context">{state.title}</p>
+      <p className="export-advice" data-testid="export-revision" role="status">{t("export.pendingDraft", { revision })}</p>
+    </> : <p className="export-context" data-testid="export-revision">{state.title} · {t("export.revision", { revision })}</p>}
     {state.draft && <div className="export-advice"><p>{t("export.unsaved")}</p><Button action="export-recover" variant="quiet" onClick={() => patch({ dialog: "recovery" })}>{t("save.retry")}</Button></div>}
     <TabBar id="export-format" label={t("export.format")} value={format} onChange={value => { if (value !== format) changeOption(() => setFormat(value)); }} items={(["svg", "png", "project"] as const).map(value => ({value, action:"format-" + value, label:value === "project" ? t("export.project") : value.toUpperCase(), disabled:running}))} />
     <div className="export-format-content" role="tabpanel" id="export-format-panel" aria-labelledby={"export-format-" + format}>
       {format === "svg" && <><p>{t("export.editableDetail")}</p><label className="check"><input type="checkbox" checked={metadata} disabled={running} onChange={event => changeOption(() => setMetadata(event.target.checked))} />{t("export.includeMetadata")}</label></>}
       {format === "png" && <><label className="field"><span>{t("export.dpi")}</span><select value={dpi} disabled={running} onChange={event => changeOption(() => setDpi(Number(event.target.value) as typeof dpi))}>
         {PNG_DPI_OPTIONS.map(option => <option key={option} value={option}>{option} DPI</option>)}</select></label>
-        {source && <p className="numeric-text">{t("export.dimensions", { width: pngPixelsFromMm(source.document.canvas.widthMm, dpi), height: pngPixelsFromMm(source.document.canvas.heightMm, dpi) })}</p>}</>}
+        {source && <p className="numeric-text" data-testid="export-dimensions">{t("export.dimensions", { width: pngPixelsFromMm(source.document.canvas.widthMm, dpi), height: pngPixelsFromMm(source.document.canvas.heightMm, dpi) })}</p>}</>}
       {format === "project" && <><p>{t("export.packageDetail")}</p><label className="check"><input type="checkbox" checked={fonts} disabled={running} onChange={event => changeOption(() => setFonts(event.target.checked))} />{t("export.includeFonts")}</label></>}
       {open && source && state.projectId && <RasterQuality projectId={state.projectId} document={source.document} />}
-      <details className="export-font-details" open={format === "svg"}><summary>{t("export.fontDetails")}</summary>
+      <details key={format} className="export-font-details"><summary>{t(format === "svg" ? "export.svgDetails" : "export.fontDetails")}</summary>
+        {format === "svg" && <p>{t("export.rasterDetail")}</p>}
         <p data-testid="font-status">{BUNDLED_FONTS.map(font => font.family).join(" / ")}</p><p>{t("export.fontAdvice")}</p>
         <a className="button quiet" data-action="download-fonts" href="/api/v1/fonts/bundle" download="panelstudio-fonts.zip">{t("export.downloadFonts")}<Icon name="import" /></a>
       </details>
     </div>
     {state.exportState?.status === "running" && <p role="status" data-testid="export-phase">{t("export.running", { revision: state.exportState.request.revision, phase: state.exportState.phase })}</p>}
-    {state.exportState?.status === "ready" && <div className="export-result" role="status"><strong>{state.exportState.filename}</strong>
+    {state.exportState?.status === "ready" && state.exportState.format === format && <div className="export-result" role="status"><strong>{state.exportState.filename}</strong>
       <Button action="download-again" variant="quiet" onClick={() => void downloadAgain()}>{t("export.downloadAgain")}</Button>
       <ul data-testid="export-diagnostics">{state.exportState.diagnostics.map((item, index) => <li key={index}>{formatDiagnostic(t, item)}</li>)}</ul></div>}
     {state.exportState?.status === "failed" && <p role="alert" className="field-error">{state.exportState.message}</p>}

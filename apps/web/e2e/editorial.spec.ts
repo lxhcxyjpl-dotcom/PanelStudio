@@ -39,6 +39,13 @@ for (const [width, height, locale, theme] of [[1440,900,"zh-CN","light"], [1280,
     await expect(papers).toHaveCount(3);
     await expect(papers.locator("img")).toHaveCount(3);
     await expect(page.getByTestId("demo-stage")).toBeHidden();
+    await expect(action(page, "hero-playback")).toBeHidden();
+    await action(page, "choose-example").nth(2).focus();
+    await page.keyboard.press("Enter");
+    await expect(papers.nth(2)).toHaveAttribute("data-role", "front");
+    await expect(papers.nth(2)).toHaveCSS("opacity", "1");
+    await expect(papers.nth(1)).toHaveCSS("opacity", "0.42");
+    await action(page, "choose-example").first().click();
     await expect(page.locator(".brand-intro h1")).toHaveCSS("font-size", width < 768 ? "24px" : "56px");
     await expect.poll(() => papers.locator("img").evaluateAll(images => images.every(img => (img as HTMLImageElement).complete && (img as HTMLImageElement).naturalWidth > 0))).toBe(true);
     await boundsAndType(page);
@@ -139,13 +146,79 @@ test("inspector candidates preserve the viewport, readonly previews and saved ex
   await expect(page.getByTestId("export-revision")).toContainText(String(original.revision));
   for (const format of ["svg","png","project"] as const) {
     await action(page,"format-"+format).click();
+    await expect(action(page,"download-again")).toBeHidden();
+    await expect(page.getByTestId("export-revision")).toBeVisible();
+    await expect(page.getByTestId("export-revision")).toContainText(`草案未应用，将导出已保存版本 ${original.revision}`);
+    await expect(page.getByTestId("font-status")).toBeHidden();
+    if (format === "svg") {
+      const rasterHint = page.getByText(/栅格子图保留为独立图片/);
+      await expect(rasterHint).toBeHidden(); await page.locator(".export-font-details summary").click();
+      await expect(rasterHint).toBeVisible(); await expect(action(page,"download-fonts")).toBeVisible();
+    }
+    const {widthMm,heightMm} = original.document.canvas;
+    const pixels = [widthMm,heightMm].map(mm => Math.round(mm * 300 / 25.4));
+    if (format === "png") {
+      await page.getByRole("combobox", { name: "整图 PNG 输出分辨率" }).selectOption("300");
+      await expect(page.getByTestId("export-dimensions")).toHaveText(`预计 ${pixels.join(" × ")} px`);
+    }
     const downloadPromise=page.waitForEvent("download"); await action(page,"export-"+format).click();
     const file=await downloadPromise, dest=info.outputPath(file.suggestedFilename()); await file.saveAs(dest);
     expect(readFileSync(dest).byteLength).toBeGreaterThan(100);
-    if (format==="svg") expect(readFileSync(dest,"utf8")).toContain("<text");
+    if (format === "svg") {
+      const svg = readFileSync(dest,"utf8"); expect(svg).toContain("<text");
+      const meta = await page.evaluate(text => JSON.parse(new DOMParser().parseFromString(text,"image/svg+xml").querySelector("metadata")!.textContent!), svg);
+      expect(meta.revision).toBe(original.revision);
+    } else if (format === "png") {
+      const bytes = readFileSync(dest); expect([bytes.readUInt32BE(16), bytes.readUInt32BE(20)]).toEqual(pixels);
+    }
     await expect(action(page,"download-again")).toBeVisible();
   }
   expect((await snapshot(page,id)).documentHash).toBe(original.documentHash);
+});
+
+for (const width of [1440, 320]) test(`compares real artwork, reopens kept candidates and discards without committing at ${width}`, async ({page}) => {
+  await page.setViewportSize({ width, height: width === 320 ? 740 : 900 });
+  await preferences(page); await page.goto("/"); const id = await sample(page), saved = await snapshot(page,id);
+  await action(page,"guided-layout").click(); await page.getByTestId("guide-words").fill("间距 4 mm");
+  await action(page,"generate-guided").click();
+  const cards = page.getByTestId("candidate-card");
+  await expect(cards.first()).toContainText("2 行 · 每行 3 图");
+  await expect(cards.nth(1)).toContainText("3 行 · 每行 2 图");
+  await expect(cards.first().locator("img")).toBeVisible();
+  const ratios = await cards.first().locator("img").evaluate(img => {
+    const {width:w,height:h} = img.getBoundingClientRect();
+    return [w/h, img.naturalWidth/img.naturalHeight];
+  });
+  expect(ratios[0]).toBeCloseTo(ratios[1]!, 1);
+  await boundsAndType(page); await expect(action(page,"apply-layout")).toBeInViewport();
+  await cards.nth(1).click(); await expect(cards.nth(1)).toHaveAttribute("aria-pressed", "true");
+  await page.getByRole("button",{name:"保留候选，返回编辑"}).click();
+  await expect(page.locator(".board-info strong")).toHaveText("画板");
+  if (width < 768) await action(page,"mobile-properties").click();
+  await page.getByRole("tab",{name:"候选版式"}).click();
+  await expect(cards.nth(1)).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator(".board-info strong")).toHaveText("布局预览");
+  await page.getByRole("button",{name:"丢弃候选"}).click();
+  await expect(action(page,"tab-layout")).toHaveCount(0);
+  expect((await snapshot(page,id)).documentHash).toBe(saved.documentHash);
+  expect((await snapshot(page,id)).revision).toBe(saved.revision);
+});
+
+test("cancelling layout before the server replies cannot reopen a discarded preview", async ({ page }) => {
+  await preferences(page); await page.goto("/"); const id = await sample(page), saved = await snapshot(page,id);
+  let release!: () => void;
+  const waitForCancel = new Promise<void>(resolve => { release = resolve; });
+  await page.route("**/layout-candidates", async route => { const response = await route.fetch(); await waitForCancel; await route.fulfill({response}); });
+  try {
+    await page.getByTestId("layout-button").click();
+    await expect(page.getByText("正在计算布局候选", {exact:true})).toBeVisible();
+    await action(page,"cancel-layout").click();
+    const done = page.waitForResponse(response => response.url().endsWith("/layout-candidates"));
+    release(); await (await done).finished();
+    await expect(action(page,"tab-properties")).toHaveAttribute("aria-selected","true");
+    await expect(action(page,"tab-layout")).toHaveCount(0); await expect(page.getByTestId("candidate-card")).toHaveCount(0);
+    expect((await snapshot(page,id)).documentHash).toBe(saved.documentHash);
+  } finally { release(); }
 });
 
 test("multi-panel typography writes one undoable transaction and tab arrows do not nudge artwork", async ({ page }) => {

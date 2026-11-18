@@ -86,3 +86,5 @@ pnpm --filter @panelstudio/web build
 使用 Edge 可设 `PANELSTUDIO_E2E_CHANNEL=msedge`；端口可用 `PANELSTUDIO_E2E_API_PORT` / `PANELSTUDIO_E2E_WEB_PORT` 指定。录像脚本需要 `pnpm exec playwright install ffmpeg`。可用 `scripts/record-editorial.mjs`、`scripts/capture-editorial-assets.mjs` 和 `scripts/check-browser-zoom.mjs` 重新采集运行材料；这些脚本只访问专用预览服务。
 
 交付为独立 Git 分支与待评审 PR，未合并主分支，未部署远程站点。首页文字先保留本版供用户直接删减；四档字号限制已经执行。最终审美取舍仍由用户按实际页面指导。
+
+后续的排版目标、参考偏好、候选版式与导出界面见[第二批实机记录](layout-and-export-review.md)。

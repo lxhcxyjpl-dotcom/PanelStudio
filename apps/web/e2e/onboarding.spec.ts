@@ -79,7 +79,7 @@ test("home brief survives import; preferences save and remain editable after rel
   await expect(page.getByTestId("figure-message")).toHaveValue(message);
   await page.getByTestId("target-journal").fill("Nature Communications");
   await page.getByTestId("research-field").fill("肿瘤免疫");
-  await page.getByRole("radio", { name: "同组图便于比较" }).check();
+  await page.getByRole("radio", { name: "对照" }).check();
   await checkTypeAndBounds(page);
   await page.screenshot({ animations: "disabled", path: path.join(output, "brief-desktop.png") });
   await page.locator("[data-action=save-publication]").click();
@@ -90,7 +90,7 @@ test("home brief survives import; preferences save and remain editable after rel
   await expect(page.locator("[data-action=publication-context]")).toContainText("Nature Communications");
   await page.locator("[data-action=publication-context]").click();
   await expect(page.getByTestId("figure-message")).toHaveValue(message);
-  await expect(page.getByRole("radio", { name: "同组图便于比较" })).toBeChecked();
+  await expect(page.getByRole("radio", { name: "对照" })).toBeChecked();
   await page.keyboard.press("Escape");
   await expect(page.getByRole("dialog")).toHaveCount(0);
 });
@@ -113,7 +113,7 @@ test("small dark English screens keep the guide, brief, and conversation usable 
   await page.getByTestId("start-brief").press("Enter");
   await expect(page.getByTestId("figure-message")).toHaveValue("Compare the treatment with control.\n");
   await checkTypeAndBounds(page);
-  await page.getByRole("radio", { name: "Compact and readable" }).check();
+  await page.getByRole("radio", { name: "Compact" }).check();
   await expect(page.getByRole("dialog").getByRole("button", { name: "Close", exact: true })).toBeInViewport();
   await page.screenshot({ animations: "disabled", path: path.join(output, "brief-mobile-dark.png") });
   await page.locator("[data-action=save-publication]").click();
