@@ -122,4 +122,22 @@ test("small dark English screens keep the guide, brief, and conversation usable 
   await expect(page.getByTestId("ai-prompt")).toBeInViewport();
   await checkTypeAndBounds(page);
   await page.screenshot({ animations: "disabled", path: path.join(output, "chat-mobile-dark.png") });
+  await page.locator("[data-action=publication-context]").click();
+  const brief = page.getByRole("dialog");
+  const result = brief.getByTestId("figure-message");
+  await expect(result).toBeInViewport();
+  // Hit-test the visual layers as well as the focus trap. Radix normally disables
+  // pointer events outside the dialog, which can mask a drawer painted over it.
+  const isOnTop = await result.evaluate(field => {
+    const rect = field.getBoundingClientRect(), style = document.createElement("style");
+    style.textContent = ".sidebar, .drawer-backdrop { pointer-events: auto !important }";
+    document.head.append(style);
+    try { return document.elementFromPoint(rect.x + rect.width/2, rect.y + rect.height/2) === field; }
+    finally { style.remove(); }
+  });
+  expect(isOnTop).toBe(true);
+  await brief.getByRole("radio", { name: "Compare" }).check();
+  await page.locator("[data-action=save-publication]").click();
+  await expect(brief).toHaveCount(0);
+  await expect(page.getByTestId("ai-prompt")).toBeInViewport();
 });
