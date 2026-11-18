@@ -1,0 +1,144 @@
+{
+  "date": "2026-11-18",
+  "runtimeCommit": "c8a9de8",
+  "localBranch": "design/editorial-studio",
+  "unit": {
+    "packages": 9,
+    "passed": 188
+  },
+  "browser": {
+    "registered": 59,
+    "passed": 59,
+    "method": "By test ID, six isolated Chromium runs. Interrupted processes are excluded.",
+    "groups": [
+      {
+        "group": 1,
+        "tests": 8,
+        "files": [
+          "guided.spec.ts",
+          "onboarding.spec.ts",
+          "projects.spec.ts",
+          "publication.spec.ts"
+        ]
+      },
+      {
+        "group": 2,
+        "tests": 7,
+        "files": [
+          "author-workflow.spec.ts",
+          "canvas-resize.spec.ts",
+          "export-quality.spec.ts",
+          "font-geometry.spec.ts"
+        ]
+      },
+      {
+        "group": 3,
+        "tests": 15,
+        "files": [
+          "editorial.spec.ts"
+        ]
+      },
+      {
+        "group": 4,
+        "tests": 9,
+        "files": [
+          "ai.spec.ts"
+        ]
+      },
+      {
+        "group": 5,
+        "tests": 12,
+        "files": [
+          "connection.spec.ts",
+          "refinement.spec.ts",
+          "typography.spec.ts",
+          "walkthrough.spec.ts"
+        ]
+      },
+      {
+        "group": 6,
+        "tests": 8,
+        "files": [
+          "workspace.spec.ts"
+        ]
+      }
+    ]
+  },
+  "typecheck": [
+    "ai",
+    "contracts",
+    "core",
+    "layout",
+    "svg",
+    "text-metrics",
+    "ui",
+    "server",
+    "web"
+  ],
+  "productionBuildPassed": true,
+  "viewportChecks": [
+    {
+      "width": 1440,
+      "height": 900,
+      "labelToControl": [
+        8,
+        8,
+        8
+      ],
+      "focusToContext": 16,
+      "contextToPreference": 16,
+      "choicesToFooter": 16,
+      "unobscured": true,
+      "panelFullyVisible": true,
+      "footerFullyVisible": true,
+      "overflow": 0,
+      "fontSizes": [
+        "15px",
+        "13px"
+      ],
+      "savedAndReopened": true
+    },
+    {
+      "width": 390,
+      "height": 844,
+      "labelToControl": [
+        8,
+        8,
+        8
+      ],
+      "focusToContext": 14,
+      "contextToPreference": 14,
+      "choicesToFooter": 14,
+      "unobscured": true,
+      "panelFullyVisible": true,
+      "footerFullyVisible": true,
+      "overflow": 0,
+      "fontSizes": [
+        "15px",
+        "13px"
+      ],
+      "savedAndReopened": true
+    },
+    {
+      "width": 320,
+      "height": 740,
+      "labelToControl": [
+        8,
+        8,
+        8
+      ],
+      "focusToContext": 14,
+      "contextToPreference": 14,
+      "choicesToFooter": 14,
+      "unobscured": true,
+      "panelFullyVisible": true,
+      "footerFullyVisible": true,
+      "overflow": 0,
+      "fontSizes": [
+        "15px",
+        "13px"
+      ],
+      "savedAndReopened": true
+    }
+  ]
+}

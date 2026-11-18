@@ -25,3 +25,11 @@ node scripts/local-preview.mjs test-results/review-demo-db
 # 另开一个终端
 node scripts/capture-layout-review.mjs http://127.0.0.1:5283 test-results/review-capture --video
 ~~~
+
+## 第 10 项留白调整与本地接入
+
+11、12、14 采用评审版本；10 只调整间距，并修正窄屏侧栏遮挡弹窗的问题。既有的画布尺寸预览、候选图像分辨率提示、导出运行状态和保存恢复也保留在本地开发分支 `design/editorial-studio`。
+
+在 1440 × 900、390 × 844 和 320 × 740 三种浏览器视窗中，通过界面从 AI 侧栏打开排版目标。字段名与本字段输入框均相距 8 px；桌面字段组相距 16 px，两个手机视窗均为 14 px。三种视窗均可直接看到保存按钮，没有横向溢出；选择「对照」并保存，重新打开后仍为「对照」。[桌面实测图](screenshots/editorial/brief-spacing-desktop.png) · [手机实测图](screenshots/editorial/brief-spacing-mobile.png)。
+
+集成后的本地版本重新跑过 188 项单元测试、59 项不同的浏览器用例、九个包的类型检查和生产构建。Windows 的个别整轮测试进程曾中断，最终采用六个隔离组，按全部已登记的用例 ID 核对；每一项均有完整的通过记录。[实测间距与回归结果](acceptance-editorial/brief-spacing.json)。
