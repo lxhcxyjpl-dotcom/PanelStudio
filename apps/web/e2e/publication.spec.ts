@@ -52,10 +52,12 @@ test("new-project brief, configured vision images, editable proposal and adopted
   }));
   await page.getByTestId("import-input").setInputFiles(files);
   await expect(page.getByRole("dialog",{name:"排版目标"})).toBeVisible();
+  await expect(page.getByTestId("figure-message")).toHaveAccessibleName("图稿重点");
+  await expect(page.getByTestId("target-journal")).not.toHaveAttribute("placeholder", /.+/);
   await page.getByTestId("target-journal").fill("Nature Communications");
   await page.getByTestId("research-field").fill("肿瘤 蛋白降解");
   await page.getByTestId("figure-message").fill("突出定量结果，两组代表图并排");
-  await page.getByRole("radio", { name: "突出主要结果" }).check();
+  await page.getByRole("radio", { name: "突出重点" }).check();
   await page.screenshot({animations:"disabled",path:path.join(output,"publication-context.png")});
   await page.locator('[data-action="save-publication"]').click();
   await expect(page.getByRole("dialog")).toHaveCount(0);

@@ -43,7 +43,7 @@ test("imports, lays out, accepts, and exports through the real API", async ({ pa
   expect(summary).toMatch(/均衡分行|主图在/);
   await shot(page, "phase4-layout-candidates");
   const download = page.waitForEvent("download");
-  await page.getByRole("button", { name: "使用此布局" }).click();
+  await page.getByRole("button", { name: "应用此版" }).click();
   await expect(page.getByTestId("save-status")).toHaveText("已保存");
   await page.getByTestId("export-button").click();
   await page.getByRole("button", { name: "可编辑 SVG" }).click();
@@ -82,7 +82,7 @@ test("completes undo, layout, and export from the keyboard", async ({ page }) =>
   await page.getByTestId("layout-button").focus();
   await page.keyboard.press("Enter");
   await expect(page.getByTestId("candidate-card").first()).toBeVisible();
-  await page.getByRole("button", { name: "使用此布局" }).focus();
+  await page.getByRole("button", { name: "应用此版" }).focus();
   await page.keyboard.press("Enter");
   await expect(page.getByTestId("candidate-card")).toHaveCount(0);
   await page.keyboard.press("Control+Z");
@@ -114,7 +114,7 @@ test("shows empty history, import failure, save failure, conflict, stale candida
   await expect(page.getByTestId("candidate-card").first()).toBeVisible();
   await page.keyboard.press("Control+Z");
   await expect(page.getByText("布局候选已过期").first()).toBeVisible();
-  await expect(page.getByRole("button", { name: "使用此布局" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "应用此版" })).toBeDisabled();
 
   await page.route("**/api/v1/projects/*/transactions", (route) =>
     route.fulfill({
@@ -150,6 +150,8 @@ test("reports a real layout conflict and restores the project after reload", asy
   const problem = await response.json();
   expect(problem.error).toMatchObject({ code: "LAYOUT_CONFLICT", details: { reason: "layout-min-size" } });
   await expect(page.getByText("有图块低于布局最小尺寸。", { exact: false }).first()).toBeVisible();
+  await page.getByRole("button", {name: "返回编辑", exact: true}).click();
+  await expect(page.getByRole("tab", {name: "属性", exact: true})).toHaveAttribute("aria-selected", "true");
   await page.reload();
   await page.getByRole("tab", { name: "面板" }).click();
   await expect(page.getByTestId("panel-row")).toHaveCount(2);

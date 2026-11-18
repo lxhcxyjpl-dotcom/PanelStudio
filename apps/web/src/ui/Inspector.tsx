@@ -21,11 +21,12 @@ import {
   enterCrop,
   equalSize,
   restoreFullCrop,
+  selectCandidate,
   transact,
   updateCrop,
 } from "../state/session";
 import { patch, useWorkspace } from "../state/store";
-import { baseDocument } from "../state/types";
+import { baseDocument, candidatesStale } from "../state/types";
 import { AiPanel } from "./AiPanel";
 import { ArrangeInspector } from "./ArrangeInspector";
 import { LocalRow } from "./LocalRow";
@@ -35,7 +36,12 @@ export function Inspector() {
   const { t } = useTranslation();
   const state = useWorkspace();
   const tab = state.inspectorMode;
-  const setTab = (inspectorMode: typeof tab) => patch({ inspectorMode });
+  const setTab = (inspectorMode: typeof tab) => {
+    if (inspectorMode === "layout" && state.compareMode === "editing" && state.activeCandidateId && !candidatesStale(state)) {
+      selectCandidate(state.activeCandidateId);
+    }
+    patch({ inspectorMode });
+  };
   const width = sidebarWidth("right", state.mode, state.rightWidth);
   const previewing = state.compareMode !== "editing";
   const document = state.compareMode === "original" ? state.candidateRoot?.document ?? baseDocument(state)
@@ -51,11 +57,11 @@ export function Inspector() {
     >
       <TabBar id="inspector-tabs" value={tab} onChange={setTab} label={t("a11y.right")} items={[
         { value: "properties", label: t("inspector.tab"), action: "tab-properties" }, { value: "ai", label: t("ai.tab"), action: "tab-ai" },
-        ...((tab === "layout" || state.cards.some(card => card.candidate.origin !== "ai")) ? [{ value: "layout" as const, label: t("toolbar.autoLayout"), action: "tab-layout" }] : []),
+        ...((tab === "layout" || state.cards.some(card => card.candidate.origin !== "ai")) ? [{ value: "layout" as const, label: t("layout.candidatesTab"), action: "tab-layout" }] : []),
       ]} />
       <Button action="close-inspector" className="drawer-close" variant="quiet" aria-label={t("a11y.close")}
         onClick={() => patch({rightOpen:false})}><Icon name="close" /></Button>
-      <div className={"side-scroll" + (tab === "ai" ? " conversation-scroll" : "")} role="tabpanel" id="inspector-tabs-panel" aria-labelledby={"inspector-tabs-" + tab}>
+      <div className={"side-scroll" + (tab === "ai" ? " conversation-scroll" : tab === "layout" ? " layout-scroll" : "")} role="tabpanel" id="inspector-tabs-panel" aria-labelledby={"inspector-tabs-" + tab}>
         {tab === "ai" ? <AiPanel /> : tab === "layout" ? <ArrangeInspector /> : document ? <>
           {previewing && <div className="preview-readonly"><p>{t("inspector.previewReadOnly")}</p><Button action="properties-edit" onClick={continueEditing}>{t("inspector.returnEditing")}</Button></div>}
           <fieldset className="property-content" disabled={previewing}><Properties document={document} /></fieldset>

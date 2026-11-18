@@ -58,15 +58,14 @@ function PublicationDialog({ open }: { open: boolean }) {
         if (now.saveState === "saved" && now.dialog === "publication") patch({ dialog: null, startMessage: "" });
       }).finally(() => setBusy(false));
     }}>
-      <div className="brief-intro"><span className="brief-symbol"><Icon name="spark" /></span><h3>{t("publication.heading")}</h3></div>
-      <label className="field brief-message"><span className="sr-only">{t("publication.message")}</span>
+      <label className="field brief-message"><span>{t("publication.focusLabel")}</span>
         <textarea autoFocus data-testid="figure-message" value={value.message} maxLength={1000} rows={3}
           placeholder={t("publication.messagePlaceholder")} onChange={(e) => setValue({ ...value, message: e.target.value })} />
       </label>
       <div className="brief-context-fields">
       <label className="field"><span>{t("publication.journal")}</span>
         <input data-testid="target-journal" value={value.journal} maxLength={160} list="journal-suggestions"
-          placeholder={t("publication.journalPlaceholder")} onChange={(e) => setValue({ ...value, journal: e.target.value })} />
+          onChange={(e) => setValue({ ...value, journal: e.target.value })} />
         <datalist id="journal-suggestions"><option value="Nature" /><option value="Nature Communications" /><option value="Science" /><option value="Cell" /></datalist>
       </label>
       <label className="field"><span>{t("publication.field")}</span>

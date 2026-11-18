@@ -8,8 +8,8 @@
 
 1. 从项目菜单导入[六图原稿](../refinement-six/start.figurezip)，点工具栏的 **参考图与偏好**。
 2. 选择[六区域参考轮廓](reference-outline.svg)，或使用期刊原图。样稿参考了 Marconato 等的 SpatialData Figure 1，A 和 C 在左侧上下排列，B 在右侧跨两行，D、E、F 在底部并列。参考轮廓只含位置和编号。[Nature Methods 原图](https://www.nature.com/articles/s41592-024-02212-x/figures/1)
-3. 确认六个区域对应 A–F，输入 **突出 B，A 和 C 上下排列，留白多一点**。表单会显示 B 为主图、A/C 上下对比、间距 6 mm。所有选项都可以手动调整。
-4. 点 **生成候选**，预览 **参考行列结构**，再点 **使用此布局**。一次撤销可以回到原稿。也可以直接打开[排好版的工程](guided.figurezip)、[可编辑 SVG](guided.svg) 或 [Illustrator 原生文件](guided.ai)。
+3. 确认六个区域对应 A–F，输入 **突出 B，A 和 C 上下排列，留白多一点**。表单会显示 B 为主图、A/C 上下对比、间距 6 mm。展开 **手动设置** 可调整这些选项。
+4. 点 **生成候选**，预览 **参考行列结构**，再点 **应用此版**。一次撤销可以回到原稿。也可以直接打开[排好版的工程](guided.figurezip)、[可编辑 SVG](guided.svg) 或 [Illustrator 原生文件](guided.ai)。
 
 ## 可以指定什么
 

@@ -88,7 +88,7 @@ test.describe.serial("phase 5 AI", () => {
     await expect(page.getByTestId("panel-row")).toHaveCount(2);
     await page.getByTestId("layout-button").click();
     await expect(page.getByTestId("candidate-card").first()).toBeVisible();
-    await page.getByRole("button", { name: "使用此布局" }).click();
+    await page.getByRole("button", { name: "应用此版" }).click();
     await expect(page.getByTestId("save-status")).toHaveText("已保存");
     await page.getByTestId("default-label-settings").locator("summary").click();
     const size = page.getByTestId("label-size");

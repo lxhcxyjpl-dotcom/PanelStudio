@@ -1,0 +1,69 @@
+{
+  "date": "2026-11-18",
+  "baseline": "01d21e6",
+  "implemented": [
+    "10",
+    "11",
+    "12",
+    "14"
+  ],
+  "deferred": [
+    "06",
+    "13",
+    "15"
+  ],
+  "environment": "Windows; local Chrome (Chromium); isolated databases; synthetic six-panel figure",
+  "unit": {
+    "workspaces": 9,
+    "passed": 179
+  },
+  "browser": {
+    "passed": 53,
+    "duration": "3.4m",
+    "separateExportRecheck": 1
+  },
+  "typeChecked": [
+    "ai",
+    "contracts",
+    "core",
+    "layout",
+    "svg",
+    "text-metrics",
+    "ui",
+    "server",
+    "web"
+  ],
+  "productionBuild": true,
+  "actualSVG": {
+    "whilePreviewing": {
+      "revision": 0,
+      "sha256": "4da1b87f35eadf7851982c60ec0d48dd80ca1fe806738942df7b43b83930e597"
+    },
+    "afterApplying": {
+      "revision": 1,
+      "sha256": "df8771ad21296e121d043d2a831826f1a8fc43266f8ca8a9e2f33371e575f77d"
+    }
+  },
+  "png": {
+    "dpi": 300,
+    "fileWidth": 2126,
+    "fileHeight": 1106
+  },
+  "projectPackageBytes": 4065260,
+  "reviewViewports": [
+    [
+      1440,
+      900
+    ],
+    [
+      390,
+      844
+    ]
+  ],
+  "uiFontPx": [
+    13,
+    15,
+    24,
+    56
+  ]
+}

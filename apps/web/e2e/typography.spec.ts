@@ -63,7 +63,11 @@ for (const { width, locale } of [{ width: 1440, locale: "zh-CN" }, { width: 320,
     await expectStudioType(page);
     await page.locator("[data-action=close-dialog]").click();
     await page.getByTestId("export-button").click();
-    await expect(page.getByRole("dialog").getByTestId("font-status")).toContainText("Noto Sans");
+    const fonts = page.getByRole("dialog").getByTestId("font-status");
+    await expect(fonts).toBeHidden();
+    await page.locator(".export-font-details summary").click();
+    await expect(fonts).toBeVisible();
+    await expect(fonts).toContainText("Noto Sans");
     await expectStudioType(page);
   });
 }
