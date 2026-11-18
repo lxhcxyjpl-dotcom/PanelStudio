@@ -4,6 +4,7 @@ import {
   ARTWORK_COLOR_PRESETS,
   BUNDLED_FONTS,
   CANVAS_WIDTH_PRESETS_MM,
+  resolveLabelText,
   type FigureDocumentV1,
   type LabelOverrides,
 } from "@panelstudio/contracts";
@@ -81,6 +82,9 @@ function CanvasFields({ document }: { document: FigureDocumentV1 }) {
   const canvas = document.canvas;
   const settings = document.layoutSettings;
   const style = document.labelStyle;
+  const labelExamples = [0, 1, 2].map(index => resolveLabelText({
+    index, sequence: style.sequence, format: style.format, textOverride: null,
+  })).join(" ");
   const ungrouped = document.panelOrder.filter((id) => !Object.values(document.groups).some((group) => group.panelIds.includes(id)));
   return (
     <>
@@ -117,10 +121,10 @@ function CanvasFields({ document }: { document: FigureDocumentV1 }) {
         </div></details>
       </section>
       <section className="section canvas-fields">
-        <h2 className="inspector-section-title"><Icon name="layout" />{t("inspector.gutter")}</h2>
-        <div className="field-pair">
-          <NumberField label={t("inspector.gutterX") + " (mm)"} value={settings.gutterMm.horizontal} onCommit={(horizontal) => void transact([{ type: "layout.setSettings", layoutSettings: { ...settings, gutterMm: { ...settings.gutterMm, horizontal } } }])} />
-          <NumberField label={t("inspector.gutterY") + " (mm)"} value={settings.gutterMm.vertical} onCommit={(vertical) => void transact([{ type: "layout.setSettings", layoutSettings: { ...settings, gutterMm: { ...settings.gutterMm, vertical } } }])} />
+        <h2 className="inspector-section-title" id="canvas-gutters"><Icon name="layout" />{t("inspector.gutter")} (mm)</h2>
+        <div className="field-pair" role="group" aria-labelledby="canvas-gutters">
+          <NumberField label={t("inspector.gutterX")} value={settings.gutterMm.horizontal} onCommit={(horizontal) => void transact([{ type: "layout.setSettings", layoutSettings: { ...settings, gutterMm: { ...settings.gutterMm, horizontal } } }])} />
+          <NumberField label={t("inspector.gutterY")} value={settings.gutterMm.vertical} onCommit={(vertical) => void transact([{ type: "layout.setSettings", layoutSettings: { ...settings, gutterMm: { ...settings.gutterMm, vertical } } }])} />
         </div>
         <SelectField
           label={t("inspector.primary")}
@@ -139,8 +143,10 @@ function CanvasFields({ document }: { document: FigureDocumentV1 }) {
         </details>
       </section>
       <section className="section canvas-fields">
-        <h2 className="inspector-section-title"><Icon name="edit" />{t("inspector.labels")}</h2>
-        <LabelStyleFields style={style} />
+        <details className="inspector-disclosure" data-testid="default-label-settings">
+          <summary><span>{t("panels.label")}　{labelExamples} · {style.fontSizePt} pt</span><Icon name="chevron" /></summary>
+          <LabelStyleFields style={style} />
+        </details>
       </section>
     </>
   );

@@ -105,6 +105,8 @@ test("shows empty history, import failure, save failure, conflict, stale candida
   await page.getByTestId("import-input").setInputFiles(photo);
   await expect(page.getByTestId("panel-row")).toHaveCount(2);
   const size = page.getByTestId("label-size");
+  await expect(size).toBeHidden();
+  await page.getByTestId("default-label-settings").locator("summary").click();
   await size.fill("12");
   await size.press("Enter");
   await expect(page.getByTestId("save-status")).toHaveText("已保存");
@@ -225,7 +227,8 @@ test("opens a recent figure and uses both sidebars and the reference form on a p
   await name.press("Enter"); await saved;
   await page.getByRole("button", { name: "项目菜单" }).click();
   await page.getByRole("menuitem", { name: "返回工作台首页" }).click();
-  await page.getByRole("button", { name: new RegExp(title) }).click();
+  await page.locator("[data-action=home-menu]").click();
+  await page.getByRole("menuitem", { name: new RegExp(title) }).click();
   await expect(name).toHaveValue(title);
   await expect.poll(pageWidth).toBe(390);
   await page.locator("[data-action=drawer-assets]").click();

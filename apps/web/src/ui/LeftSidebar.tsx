@@ -46,14 +46,14 @@ export function LeftSidebar() {
       aria-label={t("a11y.left")}
     >
       <TabBar id="asset-tabs" value={tab} onChange={setTab} label={t("a11y.left")} items={[
-        { value: "assets", label: t("assets.tab"), action: "tab-assets" }, { value: "panels", label: t("panels.tab"), action: "tab-panels" },
+        { value: "assets", label: assets.data ? t("assets.tabCount", { count: visible.length }) : t("assets.tab"), action: "tab-assets" },
+        { value: "panels", label: t("panels.tab"), action: "tab-panels" },
       ]} />
       <Button action="close-assets" className="drawer-close" variant="quiet" aria-label={t("a11y.close")}
         onClick={() => patch({leftOpen:false})}><Icon name="close" /></Button>
       <div className="side-scroll" role="tabpanel" id="asset-tabs-panel" aria-labelledby={"asset-tabs-" + tab}>
         {tab === "assets" ? (
           <section className="section asset-library">
-            <div className="library-title"><h2>{t("assets.available")}</h2><span>{visible.length}</span></div>
             {completed > 0 && <p className="import-summary" role="status"><Icon name="check" />{t("assets.importedCount",{count:completed})}</p>}
             {pending.length > 0 ? (
               <ul className="import-log">

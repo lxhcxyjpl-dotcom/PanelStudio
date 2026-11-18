@@ -10,10 +10,10 @@ await ctx.addInitScript(()=>localStorage.setItem('panelstudio.prefs',JSON.string
 const page=await ctx.newPage(), errors=[];page.on('pageerror',error=>errors.push(error.message));
 const action=name=>page.locator(`[data-action="${name}"]`), beat=(n=1000)=>page.waitForTimeout(n);
 await page.goto(process.env.PANELSTUDIO_PREVIEW_URL||'http://127.0.0.1:5283');
-await page.locator('.hero-showcase img').waitFor();await page.evaluate(()=>document.fonts.ready);
-await beat(12000);await action('choose-example').first().click();await beat(300);
+await page.getByTestId('hero-showcase').locator('img').first().waitFor();await page.evaluate(()=>document.fonts.ready);
+await beat(16800);
 await page.screenshot({path:path.join(out,'home-desktop.png')});
-await page.locator('#laboratory').scrollIntoViewIfNeeded();
+await action('home-gallery').click();await page.locator('#laboratory').scrollIntoViewIfNeeded();
 await action('demo-step').first().click();await action('demo-playback').click();await beat(22000);
 await action('demo-step').nth(6).click();await action('demo-original').click();await beat(1200);await action('demo-draft').click();await beat(1200);
 await page.screenshot({path:path.join(out,'home-replay.png')});

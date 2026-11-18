@@ -18,11 +18,12 @@ for(const factor of [1,2]){
  const actual=await page.evaluate(()=>new Promise(resolve=>chrome.settingsPrivate.getDefaultZoom(resolve)));
  if(actual!==factor)throw new Error('Browser did not retain the requested zoom');
  await page.goto('http://127.0.0.1:5283');
- await page.locator('.hero-showcase img').waitFor();await page.locator('.hero-showcase img').evaluate(img=>img.decode());await page.evaluate(()=>document.fonts.ready);
+ await page.getByTestId('hero-showcase').locator('img').first().waitFor();await page.getByTestId('hero-showcase').locator('img').evaluateAll(images=>Promise.all(images.map(img=>img.decode())));await page.evaluate(()=>document.fonts.ready);
  const cdp=await ctx.newCDPSession(page);
  const capture=async name=>writeFileSync(path.join(out,name),Buffer.from((await cdp.send('Page.captureScreenshot',{format:'png',captureBeyondViewport:false,fromSurface:true})).data,'base64'));
  const read=()=>page.evaluate(()=>({outerWidth,innerWidth,devicePixelRatio,overflow:document.documentElement.scrollWidth-innerWidth}));
  const home=await read();await capture('home-zoom-'+factor+'.png');
+ await page.locator('[data-action=home-gallery]').click();
  await page.locator('[data-action=open-scientific-example]').first().click();await page.locator('.panel-frame').first().waitFor();
  await page.waitForFunction(()=>[...document.querySelectorAll('.panel-artwork img')].length>0&&[...document.querySelectorAll('.panel-artwork img')].every(img=>img.complete&&img.naturalWidth>0));
  const editor=await read();await capture('editor-zoom-'+factor+'.png');

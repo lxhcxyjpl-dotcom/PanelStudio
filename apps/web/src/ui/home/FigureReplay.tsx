@@ -62,25 +62,6 @@ export function RecordedFigure({ scene, labels = true }: { scene: RecordedScene;
   </svg>;
 }
 
-export function HeroShowcase({ examples }: { examples: ShowcaseExample[] }) {
-  const { t } = useTranslation();
-  const ref = useRef<HTMLDivElement>(null);
-  const playback = usePlayback(ref, examples.length, 5500);
-  const selected = examples[playback.step] ?? examples[0];
-  if (!selected) return null;
-  return <div className="hero-showcase" ref={ref} data-testid="hero-showcase">
-    <div className="showcase-frame" key={selected.id}>
-      <img src={selected.exports.png.url} alt={`${t("brand." + selected.id)} · ${t("brand.synthetic")}`} width="1200" height="800" fetchPriority="high" />
-    </div>
-    <div className="showcase-controls" aria-label={t("brand.examples")}>
-      <div className="showcase-choices">{examples.map((example, index) => <button key={example.id} type="button" aria-pressed={playback.step === index}
-        data-action="choose-example" onClick={() => playback.choose(index)}>{t("brand." + example.id)}</button>)}</div>
-      {!playback.reduced && <Button variant="quiet" action="hero-playback" aria-label={t(playback.playing ? "brand.pause" : "brand.play")} onClick={playback.toggle}><Icon name={playback.playing ? "pause" : "play"} /></Button>}
-    </div>
-    <p className="showcase-caption">{t("brand.synthetic")}</p>
-  </div>;
-}
-
 export function CompositionReplay({ example }: { example: ShowcaseExample }) {
   const { t } = useTranslation();
   const ref = useRef<HTMLElement>(null);

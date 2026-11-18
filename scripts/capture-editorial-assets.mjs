@@ -8,13 +8,13 @@ const browser=await chromium.launch({channel:process.env.PANELSTUDIO_E2E_CHANNEL
 for(const [name,locale,theme,width,height] of [['desktop','zh-CN','light',1440,900],['english','en-US','light',1280,800],['dark','zh-CN','dark',1024,768],['mobile','en-US','dark',390,844]]){
  const ctx=await browser.newContext({viewport:{width,height}});
  await ctx.addInitScript(p=>localStorage.setItem('panelstudio.prefs',JSON.stringify(p)),{locale,theme,motion:'on'});
- const page=await ctx.newPage();await page.goto(base);await page.locator('.hero-showcase img').waitFor();
- await page.locator('[data-action=choose-example]').first().click();
- await page.locator('#examples').scrollIntoViewIfNeeded();
- await page.waitForFunction(()=>[...document.querySelectorAll('.brand-example-image img')].every(img=>img.complete&&img.naturalWidth>0));
+ const page=await ctx.newPage();await page.goto(base);
+ const artwork=page.getByTestId('hero-showcase').locator('img');
+ await artwork.first().waitFor();await artwork.evaluateAll(images=>Promise.all(images.map(img=>img.decode())));
  await page.evaluate(()=>document.fonts.ready);await page.evaluate(()=>window.scrollTo(0,0));
  await page.screenshot({path:path.join(out,'home-'+name+'.png')});
  if(name==='desktop')await page.screenshot({path:path.join(out,'home-complete.png'),fullPage:true});
+ await page.locator('[data-action=home-gallery]').click();
  await page.locator('[data-action=open-scientific-example]').first().click();await page.locator('.panel-frame').first().waitFor();
  await page.waitForFunction(()=>[...document.querySelectorAll('.panel-artwork img')].every(img=>img.complete&&img.naturalWidth>0));
  await page.screenshot({path:path.join(out,'editor-'+name+'.png')});

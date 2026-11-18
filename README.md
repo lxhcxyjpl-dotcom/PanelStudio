@@ -13,15 +13,15 @@ PanelStudio is a local or self-hosted editor for multi-panel scientific figures.
 3. Drag individual labels, rigid groups or selected panels. Reorder the panel list to change lettering. Arrange two or three selected units into a row, preserving their sizes or using a common width or height.
 4. Export editable SVG. The editor uses the bundled Noto faces to measure label ink and keeps text, supported vectors and raster images editable in their respective forms.
 
-![PanelStudio editorial homepage](docs/screenshots/editorial/home-desktop.png)
+![PanelStudio homepage with three layouts for the same figure](docs/screenshots/editorial/home-first-pass.png)
 
-The editorial branch adds a dedicated homepage at `/`, with a four-example carousel and a pausable replay built from real import, layout, transaction and export states. `/app` resumes the last project; `/app/:projectId` opens a figure directly. Returning home keeps the editing view and unsent AI input. The UI uses only 13 / 15 / 24 / 56 px type roles; scientific artwork keeps its document typography.
+The homepage at `/` shows three layouts of the same scientific figure. It advances every five seconds and supports manual selection and pausing. Open **Gallery and demo** in the header for four editable examples, the recorded editing sequence and its SVG download. **Start arranging** opens `/app` to create or resume a figure. Returning home preserves the editing view and unsent AI input. Interface text uses 13, 15, 24 and 56 px. Figure labels use the document’s own typography.
 
-![Scientific figure in the redesigned workspace](docs/screenshots/editorial/editor-desktop.png)
+![Scientific figure in the editor with collapsed label settings](docs/screenshots/editorial/editor-first-pass.png)
 
 Layout candidates now occupy the right inspector without shrinking the canvas. The inspector includes single-panel labels and common multi-selection typography; AI presents structured changes and collapsed history. Export identifies the saved revision and selects SVG, PNG or a project package. Existing reference layouts, publication briefs, provider settings and continuous draft refinement remain available.
 
-[53-second running-product recording](docs/demo/editorial-studio.webm) · [Design system](docs/editorial-design-system.md) · [Delivery and regression evidence](docs/editorial-implementation.md) · [Four original synthetic examples](examples/showcase/)
+[Homepage and workspace recording](docs/demo/first-pass.mp4) · [Design system](docs/editorial-design-system.md) · [Earlier implementation and regression evidence](docs/editorial-implementation.md) · [Four original synthetic examples](examples/showcase/)
 
 Use **Reference & preferences** to upload a reference figure, describe your preferred composition, or combine both. Review the detected regions and adjust the emphasis, pairings, canvas shape and panel gap before previewing candidates. Image analysis runs in the browser. See the [six-panel comparison and editable files](examples/reference-preferences/).
 

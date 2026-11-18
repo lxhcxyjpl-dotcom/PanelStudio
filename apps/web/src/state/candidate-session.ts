@@ -66,11 +66,12 @@ export function setPrompt(text: string) {
 export function setScope(scope: AIEditScope) {
   patch({ aiScope: scope, scopeChanged: true });
 }
-export function activeScope(state: WorkspaceState): FrozenScope {
+export function activeScope(state: WorkspaceState, fromCurrent = false): FrozenScope {
   if (state.aiStatus.phase === "running") return state.aiStatus.frozen;
-  if (state.awaitingAnswer) return state.awaitingAnswer;
-  if (state.frozenScope && !state.scopeChanged) return state.frozenScope;
-  const document = state.cards.find((card) => card.candidate.id === state.activeCandidateId)?.candidate.previewDocument ?? state.confirmed?.document;
+  if (!fromCurrent && state.awaitingAnswer) return state.awaitingAnswer;
+  if (!fromCurrent && state.frozenScope && !state.scopeChanged) return state.frozenScope;
+  const candidate = fromCurrent ? null : state.cards.find((card) => card.candidate.id === state.activeCandidateId)?.candidate;
+  const document = candidate?.previewDocument ?? state.confirmed?.document;
   return { scope: state.aiScope, selectedPanelIds: document ? completePanelIds(document, panelIdsOf(state.selection, document)) : [] };
 }
 
@@ -230,7 +231,7 @@ export async function generateAi(prompt: string, options: AIOptions) {
   const parent = fromCurrent ? null : state.cards.find((c) => c.candidate.id === state.activeCandidateId)?.candidate;
   if (!fromCurrent && (candidatesStale(state) || (answer && answer.baseRevision !== confirmed.revision))) return;
   const root = (parent || answer) && state.candidateRoot ? state.candidateRoot : confirmed;
-  const frozen = fromCurrent ? { scope: state.aiScope, selectedPanelIds: completePanelIds(confirmed.document, panelIdsOf(state.selection, confirmed.document)) } : activeScope(state);
+  const frozen = activeScope(state, fromCurrent);
   if (frozen.scope === "selection" && !frozen.selectedPanelIds.length) return patch({ liveMessage: i18n.t("reason.empty-selection") });
   const context: AIContext = answer ? { kind: "clarification", jobId: answer.jobId } : parent ? { kind: "candidate", candidateId: parent.id } : { kind: "revision" };
   const origin = begin(projectId, root.revision, contextId(context));

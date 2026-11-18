@@ -1,10 +1,11 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import type { AIHistoryTurn, PromptPreset } from "@panelstudio/contracts";
+import type { AIHistoryTurn, FigureDocumentV1, PromptPreset } from "@panelstudio/contracts";
 import { api } from "../api/client";
 import { formatDiagnostic } from "../i18n/diagnostic";
 import { labelName, proposalChanges, unchangedPanelCount, type ProposalChange } from "../model/changes";
+import { completePanelIds, panelIdsOf } from "../model/document-ui";
 import { localizedSummary } from "../model/chrome";
 import { acceptCandidate, sendAiPrompt } from "../state/session";
 import { activeScope, cancelAiPrompt, continueEditing, dismissCandidates, openHistoryTurn, refreshAiHistory, selectCandidate, setPrompt, setScope } from "../state/candidate-session";
@@ -28,6 +29,11 @@ function changeLine(t: ReturnType<typeof useTranslation>["t"], line: ProposalCha
   return t("ai." + key, { ...line });
 }
 
+function selectionNames(document: FigureDocumentV1 | undefined, ids: string[], locale: string) {
+  if (!document) return "";
+  return ids.map(id => labelName(document, id)).filter(Boolean).join(locale === "zh-CN" ? "、" : ", ");
+}
+
 export function AiPanel() {
   const { t } = useTranslation();
   const state = useWorkspace();
@@ -42,14 +48,27 @@ export function AiPanel() {
   const thread = useRef<HTMLDivElement>(null);
   const atEnd = useRef(true);
   const olderPosition = useRef<{ top: number; height: number } | null>(null);
-  const frozen = activeScope(state);
   const card = state.cards.find(c => c.candidate.id === state.activeCandidateId);
   const parent = card?.candidate;
-  const scopeDoc = parent?.previewDocument ?? state.candidateRoot?.document ?? state.confirmed?.document;
-  const brief = scopeDoc?.publicationContext;
-  const scopeNames = scopeDoc ? frozen.selectedPanelIds.map(id => labelName(scopeDoc, id)).filter(Boolean).join(" · ") : "";
   const running = state.aiStatus.phase === "running";
   const stale = candidatesStale(state) || Boolean(state.awaitingAnswer && state.awaitingAnswer.baseRevision !== state.confirmed?.revision);
+  const frozen = activeScope(state, stale);
+  const draftDocument = parent?.previewDocument ?? state.candidateRoot?.document;
+  const scopeDoc = stale && !running ? state.confirmed?.document : draftDocument ?? state.confirmed?.document;
+  const brief = scopeDoc?.publicationContext;
+  const currentIds = scopeDoc ? completePanelIds(scopeDoc, panelIdsOf(state.selection, scopeDoc)) : [];
+  const optionIds = frozen.scope === "selection" ? frozen.selectedPanelIds : currentIds;
+  const names = selectionNames(scopeDoc, optionIds, state.locale);
+  const selectionLabel = names ? t("ai.selectedNames", { names }) : t("ai.selection");
+  const documentLabel = t("ai.documentCount", { count: scopeDoc?.panelOrder.length ?? 0 });
+  const canRefreshSelection = parent && frozen.scope === "selection" && !running && !state.awaitingAnswer && !stale
+    && (currentIds.length !== optionIds.length || currentIds.some(id => !optionIds.includes(id)));
+  const draftScope = parent?.origin === "ai" ? state.frozenScope : null;
+  const differentDraftScope = draftScope && (draftScope.scope !== frozen.scope || (draftScope.scope === "selection" &&
+    (draftScope.selectedPanelIds.length !== optionIds.length || draftScope.selectedPanelIds.some(id => !optionIds.includes(id)))));
+  const draftScopeLabel = differentDraftScope && draftScope.scope === "selection"
+    ? t("ai.selectedNames", { names: selectionNames(state.candidateRoot?.document, draftScope.selectedPanelIds, state.locale) })
+    : t("ai.documentCount", { count: state.candidateRoot?.document.panelOrder.length ?? 0 });
   const clarification = state.awaitingAnswer;
   const changes = parent && state.candidateRoot ? proposalChanges(state.candidateRoot.document, parent.previewDocument) : [];
   const unchanged = parent && state.candidateRoot ? unchangedPanelCount(state.candidateRoot.document, parent.previewDocument) : 0;
@@ -81,8 +100,10 @@ export function AiPanel() {
   const sendLabel = t(stale ? "ai.regenerate" : state.aiStatus.phase === "failed" ? "ai.retry" : "ai.send");
   const empty = !state.aiHistory.length && !parent && !clarification && !running;
 
+  const heroPanel = scopeDoc && scopeDoc.panelOrder.length >= 2 ? scopeDoc.panelOrder[2] ?? scopeDoc.panelOrder[0] : null;
+  const heroExample = heroPanel && scopeDoc ? t("ai.heroExample", { label: labelName(scopeDoc, heroPanel) }) : null;
+
   return <section className="section ai-panel" data-testid="ai-panel">
-    <div className="refine-scope"><span>{t("refine.scope")}</span><strong>{frozen.scope === "selection" ? scopeNames || t("reason.empty-selection") : t("ai.scopeAll", { count: scopeDoc?.panelOrder.length ?? 0 })}</strong></div>
     <div className="ai-context">
       <Button action="publication-context" variant="quiet" className="ai-brief" onClick={() => patch({ dialog: "publication" })}>
         <span className="ai-brief-icon"><Icon name="sliders" /></span>
@@ -106,18 +127,13 @@ export function AiPanel() {
           if (useWorkspace.getState().aiHistory === before) olderPosition.current = null;
         });
       }}>{t("ai.older")}</Button>}
-      {empty && <div className="ai-welcome">
-        <p>{t("ai.welcomeHint")}</p>
-        {!configured ? <div className="ai-connection">
-          <p data-testid="ai-status">{provider.isError ? t("ai.connectionError") : t("ai.connectHint")}</p>
-          <Button action="ai-settings" onClick={() => patch({ dialog: "ai-settings" })}><Icon name="settings" />{t("ai.connect")}</Button>
-        </div> : null}
-        <div className="ai-starters">
-          {examples.slice(0, 3).map(key => <Button key={key} action="fill-example" variant="quiet" onClick={() => fill(t("example." + key))}>{t("example." + key)}<Icon name="arrowRight" /></Button>)}
-        </div>
+      {!provider.isPending && (!configured || provider.isError) && <div className="ai-connection">
+        <p data-testid="ai-status" role="status">{t(provider.isError ? "ai.connectionError" : "ai.disconnected")}</p>
+        <Button action="ai-settings" onClick={() => patch({ dialog: "ai-settings" })}><Icon name="settings" />{t("ai.connect")}</Button>
       </div>}
-      {!empty && !configured && <div className="ai-connection"><p data-testid="ai-status">{t("ai.notConfigured")}</p>
-        <Button action="ai-settings" onClick={() => patch({ dialog: "ai-settings" })}>{t("ai.connect")}</Button></div>}
+      {configured && !provider.isError && empty && frozen.scope === "document" && heroExample && <div className="ai-starters">
+        <Button action="fill-starter" variant="quiet" onClick={() => fill(heroExample)}>{heroExample}<Icon name="arrowRight" /></Button>
+      </div>}
       {state.aiStatus.phase === "running" && <div className="ai-progress" role="status" data-testid="ai-status">
         {!state.aiHistory.some(turn => turn.jobId === (state.aiStatus.phase === "running" ? state.aiStatus.jobId : null)) && <div className="chat-user"><p>{state.aiStatus.prompt}</p></div>}
         <span className="assistant-signature"><Icon name="spark" />PanelStudio</span><p className="thinking-label"><span className="thinking-dot" />{state.aiStatus.label}</p>
@@ -131,6 +147,7 @@ export function AiPanel() {
       </div>}
       {parent && <div className="ai-preview" data-testid="ai-proposal">
         <div className="draft-heading"><Icon name="sheets" /><h2>{t("ai.proposalTitle")}</h2><span>{t("ai.notApplied")}</span></div>
+        {differentDraftScope && <p className="muted">{t("ai.draftScope", { scope: draftScopeLabel })}</p>}
         <p data-testid="ai-summary">{localizedSummary(parent.summary, state.locale)}</p>
         <div className="compare-tabs" aria-label={t("ai.compare")}>
           <Button action="compare-original" aria-pressed={state.compareMode === "original"} onClick={() => selectCandidate(parent.id, "original")}>{t("ai.original")}</Button>
@@ -184,11 +201,11 @@ export function AiPanel() {
             }} />
         </label>
         <div className="composer-tools">
-          <label className="scope-control" title={scopeNames || t("ai.scopeAll", { count: scopeDoc?.panelOrder.length ?? 0 })}>
+          <label className="scope-control" title={frozen.scope === "document" ? documentLabel : names ? selectionLabel : t("reason.empty-selection")}>
             <span className="sr-only">{t("ai.scope")}</span>
             <select data-testid="ai-scope" value={frozen.scope} disabled={running || Boolean(clarification && !stale)}
               onChange={event => setScope(event.target.value === "selection" ? "selection" : "document")}>
-              <option value="document">{t("ai.document")}</option><option value="selection">{t("ai.selection")}</option>
+              <option value="document">{documentLabel}</option><option value="selection">{selectionLabel}</option>
             </select>
           </label>
           {imageInput && <label className="vision-chip" data-checked={includePreview} title={t("ai.contentDisclosure")}>
@@ -200,16 +217,18 @@ export function AiPanel() {
             : <Button key="send" type="submit" variant="primary" className="round-send" action={stale ? "ai-regenerate" : "ai-send"} disabledReason={reason} aria-label={sendLabel} title={sendLabel}><Icon name="arrowUp" /></Button>}
         </div>
       </form>
-      {frozen.scope === "selection" && <div className="scope-summary"><span>{scopeNames ? t("ai.scopeSelection", { labels: scopeNames }) : t("reason.empty-selection")}</span>
-        {parent && !running && !clarification && !stale && <Button action="use-current-selection" variant="quiet" onClick={() => setScope("selection")}>{t("ai.updateSelection")}</Button>}
-      </div>}
+      {frozen.scope === "selection" && !optionIds.length && <p className="scope-summary">{t("reason.empty-selection")}</p>}
+      {canRefreshSelection && <div className="scope-summary"><Button action="use-current-selection" variant="quiet" onClick={() => setScope("selection")}>{t("ai.updateSelection")}</Button></div>}
       {imageInput && (includePreview || review) && <p className="ai-disclosure">{t("ai.imageDisclosure")}</p>}
       <details className="composer-options"><summary><Icon name="sliders" />{t("ai.options")}<Icon name="chevron" /></summary>
         <div className="composer-options-body">
           {imageInput ? <label className="check"><input type="checkbox" checked={review} onChange={event => setReview(event.target.checked)} />{t("ai.review")}</label>
             : configured && <p className="muted">{t("ai.textOnly")}</p>}
           <div className="ai-examples">
-            {examples.map(key => <Button key={key} action="fill-example" variant="quiet" onClick={() => fill(t("example." + key))}>{t("example." + key)}</Button>)}
+            {examples.map(key => {
+              const example = key === "hero" && heroExample ? heroExample : t("example." + key);
+              return <Button key={key} action="fill-example" variant="quiet" onClick={() => fill(example)}>{example}</Button>;
+            })}
             {["compact", "hero", "labels"].map(key => <Button key={key} action="use-builtin" variant="quiet" onClick={() => fill(t("example.preset." + key))}>{t("preset." + key)}</Button>)}
             <Button action="save-preset" disabled={!prompt.trim()} onClick={() => {
               const next: PromptPreset[] = [...presets, { id: crypto.randomUUID(), title: prompt.slice(0, 24), prompt, scope: frozen.scope === "selection" ? "selection" : "all" }];
