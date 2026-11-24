@@ -83,11 +83,12 @@ export function CompositionReplay({ example }: { example: ShowcaseExample }) {
       <div className="replay-navigation">
         <div className="replay-steps" aria-label={t("brand.play")}>{Array.from({ length: 8 }, (_, index) => <button type="button" key={index}
           data-action="demo-step" aria-current={step === index ? "step" : undefined} onClick={() => playback.choose(index)}>{t("brand.step." + index)}</button>)}</div>
-        <div className="replay-buttons">
-          <Button variant="quiet" action="demo-previous" disabled={step === 0} aria-label={t("brand.previous")} onClick={() => playback.choose(step - 1)}><Icon name="arrowLeft" /></Button>
-          {!playback.reduced && <Button variant="quiet" action="demo-playback" aria-label={t(playback.playing ? "brand.pause" : step === 7 ? "brand.replay" : "brand.play")} onClick={playback.toggle}><Icon name={playback.playing ? "pause" : "play"} /></Button>}
-          <Button variant="quiet" action="demo-next" disabled={step === 7} aria-label={t("brand.next")} onClick={() => playback.choose(step + 1)}><Icon name="arrowRight" /></Button>
-        </div>
+        {!playback.reduced && <div className="replay-buttons">
+          <Button variant="quiet" action="demo-playback" onClick={playback.toggle}>
+            <Icon name={playback.playing ? "pause" : "play"} />
+            {t(playback.playing ? "brand.pause" : step === 7 ? "brand.replay" : "brand.play")}
+          </Button>
+        </div>}
         <p className="showcase-caption">{t("brand.demoDisclosure")}</p>
         <a className="brand-text-link" href={example.exports.svg.url} download>{t("brand.downloadSvg")}<Icon name="export" /></a>
       </div>

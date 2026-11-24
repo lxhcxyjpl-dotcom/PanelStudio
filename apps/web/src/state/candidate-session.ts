@@ -16,7 +16,7 @@ type Origin = {
   cancelRequested: boolean;
 };
 type Root = NonNullable<WorkspaceState["candidateRoot"]>;
-type AIOptions = { includePreviewImage: boolean; visualReview: boolean; fromCurrent?: boolean };
+type AIOptions = { includePreviewImage: boolean; visualReview: boolean; fromCurrent?: boolean; onQueued?: (id:string) => void };
 let epoch = 0;
 let sequence = 0;
 let active: Origin | null = null;
@@ -247,6 +247,7 @@ export async function generateAi(prompt: string, options: AIOptions) {
       includePreviewImage: options.includePreviewImage, visualReview: options.visualReview,
     }, newKey());
     origin.jobId = jobId;
+    options.onQueued?.(jobId);
     if (origin.cancelRequested) { await api.cancelJob(jobId, newKey()); return; }
     if (!current(origin)) return;
     // Clear only the submitted text; preserve anything typed while the request was queued.
@@ -290,6 +291,17 @@ async function finishAi(origin: Origin, root: Root, frozen: FrozenScope, show: b
     }
   }
   void refreshAiHistory();
+}
+export async function followEditedAi(jobId: string, prompt: string, frozen: FrozenScope) {
+  const state = get();
+  if (!state.projectId || !state.confirmed) return;
+  const origin = begin(state.projectId, state.confirmed.revision);
+  origin.jobId = jobId;
+  patch({ inspectorMode:"ai", rightOpen:true, aiScope:frozen.scope, frozenScope:frozen, scopeChanged:false,
+    aiStatus:{phase:"running",jobId,prompt,frozen,baseRevision:state.confirmed.revision,label:i18n.t("ai.running")} });
+  void refreshAiHistory();
+  try { await finishAi(origin,state.confirmed,frozen,true); }
+  catch (error) { if (current(origin)) failAi(error); }
 }
 export async function cancelAiPrompt() {
   const origin = active;

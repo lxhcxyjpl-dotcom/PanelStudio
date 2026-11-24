@@ -23,8 +23,10 @@ export {
   UuidSchema,
   uuidKeyed,
 } from "./primitives.js";
+export { SPEECH_SAMPLE_RATE, SPEECH_MAX_SECONDS, supportsDeepSeekSpeech, type SpeechTranscript } from "./speech.js";
 export { nullable, object } from "./schema.js";
-export { PublicationContextSchema } from "./document.js";
+export { FigureCurationSchema, FigurePickSchema, PublicationContextSchema } from "./document.js";
+export type { FigureCuration, FigurePick } from "./document.js";
 export type { PublicationContext } from "./document.js";
 export { LayoutExampleSchema, AIReferenceLayoutActionSchema } from "./ai.js";
 export type { LayoutExample } from "./ai.js";
@@ -258,4 +260,8 @@ export {
   isSecretWriteRequest,
   isTransactionRequest,
 } from "./guards.js";
+export * from "./figure-reading.js";
+export * from "./message-branches.js";
+export { FigureDiscussionRequestSchema, FigureDiscussionReplySchema, FigureBriefRequestSchema, FigureBriefReplySchema, CurationDecisionSchema, CurationPlanSchema, CurationPromotionSchema } from "./figure-discussion.js";
+export type { CurationDecision, FigureDiscussionRequest, FigureDiscussionReply, FigureBriefRequest, FigureBriefReply, OpeningTurn } from "./figure-discussion.js";
 export type { LayoutCandidatesRequest } from "./guards.js";

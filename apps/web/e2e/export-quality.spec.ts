@@ -59,7 +59,8 @@ test("checks the saved microscopy panels and downloads only the selected export 
   await action("format-svg").click();
   await expect(again).toHaveCount(0);
   await download("export-svg", "显微成像终稿.svg");
-  const metadata = page.getByRole("checkbox", { name: /修订元数据/ });
+  await page.locator(".export-font-details > summary").click();
+  const metadata = page.getByRole("checkbox", { name: /保留修订信息/ });
   await metadata.uncheck();
   await expect(again).toHaveCount(0);
 
@@ -86,4 +87,17 @@ test("checks the saved microscopy panels and downloads only the selected export 
   await expect(again).toBeVisible();
   await action("format-svg").click();
   await expect(again).toHaveCount(0);
+
+  const dialog = page.getByRole("dialog", { name: "导出" });
+  for (const width of [390, 320]) {
+    await page.setViewportSize({ width, height: 844 });
+    for (const format of ["svg", "png", "project"]) {
+      await action("format-" + format).click();
+      await expect.poll(() => dialog.evaluate(el => {
+        const bounds = el.getBoundingClientRect();
+        return bounds.left >= 0 && bounds.right <= innerWidth && el.scrollWidth <= el.clientWidth;
+      })).toBe(true);
+      await action("export-" + format).click({ trial: true });
+    }
+  }
 });

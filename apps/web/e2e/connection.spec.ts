@@ -44,6 +44,11 @@ async function checkFourSizes(page: Page) {
 }
 
 test("explains a key in the URL field and supports provider presets without calling them", async ({ page }) => {
+  // This is the first-time connection flow. Other specs use a mock provider in this test server.
+  const cleared = await page.request.delete("/api/v1/settings/ai-provider/secret", {
+    headers: { "Idempotency-Key": crypto.randomUUID() },
+  });
+  expect(cleared.ok()).toBe(true);
   const saves: string[] = [];
   page.on("request", request => { if (request.method() === "PUT" && request.url().includes("/settings/")) saves.push(request.url()); });
   await page.locator("[data-action=settings]").click();
@@ -67,7 +72,8 @@ test("explains a key in the URL field and supports provider presets without call
   await expect(page.getByTestId("ai-image")).toBeDisabled();
   await expect(page.getByTestId("ai-image")).not.toBeChecked();
   await address.fill("sk-test-value-in-the-wrong-field");
-  await page.locator("[data-action=save-connection]").click();
+  await expect(page.locator("[data-action=save-connection]")).toBeHidden();
+  await page.locator("[data-action=test-provider]").click();
   await expect(page.getByText(/这里需要网址/)).toBeVisible();
   await expect(address).toHaveAccessibleDescription(/这里需要网址/);
   expect(saves).toEqual([]);

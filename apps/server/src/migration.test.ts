@@ -65,7 +65,7 @@ describe("SQLite v0.1 migration", () => {
       const oldResult = JSON.stringify({ kind: "candidates", candidates: [legacyCandidate] });
       legacy.prepare("UPDATE jobs SET resultJson = ? WHERE id = ?").run(oldResult, jobId);
       migrated = openDatabase(dir);
-      expect(migrated.pragma("user_version", { simple: true })).toBe(4);
+      expect(migrated.pragma("user_version", { simple: true })).toBe(5);
       expect(getProject(migrated, projectId)).toEqual(project);
       expect(getRevision(migrated, projectId, 1)?.documentHash).toBe(documentHash);
       expect(getAsset(migrated, projectId, assetId)?.originalFilename).toBe("legacy.svg");
@@ -131,7 +131,7 @@ describe("SQLite v0.1 migration", () => {
     old.close();
     const upgraded = openDatabase(dir);
     try {
-      expect(upgraded.pragma("user_version", { simple: true })).toBe(4);
+      expect(upgraded.pragma("user_version", { simple: true })).toBe(5);
       expect(upgraded.prepare("SELECT sql FROM sqlite_schema WHERE name='assets'").get()).toEqual(definition);
       expect(upgraded.prepare("SELECT * FROM layout_choices").all()).toEqual([]);
       expect(readdirSync(path.join(dir, "backups"))).toHaveLength(1);

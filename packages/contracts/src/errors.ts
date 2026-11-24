@@ -27,6 +27,7 @@ export const ErrorCodeSchema = Type.Union([
   Type.Literal("PROVIDER_NOT_CONFIGURED"),
   Type.Literal("PROVIDER_CONFIG_CHANGED"),
   Type.Literal("MODEL_OUTPUT_INVALID"),
+  Type.Literal("SPEECH_UNAVAILABLE"),
   Type.Literal("SERVER_RESTARTED"),
 ]);
 
@@ -82,6 +83,7 @@ export const ERROR_CODES: Record<
   PROVIDER_NOT_CONFIGURED: { httpStatus: null, scene: "AI request error" },
   PROVIDER_CONFIG_CHANGED: { httpStatus: null, scene: "AI job error" },
   MODEL_OUTPUT_INVALID: { httpStatus: null, scene: "AI job error" },
+  SPEECH_UNAVAILABLE: { httpStatus: 502, scene: "speech transcription provider unavailable" },
   SERVER_RESTARTED: { httpStatus: null, scene: "unfinished job error" },
 };
 
@@ -96,7 +98,7 @@ export const ApiErrorDetailsSchema = object(
       Type.Literal("layout-constraint"), Type.Literal("layout-max-height"),
       Type.Literal("unsupported-text-layout"), Type.Literal("turn-limit"),
       Type.Literal("command-limit"), Type.Literal("empty-selection"),
-      Type.Literal("scope-conflict"),
+      Type.Literal("scope-conflict"), Type.Literal("reader-busy"), Type.Literal("vision-unavailable"), Type.Literal("reading-failed"),
       Type.Literal("reference-slots"), Type.Literal("reference-structure"), Type.Literal("guided-preferences"),
     ])),
     expectedRevision: Type.Optional(RevisionSchema),

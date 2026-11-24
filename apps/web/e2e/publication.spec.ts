@@ -51,6 +51,9 @@ test("new-project brief, configured vision images, editable proposal and adopted
     buffer:Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 '+ratio*40+' 40"><rect width="'+ratio*40+'" height="40" fill="'+["#668977","#8a7165","#bdcaaf"][i]+'"/></svg>'),
   }));
   await page.getByTestId("import-input").setInputFiles(files);
+  await expect(page.locator(".panel-frame")).toHaveCount(3);
+  await page.locator("[data-action=layout-tools]").click();
+  await page.getByRole("menuitem",{name:"排版目标"}).click();
   await expect(page.getByRole("dialog",{name:"排版目标"})).toBeVisible();
   await expect(page.getByTestId("figure-message")).toHaveAccessibleName("图稿重点");
   await expect(page.getByTestId("target-journal")).not.toHaveAttribute("placeholder", /.+/);
@@ -75,13 +78,23 @@ test("new-project brief, configured vision images, editable proposal and adopted
     baseUrl:"http://127.0.0.1:"+port+"/v1",capabilities:{imageInput:true,structuredOutput:"json_object"},allowLocalEndpoint:true})).ok()).toBe(true);
   expect((await write("/api/v1/settings/ai-provider/secret",{secret:"ephemeral-browser-vision"})).ok()).toBe(true);
   await page.reload();
-  await expect(page.getByTestId("layout-button")).toHaveText("一键排版");
+  await page.locator("[data-action=layout-tools]").click();
+  await expect(page.getByTestId("layout-button")).toHaveText("比较布局");
+  await page.keyboard.press("Escape");
   await page.locator("[data-action=tab-ai]").click();
   await page.locator("[data-action=ai-content-layout]").click();
   await expect(page.getByTestId("ai-proposal")).toBeVisible();
   expect(seen[0]!.scene.publicationContext).toEqual(original.document.publicationContext);
   const content=seen[0]!.wire.messages.find(m=>m.role==="user")!.content;
   expect(Array.isArray(content) && content.filter(p=>p.type==="image_url").length).toBe(4);
+  await expect(page.locator("[data-action=ai-apply]")).toBeInViewport();
+  await expect(page.locator("[data-action=ai-discard]")).toBeInViewport();
+  const thread = page.getByTestId("ai-thread");
+  await expect.poll(() => thread.evaluate(el => el.scrollHeight - el.clientHeight)).toBeGreaterThan(0);
+  await thread.evaluate(el => { el.scrollTop = 0; });
+  await expect(page.locator("[data-action=ai-apply]")).toBeInViewport();
+  await expect(page.locator("[data-action=ai-discard]")).toBeInViewport();
+  await thread.evaluate(el => { el.scrollTop = el.scrollHeight; });
   await expect(page.locator("[data-action=ai-apply]")).toBeInViewport();
   await expect(page.locator("[data-action=ai-discard]")).toBeInViewport();
   await page.screenshot({animations:"disabled",path:path.join(output,"content-proposal.png")});
@@ -97,7 +110,7 @@ test("new-project brief, configured vision images, editable proposal and adopted
   await page.locator('[data-action="ai-discard"]').click();
   await page.getByTestId("export-button").click();
   const pending=page.waitForEvent("download");
-  await page.getByRole("button",{name:"可编辑 SVG",exact:true}).click();
+  await page.getByRole("button",{name:"下载 SVG",exact:true}).click();
   const download=await pending;
   await download.saveAs(path.join(output,"content-proposal.svg"));
   await page.getByRole("button",{name:"关闭",exact:true}).click();

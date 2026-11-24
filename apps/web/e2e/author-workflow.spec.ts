@@ -15,6 +15,7 @@ test("a researcher can import two ggplot2 SVGs and a raster through the file pic
     path.join(root, "fixtures/scientific-svg/ggplot2-scatter-natural-width.svg"),
     path.join(root, "fixtures/mixed/raster.png"),
   ]);
+  await action(page,"start-send").click();
   await expect(page.locator(".panel-frame")).toHaveCount(3);
   const later = action(page, "skip-publication");
   if (await later.isVisible()) await later.click();
@@ -51,10 +52,16 @@ test.describe("a collaborator on a phone", () => {
     await (await picker).setFiles(path.join(root, "examples/synthetic-six/synthetic-six.figurezip"));
     await expect(page.locator(".panel-frame")).toHaveCount(6);
     await action(page, "fit").tap();
+    const zoom = await action(page, "actual-size").innerText();
     await action(page, "mobile-properties").tap();
     const canvas = page.getByTestId("canvas");
     const inspector = page.getByTestId("right-sidebar");
     await expect(inspector).toBeInViewport();
+    await expect(action(page, "actual-size")).toHaveText(zoom);
+    const drawer = (await inspector.boundingBox())!;
+    const visibleCanvas = (await canvas.boundingBox())!;
+    expect(visibleCanvas.y + visibleCanvas.height).toBeLessThanOrEqual(drawer.y + 1);
+    await action(page, "fit").tap();
     await expect.poll(async () => {
       const paper = await page.locator(".paper").boundingBox();
       const panel = await inspector.boundingBox();

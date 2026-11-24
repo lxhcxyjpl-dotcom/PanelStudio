@@ -24,6 +24,7 @@ export function LeftSidebar() {
   const { t } = useTranslation();
   const state = useWorkspaceFields("assetTab", "mode", "leftWidth", "leftOpen", "projectId", "imports");
   const tab = state.assetTab;
+  const phoneHeading = state.mode === "phone";
   const setTab = (assetTab: "assets" | "panels") => patch({ assetTab });
   const [openPanels, setOpenPanels] = useState<Record<string, boolean>>({});
   const width = sidebarWidth("left", state.mode, state.leftWidth);
@@ -37,6 +38,7 @@ export function LeftSidebar() {
     !(asset.status === "failed" && state.imports.some(row => row.status === "failed" && row.filename === asset.originalFilename)));
   const completed = state.imports.filter((row) => row.status === "ready").length;
   const pending = state.imports.filter((row) => row.status !== "ready");
+  const assetsLabel = assets.data ? t("assets.tabCount", { count: visible.length }) : t("assets.tab");
   return (
     <aside
       className="sidebar left-sidebar" id="studio-assets"
@@ -45,16 +47,19 @@ export function LeftSidebar() {
       style={{ width }}
       aria-label={t("a11y.left")}
     >
-      <TabBar id="asset-tabs" value={tab} onChange={setTab} label={t("a11y.left")} items={[
-        { value: "assets", label: assets.data ? t("assets.tabCount", { count: visible.length }) : t("assets.tab"), action: "tab-assets" },
+      {phoneHeading ? <h2 className="drawer-heading" id="assets-drawer-heading" tabIndex={-1} data-drawer-heading>
+        {tab === "assets" ? assetsLabel : t("panels.tab")}
+      </h2> : <TabBar id="asset-tabs" value={tab} onChange={setTab} label={t("a11y.left")} items={[
+        { value: "assets", label: assetsLabel, action: "tab-assets" },
         { value: "panels", label: t("panels.tab"), action: "tab-panels" },
-      ]} />
+      ]} />}
       <Button action="close-assets" className="drawer-close" variant="quiet" aria-label={t("a11y.close")}
         onClick={() => patch({leftOpen:false})}><Icon name="close" /></Button>
-      <div className="side-scroll" role="tabpanel" id="asset-tabs-panel" aria-labelledby={"asset-tabs-" + tab}>
+      <div className="side-scroll" role={phoneHeading ? "region" : "tabpanel"} id="asset-tabs-panel"
+        aria-labelledby={phoneHeading ? "assets-drawer-heading" : "asset-tabs-" + tab}>
         {tab === "assets" ? (
           <section className="section asset-library">
-            {completed > 0 && <p className="import-summary" role="status"><Icon name="check" />{t("assets.importedCount",{count:completed})}</p>}
+            {completed > 0 && pending.length > 0 && <p className="import-summary" role="status"><Icon name="check" />{t("assets.importedCount",{count:completed})}</p>}
             {pending.length > 0 ? (
               <ul className="import-log">
                 {pending.map((row) => (
@@ -96,8 +101,9 @@ function AssetCard({ asset, count }: { asset: Asset; count: number }) {
   const size = asset.status === "ready" && asset.normalized
     ? asset.normalized.rasterPixelSize
       ? `${asset.normalized.rasterPixelSize.width}×${asset.normalized.rasterPixelSize.height} px`
-      : `${Math.round(asset.normalized.viewport.width)}×${Math.round(asset.normalized.viewport.height)}`
+      : t("assets.viewportShort", { size: `${Math.round(asset.normalized.viewport.width)}×${Math.round(asset.normalized.viewport.height)}` })
     : "—";
+  const openInfo = () => patch({ dialog: "asset", assetInfoId: asset.id });
   return (
     <article className="asset-card" data-used={count > 0}>
       <div className="thumb">
@@ -112,15 +118,23 @@ function AssetCard({ asset, count }: { asset: Asset; count: number }) {
         <strong title={asset.originalFilename}>{asset.originalFilename}</strong>
         <span title={format + " · " + size}>{size}</span>
         {asset.status !== "ready" && <span className="asset-status">{t(asset.status === "failed" ? "assets.failed" : "assets.processing")}</span>}
+        {asset.status === "ready" && asset.diagnostics.length > 0 && <button
+          type="button" className="asset-notice" data-action="asset-notice"
+          aria-label={t("assets.viewNotices", { name: asset.originalFilename })}
+          onClick={openInfo}>
+          {t(asset.diagnostics.every(item => item.code === "FONT_MISSING") ? "assets.fontNotice" : "assets.noticeCount",
+            { count: asset.diagnostics.length })}
+        </button>}
       </div>
       <div className="asset-tools">
-        <Button action="add-asset" variant="quiet" aria-label={t(count ? "assets.addCopy" : "assets.add")} title={t(count ? "assets.addCopy" : "assets.add")}
-          disabledReason={asset.status === "ready" ? undefined : t("assets.processing")} onClick={() => void offerAssets([asset.id])}><Icon name="plus" /></Button>
+        {count === 0 && <Button action="add-asset" variant="quiet" aria-label={t("assets.add")} title={t("assets.add")}
+          disabledReason={asset.status === "ready" ? undefined : t("assets.processing")} onClick={() => void offerAssets([asset.id])}><Icon name="plus" /></Button>}
         <DropdownMenu.Root>
           <DropdownMenu.Trigger asChild><Button action="asset-menu" variant="quiet" aria-label={t("assets.actions",{name:asset.originalFilename})} title={t("toolbar.more")}><Icon name="more" /></Button></DropdownMenu.Trigger>
           <DropdownMenu.Portal>
             <DropdownMenu.Content className="menu" align="end" sideOffset={4}>
-              <DropdownMenu.Item className="menu-item" data-action="asset-info" onSelect={() => patch({dialog:"asset",assetInfoId:asset.id})}>{t("assets.info")}</DropdownMenu.Item>
+              {count > 0 && <DropdownMenu.Item className="menu-item" data-action="add-asset-copy" onSelect={() => void offerAssets([asset.id])}>{t("assets.addCopy")}</DropdownMenu.Item>}
+              <DropdownMenu.Item className="menu-item" data-action="asset-info" onSelect={openInfo}>{t("assets.info")}</DropdownMenu.Item>
               <DropdownMenu.Item className="menu-item" data-action="download-original" onSelect={() => void downloadOriginal(asset.id)}>{t("assets.download")}</DropdownMenu.Item>
               <DropdownMenu.Item className="menu-item" data-action="remove-asset" disabled={count > 0} title={count > 0 ? t("assets.removeReasonUsed") : undefined}
                 onSelect={() => void removeAsset(asset.id)}>{t("assets.remove")}</DropdownMenu.Item>
@@ -128,7 +142,8 @@ function AssetCard({ asset, count }: { asset: Asset; count: number }) {
           </DropdownMenu.Portal>
         </DropdownMenu.Root>
       </div>
-      {asset.diagnostics.length > 0 && <span className="asset-diagnostic">{asset.diagnostics.map((item) => formatDiagnostic(t, item)).join(" ")}</span>}
+      {asset.status !== "ready" && asset.diagnostics.length > 0 &&
+        <span className="asset-diagnostic">{asset.diagnostics.map((item) => formatDiagnostic(t, item)).join(" ")}</span>}
     </article>
   );
 }

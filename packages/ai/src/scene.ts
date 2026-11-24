@@ -4,6 +4,7 @@ import {
   resolveLabelText,
   type FigureDocumentV1,
   type LayoutExample,
+  type PanelReadingClue,
 } from "@panelstudio/contracts";
 import { canonicalJson, resolvePanelLabel } from "@panelstudio/core";
 
@@ -17,6 +18,7 @@ export type FrozenScene = {
   previousTurns: TurnTranscript[];
   publicationContext?: FigureDocumentV1["publicationContext"];
   layoutExamples?: LayoutExample[];
+  imageReadings?: PanelReadingClue[];
   actions: readonly string[];
   canvas: {
     widthMm: number;

@@ -4,18 +4,21 @@
 
 PanelStudio is a local or self-hosted editor for multi-panel scientific figures. You import drawings you already made, the app proposes a layout and adds panel labels, and you export an SVG you can keep editing in Adobe Illustrator.
 
-**Version 0.2.0** supports continuous refinement of an unapplied draft, comparison with its original revision, and acceptance or undo in one transaction. Existing schema-1 figures and project packages remain compatible. AI is optional.
+**Development preview · 0.2.0.** Run it locally in a browser with no PanelStudio account. Import, manual layout, editing and export work without an API key.
 
-## Refine a figure
+## Make a figure
 
-1. Import up to eight existing panels and choose a layout.
-2. Ask for changes to the full figure or a frozen selection. Keep refining the same draft, answer clarification questions, compare original and draft, then apply. You can edit while a proposal is being generated.
-3. Drag individual labels, rigid groups or selected panels. Reorder the panel list to change lettering. Arrange two or three selected units into a row, preserving their sizes or using a common width or height.
-4. Export editable SVG. The editor uses the bundled Noto faces to measure label ink and keeps text, supported vectors and raster images editable in their respective forms.
+Start on the homepage with a message, images, or both. Attach, paste or drop panels, remove any unwanted attachments, then send. When the goal is unclear, PanelStudio asks one question with suggested answers and space for your own answer. The conversation carries into panel selection and layout. For a known arrangement, send “A and B side by side, C below, 85 mm wide.” Keep refining the draft on the canvas by talking, dragging or entering precise dimensions.
 
-![PanelStudio homepage with three layouts for the same figure](docs/screenshots/editorial/home-first-pass.png)
+If the layout is undecided, give the target journal or the point your reader should notice first. With a visual model connected, PanelStudio can suggest which panels belong in the main figure and which belong in the supplement. Try changing the focus to “Show how closely the two methods agree.” If a supplemental panel offers more direct evidence, the model asks whether to bring it into the main figure. You can locate a changed panel from the edit summary and undo the edit in one step.
 
-The homepage at `/` shows three layouts of the same scientific figure. It advances every five seconds and supports manual selection and pausing. Open **Gallery and demo** in the header for four editable examples, the recorded editing sequence and its SVG download. **Start arranging** opens `/app` to create or resume a figure. Returning home preserves the editing view and unsent AI input. Interface text uses 13, 15, 24 and 56 px. Figure labels use the document’s own typography.
+Local reading extracts SVG text, runs English and Simplified Chinese OCR on pixels and suggests a figure type without an API key. Connect an image-capable model in **Settings → AI connection** to send readable images, extracted text and preliminary types with your request. The switch beside the input turns this off. The model reads each image before checking its filename. A clear discrepancy opens one question beside the image. You can enlarge it, use what it shows, follow the filename, or give your own interpretation. The project remembers your choice and resumes the request. Export an editable SVG, a PNG, or the project package.
+
+To inspect the local reading separately, run `node apps/server/inspect-figures.mjs --out reading-output plot.svg panel.png` from the repository root. The output contains reading previews and `evidence.json`.
+
+![PanelStudio figure chat with image attachments and a send button](docs/screenshots/editorial/home-chat.png)
+
+The homepage at `/` accepts your own figures or opens a three-image rehearsal. The gallery shows three layouts of the same scientific figure. It advances every five seconds and supports manual selection and pausing. Open **Gallery and demo** in the header for four editable examples, the recorded editing sequence and its SVG download. **Open workspace** opens `/app` to create or resume a figure. Returning home preserves the editing view and unsent AI input. Interface text uses 13, 15, 24 and 56 px. Figure labels use the document’s own typography.
 
 ![Scientific figure in the editor with collapsed label settings](docs/screenshots/editorial/editor-first-pass.png)
 
@@ -32,6 +35,8 @@ The latest native Illustrator run passed 136/156 direct-open checks; the remaini
 Node.js 22.12 or newer, pnpm 10.33.4.
 
 ```bash
+git clone --branch design/editorial-studio https://github.com/lxhcxyjpl-dotcom/PanelStudio.git
+cd PanelStudio
 pnpm install --frozen-lockfile
 pnpm --filter @panelstudio/server exec node start.mjs
 ```
@@ -50,7 +55,7 @@ The project menu opens another project on this server, soft-deletes the current 
 
 ## Formats and limits
 
-PNG, JPEG, WebP, and a documented subset of SVG. At most 8 panels in a project. Editable SVG keeps vectors and label text; it does not turn type into outlines. PDF, EPS, native `.ai`, and outline export are outside the supported formats.
+Supports PNG, JPEG, WebP, and the documented SVG subset. A project can hold up to 32 assets and use up to 32 panels. SVG export keeps vector artwork and panel labels editable and embeds raster images as raster artwork.
 
 Details: [`docs/format-support.md`](docs/format-support.md).
 

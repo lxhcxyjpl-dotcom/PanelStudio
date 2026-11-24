@@ -35,11 +35,12 @@ export function ArrangeInspector() {
   const stale = cards.length > 0 && candidatesStale(state);
   const applyReason = state.layoutState === "loading" ? t("layout.loading") : !cards.length || !state.activeCandidateId ? t("layout.pick") : stale ? t("layout.stale") : undefined;
   const titleFor = (summary: string, doc: FigureDocumentV1, index: number) => {
-    if (summary !== "按排版偏好") return localizedSummary(summary, i18n.language);
+    if (summary !== "按排版偏好" && !summary.startsWith("均衡分行")) return localizedSummary(summary, i18n.language);
     const rows = alignedRows(doc);
     if (!rows) return t("layout.numbered", { number: index + 1 });
     if (rows.length === 1) return t("layout.singleRow", { panels: rows[0] });
     if (rows.every(count => count === rows[0])) return t("layout.evenRows", { rows: rows.length, panels: rows[0] });
+    if (rows.length === 2) return t("layout.twoRows", { top: rows[0], bottom: rows[1] });
     return t("layout.mixedRows", { counts: rows.join(" / ") });
   };
   return <section className="section arrange-inspector" aria-label={t("layout.preview")} data-keys="candidates">
@@ -47,13 +48,18 @@ export function ArrangeInspector() {
     {state.layoutMessage && <p role="status">{state.layoutMessage}</p>}
     <div className="arrange-candidates">{cards.map(({ candidate, previewUrl, previewError }, i) => {
       const selected = candidate.id === state.activeCandidateId, doc = candidate.previewDocument;
+      const width = round(doc.canvas.widthMm), height = round(doc.canvas.heightMm);
+      const source = state.candidateRoot?.document.canvas;
+      const size = width + " × " + height;
+      const baseSize = source ? round(source.widthMm) + " × " + round(source.heightMm) : size;
       return <button key={candidate.id} type="button" data-action="select-candidate" data-testid="candidate-card"
         className={"candidate" + (selected ? " active" : "")} aria-pressed={selected} onClick={() => selectCandidate(candidate.id)}>
         <span className="candidate-proof">
-          {previewUrl ? <img src={previewUrl} alt="" /> : <span className="candidate-placeholder">{previewError ?? t("layout.loading")}</span>}
+          {previewUrl ? <img src={previewUrl} alt="" /> : <span className="candidate-placeholder">{previewError ?? t("layout.thumbnailLoading")}</span>}
         </span>
         <span className="candidate-copy"><strong>{titleFor(candidate.summary, doc, i)}</strong>
-          <span className="numeric-text">{t("layout.canvasSize", { width: round(doc.canvas.widthMm), height: round(doc.canvas.heightMm) })}</span>
+          <span className="numeric-text">{baseSize === size ? t("layout.canvasSize", { width, height }) :
+            t("layout.canvasSizeChange", { before: baseSize, after: size })}</span>
           {cards.length === 1 && state.candidateRoot && proposalChanges(state.candidateRoot.document, doc).filter(change => change.kind === "size").map(change => <span key={change.label}>{t("ai.changeSize", change)}</span>)}
           {candidate.diagnostics.map((item, index) => {
             const id = item.code === "LAYOUT_PPI_BELOW_TARGET" ? item.panelIds?.[0] : undefined;

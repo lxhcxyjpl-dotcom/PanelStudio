@@ -20,11 +20,14 @@
     "@panelstudio/layout": "workspace:*",
     "@panelstudio/svg": "workspace:*",
     "@resvg/resvg-js": "2.6.2",
+    "@tesseract.js-data/chi_sim": "1.0.0",
+    "@tesseract.js-data/eng": "1.0.0",
     "ajv-formats": "3.0.1",
     "better-sqlite3": "13.0.3",
     "fastify": "5.12.8",
     "fflate": "0.8.3",
     "sharp": "0.35.5",
+    "tesseract.js": "7.0.0",
     "typebox": "1.4.6"
   },
   "devDependencies": {

@@ -21,6 +21,7 @@ test.beforeEach(async ({page}) => {
   await page.getByTestId("import-input").setInputFiles([1,2,3].map(i => image(i+".svg",'<rect width="400" height="240" fill="#426c89"/>')));
   await expect(page.locator(".panel-frame")).toHaveCount(3);
   await expect(page.getByTestId("save-status")).toHaveText("已保存");
+  await page.locator("[data-action=layout-tools]").click();
   await action(page,"guided-layout").click();
 });
 test("reference only and combined input preview, commit, undo and export via the normal editor",async ({page}) => {
@@ -41,6 +42,7 @@ test("reference only and combined input preview, commit, undo and export via the
   expect(JSON.stringify(body)).not.toContain("<svg");
   await expect(page.getByTestId("candidate-card").first()).toBeVisible();
   expect((await snapshot(page)).documentHash).toBe(base.documentHash);
+  await page.locator("[data-action=layout-tools]").click();
   await action(page,"guided-layout").click();
   await page.getByTestId("guide-words").fill("突出 B，A 和 C 上下排列，留白多一点");
   await expect(page.getByTestId("guide-summary")).toHaveText("突出 B · A 与 C 上下对照 · 间距 6 mm");

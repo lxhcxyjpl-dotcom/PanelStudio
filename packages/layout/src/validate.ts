@@ -1,6 +1,6 @@
 import { TOLERANCES, type DomainCommand, type FigureDocumentV1 } from "@panelstudio/contracts";
 import { applyCommands, assertLabelBounds, DocumentCommandError, type AssetLookup } from "@panelstudio/core";
-import { insideMargins, intersects, nearly, occupiedRects } from "./measure.js";
+import { autoHeightLimit, insideMargins, intersects, nearly, occupiedRects } from "./measure.js";
 
 /** Replays the stored commands and validates their actual outcome; never calls a solver. */
 export function validateCandidateResult(
@@ -20,7 +20,7 @@ function assertStrictLayout(document: FigureDocumentV1): void {
   const settings = document.layoutSettings;
   const min = settings.minPanelSizeMm;
   const tol = TOLERANCES.geometryComparisonMm;
-  if (document.canvas.heightMode === "auto" && document.canvas.heightMm > settings.maxAutoHeightMm + tol) {
+  if (document.canvas.heightMode === "auto" && document.canvas.heightMm > autoHeightLimit(document) + tol) {
     throw new DocumentCommandError("LAYOUT_CONFLICT", "The layout exceeds its automatic canvas height limit.", {
       reason: "layout-max-height", panelIds: panels,
     });

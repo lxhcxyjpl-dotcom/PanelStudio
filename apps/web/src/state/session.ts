@@ -1,6 +1,7 @@
 import {
   RESOURCE_LIMITS,
   type Asset,
+  type Candidate,
   type Diagnostic,
   type DomainCommand,
   type ExportRequest,
@@ -17,12 +18,15 @@ import {
 import { stackOrderCommand, type StackMove } from "@panelstudio/core/stack";
 import { api, ApiClientError, newKey, thumbnailUrl, waitForJob, type AssetPage } from "../api/client";
 import { i18n } from "../i18n";
+import { proposalChanges } from "../model/changes";
 import { cropInvalid, geometryLocked, groupForPanel, mergedOverrides, panelIdsOf } from "../model/document-ui";
 import { placePanelCommands } from "../model/place";
 import { writeProjectId } from "../prefs";
 import { clearRecovery, readRecovery, writeRecovery, type RecoveryDraft } from "./drafts";
 import { queryClient } from "./query";
 import { patch, syncChrome, useWorkspace } from "./store";
+import { changeWish, isCurrentWishEdit, openWish, useWish, type WishEditFeedback } from "./wish-session";
+import { asksForSelection } from "../model/wish";
 import { errorText } from "../model/feedback";
 import { resolvePanelLabel } from "@panelstudio/core/labels";
 import { belongsToProject, dismissCandidates, generateAi, generateLayout, projectEpoch, refreshAiHistory, resetCandidateSession } from "./candidate-session";
@@ -35,7 +39,7 @@ import photoUrl from "../../../../fixtures/mixed/photo.jpg";
 import vectorUrl from "../../../../fixtures/mixed/panel-vector.svg";
 
 let chain: Promise<void> = Promise.resolve();
-const activeImports = new Set<Promise<void>>();
+const activeImports = new Set<Promise<unknown>>();
 let bootPromise: Promise<void> | null = null;
 let loadingProject = 0;
 let creatingProject: Promise<string | null> | null = null;
@@ -131,6 +135,7 @@ export async function loadProject(projectId: string, isCurrent: () => boolean = 
   const epoch = resetCandidateSession(projectId);
   queryClient.setQueryData(["assets", projectId], assets);
   writeProjectId(projectId);
+  openWish(projectId, document.document.panelOrder.length > 0);
   const confirmed: Confirmed = {
     revision: document.revision,
     document: document.document,
@@ -216,7 +221,14 @@ export function newProject(askForContext = false): Promise<string | null> {
   return creatingProject;
 }
 
+let openingEmpty: Promise<string> | null = null;
 export async function ensureProject(askForContext = true): Promise<string> {
+  const existing = useWorkspace.getState();
+  if (existing.projectId && existing.confirmed) return existing.projectId;
+  if (!openingEmpty) openingEmpty = createEmptyProject(askForContext).finally(() => { openingEmpty = null; });
+  return openingEmpty;
+}
+async function createEmptyProject(askForContext: boolean): Promise<string> {
   const current = useWorkspace.getState();
   if (current.projectId && current.confirmed) return current.projectId;
   const title = current.locale === "zh-CN" ? "未命名图稿" : "Untitled figure";
@@ -224,6 +236,7 @@ export async function ensureProject(askForContext = true): Promise<string> {
   const fresh = await api.document(created.project.id);
   resetCandidateSession(created.project.id);
   writeProjectId(created.project.id);
+  openWish(created.project.id);
   queryClient.setQueryData(["assets", created.project.id], { items: [], nextCursor: null });
   patch({
     projectId: created.project.id,
@@ -281,6 +294,7 @@ export async function returnToStart(): Promise<void> {
 function showStart(message: string): void {
   resetCandidateSession(null);
   writeProjectId(null);
+  openWish(null);
   patch({
     startMessage: "",
     projectId: null,
@@ -324,24 +338,32 @@ export async function restoreListedProject(projectId: string): Promise<void> {
   patch({ liveMessage: i18n.t("toolbar.projectRestored") });
 }
 
-export function renameTitle(title: string): Promise<void> {
+export function renameTitle(title: string, expectedTitle?: string): Promise<void> {
   return later(async () => {
-    const { projectId } = useWorkspace.getState();
-    if (!projectId) return;
+    const state = useWorkspace.getState();
+    const { projectId } = state;
+    if (!projectId || (expectedTitle !== undefined && state.title !== expectedTitle)) return;
     const project = await api.renameProject(projectId, title);
     if (useWorkspace.getState().projectId === projectId) patch({ title: project.title, liveMessage: i18n.t("save.saved") });
   });
 }
 
-export function importFiles(files: File[]): Promise<void> {
-  const pending = importAndPlace(files);
+function importBatch(files: File[], libraryOnly: boolean): Promise<string[]> {
+  const pending = importAndPlace(files, libraryOnly);
   activeImports.add(pending);
   return pending.finally(() => activeImports.delete(pending));
 }
+export function importFiles(files: File[], libraryOnly = false): Promise<void> {
+  return importBatch(files, libraryOnly).then(() => undefined);
+}
+export function importToLibrary(file: File): Promise<string | undefined> {
+  return importBatch([file], true).then(ids => ids[0]);
+}
 
-async function importAndPlace(files: File[]): Promise<void> {
-  if (files.length === 0) return;
-  const projectId = await ensureProject();
+async function importAndPlace(files: File[], libraryOnly: boolean): Promise<string[]> {
+  if (files.length === 0) return [];
+  const projectId = await ensureProject(false);
+  const epoch = projectEpoch();
   const ready: string[] = [];
   let failed = 0;
   for (const file of files) {
@@ -370,9 +392,29 @@ async function importAndPlace(files: File[]): Promise<void> {
       });
     }
   }
-  await queryClient.refetchQueries({ queryKey: ["assets", projectId] });
+  if (!belongsToProject(projectId, epoch)) return [];
+  const library = await api.assets(projectId);
+  if (!belongsToProject(projectId, epoch)) return [];
+  queryClient.setQueryData(["assets", projectId], library);
   if (failed > 0) say(i18n.t("assets.partial"));
-  if (ready.length > 0) await offerAssets(ready);
+  const wish = useWish.getState();
+  const priorOrder = wish.order;
+  changeWish({ order: [...new Set([...priorOrder, ...ready])] });
+  if (failed) {
+    patch({assetTab:"assets", leftOpen:true});
+    changeWish({reply:i18n.t("assets.partial")});
+  }
+  if (!ready.length || libraryOnly) return ready;
+  const state = useWorkspace.getState();
+  const count = state.confirmed?.document.panelOrder.length ?? 0;
+  const initial = !count && !state.cards.length;
+  if (wish.phase === "select" || ready.length + count > RESOURCE_LIMITS.maxPanelsPerProject || (initial && asksForSelection(wish.input))) {
+    const selected = wish.phase === "select" ? wish.selected : Object.values(state.confirmed?.document.panels ?? {}).map(panel=>panel.assetId);
+    changeWish({phase:"select", selected:[...new Set(selected)]});
+  } else {
+    await offerAssets(ready);
+  }
+  return ready;
 }
 
 function replaceImport(id: string, next: Partial<ImportRow>): void {
@@ -427,6 +469,57 @@ async function fileFromUrl(url: string, name: string, type: string): Promise<Fil
 
 export function transact(commands: DomainCommand[]): Promise<void> {
   return later(() => transactNow(commands));
+}
+
+function recordWishEdit(before: Confirmed, projectId: string, focusPanelId?: string): void {
+  const after = useWorkspace.getState().confirmed;
+  const wish = useWish.getState();
+  if (!after || wish.projectId !== projectId || wish.phase !== "editing" || !before.document.panelOrder.length) return;
+  const changed = before.documentHash !== after.documentHash;
+  changeWish({ editFeedback: {
+    revision: after.revision,
+    documentHash: after.documentHash,
+    changed,
+    changes: changed ? proposalChanges(before.document, after.document) : [],
+    ...(focusPanelId ? { focusPanelId } : {}),
+  } });
+}
+
+/** Serialize the preview and commit against the revision from which the author made the wish. */
+export function commitWish(revision: number, commands: DomainCommand[], request?: LayoutRequest, focusPanelId?: string): Promise<void> {
+  let committed = false;
+  const epoch = projectEpoch();
+  return later(async () => {
+    const state = useWorkspace.getState();
+    if (!state.projectId || state.confirmed?.revision !== revision || state.draft || state.crop || state.optimistic)
+      throw new Error(i18n.t("wish.changed"));
+    let candidate: Candidate | undefined;
+    if (request) {
+      const preparation = commands.filter((c): c is Extract<DomainCommand,{type:"panel.add"|"panel.remove"|"panel.replaceAsset"|"figure.setPublicationContext"|"figure.setCuration"}> =>
+        c.type === "panel.add" || c.type === "panel.remove" || c.type === "panel.replaceAsset" ||
+        c.type === "figure.setPublicationContext" || c.type === "figure.setCuration");
+      if (preparation.length !== commands.length) throw new Error(i18n.t("wish.changed"));
+      const response = await api.layoutCandidates(state.projectId, {baseRevision:revision, request, maxCandidates:1, preparation}, newKey());
+      candidate = response.candidates[0];
+      if (!candidate) throw new Error(i18n.t("layout.pick"));
+    }
+    if (!belongsToProject(state.projectId, epoch) || useWorkspace.getState().confirmed?.revision !== revision)
+      throw new Error(i18n.t("wish.changed"));
+    if (candidate) {
+      await saveCandidate(candidate);
+    } else if (commands.length) {
+      let rejection: unknown;
+      await transactNow(commands, error => { rejection = error; });
+      if (rejection) throw rejection;
+      const saved = useWorkspace.getState();
+      if (saved.confirmed?.revision !== revision + 1 || saved.saveState !== "saved") throw new Error(i18n.t("save.failed"));
+    }
+    if (!belongsToProject(state.projectId, epoch)) return;
+    const publicationOnly = !request && commands.length === 1 && commands[0]?.type === "figure.setPublicationContext";
+    if (!publicationOnly) recordWishEdit(state.confirmed, state.projectId, focusPanelId);
+    if (useWorkspace.getState().cards.length) dismissCandidates();
+    committed = true;
+  }).then(() => { if (!committed) throw new Error(i18n.t("wish.changed")); });
 }
 
 export function resizeCanvas(
@@ -604,13 +697,19 @@ export function undo(): Promise<void> {
   return history("undo");
 }
 
+export function undoWishEdit(projectId: string, edit: WishEditFeedback): Promise<void> {
+  return history("undo", { projectId, edit });
+}
+
 export function redo(): Promise<void> {
   return history("redo");
 }
 
-function history(direction: "undo" | "redo"): Promise<void> {
+function history(direction: "undo" | "redo", target?: { projectId: string; edit: WishEditFeedback }): Promise<void> {
   return later(async () => {
     const state = useWorkspace.getState();
+    if (target && (!target.edit.changed || target.projectId !== state.projectId || !isCurrentWishEdit(target.edit, state.confirmed) ||
+        state.saveState !== "saved" || state.crop || state.interaction || nudge)) return;
     if (!state.projectId || !state.confirmed) {
       say(i18n.t(direction === "undo" ? "history.undoEmpty" : "history.redoEmpty"));
       return;
@@ -624,12 +723,13 @@ function history(direction: "undo" | "redo"): Promise<void> {
       say(i18n.t(direction === "undo" ? "history.undoEmpty" : "history.redoEmpty"));
       return;
     }
-    await runHistory(direction, state.confirmed.revision, newKey());
+    await runHistory(direction, state.confirmed.revision, newKey(), Boolean(target));
   });
 }
 
-async function runHistory(direction: "undo" | "redo", baseRevision: number, key: string): Promise<void> {
-  const { projectId } = useWorkspace.getState();
+async function runHistory(direction: "undo" | "redo", baseRevision: number, key: string, fromWish = false): Promise<void> {
+  const { projectId, confirmed } = useWorkspace.getState();
+  const priorCuration = confirmed?.document.curation;
   if (!projectId) return;
   const epoch = projectEpoch();
   patch({ saveState: "saving", historyRetry: null });
@@ -649,8 +749,23 @@ async function runHistory(direction: "undo" | "redo", baseRevision: number, key:
       historyRetry: null,
       liveMessage: i18n.t(direction === "undo" ? "history.undone" : "history.redone"),
     });
+    const wish = useWish.getState();
+    if ((wish.selected.length || priorCuration) && result.document.panelOrder.length === 0 && direction === "undo") {
+      const selected = wish.selected.length ? wish.selected : priorCuration?.main.map(pick=>pick.id) ?? [];
+      changeWish({phase:"select",selected,reply:i18n.t("wish.revised",{count:selected.length}),editFeedback:null});
+    } else if (wish.phase === "select" && direction === "redo" && result.document.panelOrder.length) {
+      changeWish({phase:"editing",reply:"",editFeedback:null});
+    } else if (fromWish || result.document.curation || wish.editFeedback) {
+      changeWish({reply:i18n.t(direction === "undo" ? "history.undone" : "history.redone"),replyRevision:result.revision,editFeedback:null});
+    }
   } catch (error) {
     if (!belongsToProject(projectId, epoch)) return;
+    if (fromWish && error instanceof ApiClientError && error.code === "REVISION_CONFLICT") {
+      changeWish({ editFeedback: null, reply: i18n.t("wish.changed") });
+      patch({ saveState: "saved", liveMessage: i18n.t("wish.changed") });
+      await loadProject(projectId, () => belongsToProject(projectId, epoch)).catch(() => {});
+      return;
+    }
     if (error instanceof ApiClientError && error.code === "REQUEST_INVALID") {
       patch({ saveState: "saved", liveMessage: i18n.t(direction === "undo" ? "history.undoEmpty" : "history.redoEmpty") });
       return;
@@ -732,49 +847,46 @@ export async function requestLayout(request: LayoutRequest = { family: "auto" })
   if (projectEpoch() === epoch) return generateLayout(request);
 }
 
-export function acceptCandidate(): Promise<void> {
+async function saveCandidate(candidate: Candidate): Promise<void> {
+  const project = candidate.projectId, epoch = projectEpoch();
+  if (useWorkspace.getState().projectId !== project || useWorkspace.getState().confirmed?.revision !== candidate.baseRevision)
+    throw new Error(i18n.t("wish.changed"));
+  const key = newKey();
+  const persist = () => api.transaction(project, {baseRevision:candidate.baseRevision, candidateId:candidate.id}, key);
+  patch({saveState:"saving"});
+  try {
+    const result = await persist().catch(error => {
+      // A lost response may already have committed. Replay the same request/key.
+      if (error instanceof ApiClientError && error.status === 0 && belongsToProject(project,epoch)) return persist();
+      throw error;
+    });
+    if (!belongsToProject(project,epoch)) return;
+    dismissCandidates();
+    patch({confirmed:{revision:result.revision,document:result.document,documentHash:result.documentHash,history:result.history},
+      saveState:"saved",liveMessage:i18n.t(candidate.origin==="ai" ? "ai.applied":"layout.apply")});
+  } catch(error) {
+    if (!belongsToProject(project,epoch)) return;
+    patch({saveState:"saved",liveMessage:errorText(error)});
+    if (error instanceof ApiClientError && (error.code==="CANDIDATE_STALE" || error.code==="REVISION_CONFLICT"))
+      await reloadFromServer();
+    throw error;
+  }
+}
+
+export function acceptCandidate(reportWishEdit = false): Promise<void> {
   return later(async () => {
     const state = useWorkspace.getState();
-    const card = state.cards.find((item) => item.candidate.id === state.activeCandidateId);
-    if (!state.projectId || !state.confirmed || !card) {
-      say(i18n.t("layout.pick"));
-      return;
-    }
-    if (candidatesStale(state)) {
-      patch({ compareMode: "editing", liveMessage: i18n.t("layout.stale") });
-      return;
-    }
+    const card = state.cards.find(item=>item.candidate.id===state.activeCandidateId);
+    if (!card) return say(i18n.t("layout.pick"));
+    if (candidatesStale(state)) return patch({compareMode:"editing",liveMessage:i18n.t("layout.stale")});
     const epoch = projectEpoch();
-    patch({ saveState: "saving" });
     try {
-      const result = await api.transaction(
-        state.projectId,
-        { baseRevision: state.confirmed.revision, candidateId: card.candidate.id },
-        newKey(),
-      );
-      if (!belongsToProject(state.projectId, epoch)) return;
-      dismissCandidates();
-      patch({
-        confirmed: {
-          revision: result.revision,
-          document: result.document,
-          documentHash: result.documentHash,
-          history: result.history,
-        },
-        cards: [],
-        activeCandidateId: null,
-        saveState: "saved",
-        aiStatus: { phase: "idle" },
-        liveMessage: i18n.t(card.candidate.origin === "ai" ? "ai.applied" : "layout.apply"),
-      });
+      await saveCandidate(card.candidate);
+      if (reportWishEdit && state.confirmed && state.projectId && belongsToProject(state.projectId, epoch))
+        recordWishEdit(state.confirmed, state.projectId);
     } catch (error) {
-      if (!belongsToProject(state.projectId, epoch)) return;
-      if (error instanceof ApiClientError && (error.code === "CANDIDATE_STALE" || error.code === "REVISION_CONFLICT")) {
-        patch({ compareMode: "editing", saveState: "saved", liveMessage: i18n.t("layout.stale") });
-        await reloadFromServer();
-        return;
-      }
-      patch({ saveState: "saved", liveMessage: errorText(error) });
+      if (reportWishEdit) throw error;
+      // saveCandidate reports the error in the active workspace.
     }
   });
 }

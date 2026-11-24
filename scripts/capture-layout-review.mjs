@@ -43,7 +43,7 @@ try {
     await act(mobile ? 'mobile-refine' : 'tab-ai').click(); await act('publication-context').click();
     await snap('10-brief'); await act('skip-publication').click();
     if (mobile) await act('close-inspector').click();
-    await act('guided-layout').click(); await snap('11-guide');
+    await act('layout-tools').click(); await act('guided-layout').click(); await snap('11-guide');
     await page.getByTestId('guide-words').pressSequentially('间距 4 mm', {delay:film ? 90 : 0});
     await snap('11-preferences');
     const manual = page.getByTestId('guide-manual').locator('summary');

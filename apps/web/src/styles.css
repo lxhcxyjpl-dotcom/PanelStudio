@@ -835,6 +835,10 @@ html[data-reduce-motion="true"] .dialog {
 .label-outline { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); box-shadow: 0 0 0 calc(1px * var(--inverse-zoom)) #333; pointer-events: none; }
 .marquee { position: absolute; border: calc(1px * var(--inverse-zoom)) solid var(--ui-accent); background: color-mix(in srgb, var(--ui-accent) 8%, transparent); pointer-events: none; }
 .panel-frame { overflow: visible; }
+.panel-frame[data-wish-changed="true"]:not([data-selected="true"]) {
+  outline: calc(1.5px * var(--inverse-zoom)) dashed var(--ui-accent);
+  outline-offset: calc(2px * var(--inverse-zoom));
+}
 .panel-artwork { position: absolute; inset: 0; overflow: hidden; }
 .handle { width: calc(32px * var(--inverse-zoom)); height: calc(32px * var(--inverse-zoom)); }
 .handle::after { left: 50%; top: 50%; transform: translate(-50%, -50%); width: calc(8px * var(--inverse-zoom)); height: calc(8px * var(--inverse-zoom)); }

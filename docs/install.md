@@ -12,7 +12,7 @@ corepack prepare pnpm@10.33.4 --activate
 pnpm install --frozen-lockfile
 ```
 
-`pnpm-lock.yaml` is the reproducible install. Do not float dependency versions.
+`pnpm-lock.yaml` is the reproducible install. English and Simplified Chinese OCR data are included in the dependencies. After installation, local reading works without downloading a model or entering an API key. Configure an image-capable provider in **Settings → AI connection** to enable cloud reading.
 
 ## Start
 

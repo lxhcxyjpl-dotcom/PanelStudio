@@ -1,0 +1,10 @@
+.ai-proposal-actions {
+  flex: none;
+  padding: 10px 20px;
+  border-top: 1px solid var(--ui-borderSubtle);
+  background: var(--ui-surface);
+}
+
+@media (max-width: 767px) {
+  .ai-proposal-actions .button { min-height: 44px; }
+}

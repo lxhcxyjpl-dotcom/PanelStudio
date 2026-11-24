@@ -9,7 +9,7 @@ for(const [name,locale,theme,width,height] of [['desktop','zh-CN','light',1440,9
  const ctx=await browser.newContext({viewport:{width,height}});
  await ctx.addInitScript(p=>localStorage.setItem('panelstudio.prefs',JSON.stringify(p)),{locale,theme,motion:'on'});
  const page=await ctx.newPage();await page.goto(base);
- const artwork=page.getByTestId('hero-showcase').locator('img');
+ const artwork=page.locator('[data-action=wish-demo] img');
  await artwork.first().waitFor();await artwork.evaluateAll(images=>Promise.all(images.map(img=>img.decode())));
  await page.evaluate(()=>document.fonts.ready);await page.evaluate(()=>window.scrollTo(0,0));
  await page.screenshot({path:path.join(out,'home-'+name+'.png')});
@@ -19,7 +19,7 @@ for(const [name,locale,theme,width,height] of [['desktop','zh-CN','light',1440,9
  await page.waitForFunction(()=>[...document.querySelectorAll('.panel-artwork img')].every(img=>img.complete&&img.naturalWidth>0));
  await page.screenshot({path:path.join(out,'editor-'+name+'.png')});
  if(name==='desktop'){
-  await page.getByTestId('layout-button').click();await page.getByTestId('candidate-card').first().locator('img').waitFor();
+  await page.locator('[data-action=layout-tools]').click();await page.getByTestId('layout-button').click();await page.getByTestId('candidate-card').first().locator('img').waitFor();
   await page.screenshot({path:path.join(out,'arrange.png')});
   await page.getByTestId('export-button').click();await page.getByRole('dialog').waitFor();await page.screenshot({path:path.join(out,'export.png')});
  }

@@ -1,4 +1,5 @@
-import { SCHEMA_VERSION } from "@panelstudio/contracts";
+import { BUNDLED_FONTS, SCHEMA_VERSION } from "@panelstudio/contracts";
+import { namedFontFamilies } from "./font-family.js";
 import { instantiateSvg } from "./instantiate.js";
 import { formatSvgNumber } from "./number.js";
 import { escapeAttr, escapeText } from "./xml.js";
@@ -89,23 +90,25 @@ function renderVector(panel: Extract<ExportPanel, { kind: "vector" }>): string {
 }
 
 function renderLabel(panelId: string, label: ExportLabel): string {
-  return `<text id="panel-${panelId}-label" xml:space="preserve" x="${formatSvgNumber(label.x)}" y="${formatSvgNumber(label.y)}" font-family="${escapeAttr(label.fontFamily)}" font-size="${formatSvgNumber(label.fontSizeUser)}" font-weight="${label.fontWeight}" fill="${escapeAttr(label.color)}">${escapeText(label.text)}</text>`;
+  const family = escapeAttr(label.fontFamily);
+  // Keep the exact presentation attribute for the Illustrator font restoration script.
+  const browserFallback = BUNDLED_FONTS.some(font => font.family === label.fontFamily)
+    ? ` style="font-family:'${family}',sans-serif"`
+    : "";
+  return `<text id="panel-${panelId}-label" xml:space="preserve" x="${formatSvgNumber(label.x)}" y="${formatSvgNumber(label.y)}" font-family="${family}"${browserFallback} font-size="${formatSvgNumber(label.fontSizeUser)}" font-weight="${label.fontWeight}" fill="${escapeAttr(label.color)}">${escapeText(label.text)}</text>`;
 }
 
 function fontFamilies(svg: string, panels: ExportPanel[]): string[] {
   const families = new Set<string>();
   for (const panel of panels) {
-    if (panel.label) families.add(panel.label.fontFamily);
+    if (panel.label) for (const family of namedFontFamilies(panel.label.fontFamily)) families.add(family);
   }
   for (const match of svg.matchAll(/font-family="([^"]+)"/gu)) {
     const value = match[1];
     if (!value) continue;
     // escapeAttr encoded the DOM value when the vector fragment was serialized.
     const decoded = value.replaceAll("&quot;", '"').replaceAll("&lt;", "<").replaceAll("&gt;", ">").replaceAll("&amp;", "&");
-    for (const family of decoded.split(",")) {
-      const name = family.trim().replace(/^['"]|['"]$/gu, "");
-      if (name) families.add(name);
-    }
+    for (const family of namedFontFamilies(decoded)) families.add(family);
   }
   return [...families];
 }

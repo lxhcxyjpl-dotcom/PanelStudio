@@ -1,5 +1,7 @@
 import { TOLERANCES, type FigureDocumentV1 } from "@panelstudio/contracts";
 import {
+  MAX_AUTO_ROW_UNITS,
+  MIN_WIDE_PANEL_ASPECT,
   croppedAspect,
   labelBounds,
   unitGeometry,
@@ -13,6 +15,11 @@ export type Placement = {
   frames: Map<string, Rect>;
   bottom: number;
 };
+
+type HorizontalAlignment = { leftPadding: number; rightExtent: number };
+type RowLimit = { height: number; alignment?: HorizontalAlignment };
+
+export type RowEmphasis = { minimumWidthMm: number; alignedRows: number[][] };
 
 /**
  * Continuous rows in a column of `width`, starting at `(originX, originY)`.
@@ -30,16 +37,17 @@ export function placeStack(
   gutterH: number,
   gutterV: number,
   commonFirstInset = 0,
+  rowLimits?: ReadonlyMap<number, RowLimit>,
 ): Placement | null {
   if (!(width > 0) || rows.length === 0) return null;
   const frames = new Map<string, Rect>();
   let previousBottom = originY;
   for (let index = 0; index < rows.length; index += 1) {
     const row = rows[index];
-    if (!row || row.length === 0 || row.length > 3) return null;
+    if (!row || row.length === 0 || row.length > MAX_AUTO_ROW_UNITS) return null;
     const headroom = row.reduce((max, unit) => Math.max(max, unitTopInset(document, unit)), index === 0 ? commonFirstInset : 0);
     const contentY = index === 0 ? originY + headroom : previousBottom + Math.max(gutterV, headroom);
-    const placed = placeRow(document, assets, row, contentY, originX, width, gutterH);
+    const placed = placeRow(document, assets, row, contentY, originX, width, gutterH, rowLimits?.get(index));
     if (!placed) return null;
     let bottom = contentY;
     for (const [panelId, frame] of placed) {
@@ -62,6 +70,7 @@ function placeRow(
   left: number,
   width: number,
   gutterH: number,
+  limit?: RowLimit,
 ): Map<string, Rect> | null {
   const gaps = (row.length - 1) * gutterH;
   let fixed = 0, aspectSum = 0;
@@ -81,7 +90,7 @@ function placeRow(
   const measure = (height: number) => row.map((unit) => unitGeometry(document, unit,
     unit.kind === "panel" ? {width: aspects.get(unit.panelId)! * height, height} : undefined));
   const capacity = (shapes: ReturnType<typeof measure>) => shapes.reduce((sum, u) => sum + u.occupied.width, gaps);
-  const upper = aspectSum === 0 ? 0 : remaining / aspectSum;
+  const upper = aspectSum === 0 ? 0 : Math.min(remaining / aspectSum, limit?.height ?? Infinity);
   let shapes = measure(upper);
   if (capacity(shapes) > width + TOLERANCES.geometryComparisonMm) {
     if (aspectSum === 0 || capacity(measure(0)) > width + TOLERANCES.geometryComparisonMm) return null;
@@ -94,7 +103,14 @@ function placeRow(
     if (low <= 0) return null;
     shapes = measure(low);
   }
-  let leftEdge = left;
+  let leftEdge = limit === undefined ? left : left + Math.max(0, (width - capacity(shapes)) / 2);
+  if (limit?.alignment) {
+    const shape = shapes[0]!;
+    const panelWidth = shape.frames[0]!.frameMm.width;
+    const desiredX = Math.max(limit.alignment.leftPadding, (width - panelWidth) / 2);
+    const maximumX = width - Math.max(panelWidth, limit.alignment.rightExtent);
+    leftEdge = left + Math.min(desiredX, maximumX) + shape.occupied.x;
+  }
   const frames = new Map<string, Rect>();
   for (const unit of shapes) {
     for (const item of unit.frames) {
@@ -104,6 +120,103 @@ function placeRow(
     leftEdge += unit.occupied.width + gutterH;
   }
   return frames;
+}
+
+type RowSizeRange = { index: number; full: number; minimum: number };
+
+/**
+ * Fits explicit rows by shortening isolated panels first, then their comparison
+ * rows. Keep paired panels at the same height and keep a stronger size floor
+ * for wide plots, where axis labels are often already small at full row width.
+ */
+export function placeCompactStack(
+  document: FigureDocumentV1,
+  assets: Readonly<Record<string, LayoutAssetFacts>>,
+  rows: Unit[][],
+  originX: number,
+  originY: number,
+  width: number,
+  gutterH: number,
+  gutterV: number,
+  bottomLimit: number,
+  primaryId: string | null,
+  emphasis?: RowEmphasis,
+): Placement | null {
+  const place = (limits?: ReadonlyMap<number, RowLimit>) =>
+    placeStack(document, assets, rows, originX, originY, width, gutterH, gutterV, 0, limits);
+  const tolerance = TOLERANCES.geometryComparisonMm;
+  const minimum = document.layoutSettings.minPanelSizeMm;
+  const limits = new Map<number, RowLimit>();
+  const aligned: RowSizeRange[] = [];
+  const primary: RowSizeRange[] = [];
+  for (const group of emphasis?.alignedRows ?? []) {
+    const panels = group.map(index => rows[index]![0]!);
+    const aspects = panels.map(panel => panel.kind === "panel" && croppedAspect(document, assets, panel.panelId));
+    if (!aspects.every((aspect): aspect is number => typeof aspect === "number")) return null;
+    const ink = panels.map(panel => unitGeometry(document, panel, { width: 0, height: 0 }).occupied);
+    const alignment = {
+      leftPadding: Math.max(0, ...ink.map(box => -box.x)),
+      rightExtent: Math.max(0, ...ink.map(box => box.x + box.width)),
+    };
+    const fullWidth = width - alignment.leftPadding;
+    if (fullWidth <= 0 || alignment.rightExtent > fullWidth + tolerance) return null;
+    const isPrimary = panels.some(panel => panel.kind === "panel" && panel.panelId === primaryId);
+    const minWidth = Math.max(fullWidth * 0.9, minimum.width, ...aspects.map(aspect => minimum.height * aspect),
+      isPrimary ? emphasis!.minimumWidthMm : 0);
+    for (const [position, index] of group.entries()) {
+      const aspect = aspects[position]!;
+      const full = fullWidth / aspect;
+      limits.set(index, { height: full, alignment });
+      if (fullWidth > minWidth + tolerance) {
+        (isPrimary ? primary : aligned).push({ index, full, minimum: minWidth / aspect });
+      }
+    }
+  }
+  const full = place(limits);
+  if (!full || full.bottom <= bottomLimit + tolerance) return full;
+
+  const single: RowSizeRange[] = [];
+  const paired: RowSizeRange[] = [];
+  for (const [index, row] of rows.entries()) {
+    if (limits.has(index) || !row.every(unit => unit.kind === "panel")) continue;
+    const primaryIndex = row.findIndex(unit => unit.panelId === primaryId);
+    if (primaryIndex >= 0 && !emphasis) continue;
+    const frames = row.map(unit => full.frames.get(unit.panelId)!);
+    const fullHeight = frames[0]!.height;
+    const aspects = frames.map(frame => frame.width / frame.height);
+    const floor = aspects.some(aspect => aspect >= MIN_WIDE_PANEL_ASPECT) ? 0.9 : row.length === 1 ? 0.5 : 0.8;
+    const focusHeight = emphasis && primaryIndex >= 0 ? emphasis.minimumWidthMm / aspects[primaryIndex]! : 0;
+    const minHeight = Math.max(fullHeight * floor, minimum.height, focusHeight, ...aspects.map(aspect => minimum.width / aspect));
+    if (minHeight + tolerance < fullHeight) {
+      (primaryIndex >= 0 ? primary : row.length === 1 ? single : paired).push({index, full: fullHeight, minimum: minHeight});
+    }
+  }
+
+  for (const cohort of [single, paired, aligned, primary]) {
+    if (!cohort.length) continue;
+    const fitAt = (fraction: number) => {
+      for (const {index, full, minimum} of cohort) {
+        limits.set(index, { ...limits.get(index), height: full + (minimum - full) * fraction });
+      }
+      return place(limits);
+    };
+    const tightest = fitAt(1);
+    if (!tightest || tightest.bottom > bottomLimit + tolerance) continue;
+    let best = tightest;
+    let low = 0;
+    let high = 1;
+    for (let i = 0; i < 32; i++) {
+      const mid = (low + high) / 2;
+      const trial = fitAt(mid);
+      if (trial && trial.bottom <= bottomLimit) {
+        best = trial;
+        high = mid;
+      } else low = mid;
+    }
+    return best;
+  }
+  // Keep the normal height diagnostic when no readable arrangement fits.
+  return full;
 }
 
 const SEARCH_ITERATIONS = 64;

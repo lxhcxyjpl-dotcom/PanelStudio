@@ -45,11 +45,11 @@ type Fixture = {
 };
 
 function panelId(id: number): string {
-  return `11111111-1111-4111-8111-11111111111${id}`;
+  return `11111111-1111-4111-8111-1111111111${String(id).padStart(2, "0")}`;
 }
 
 function assetId(id: number): string {
-  return `22222222-2222-4222-8222-22222222222${id}`;
+  return `22222222-2222-4222-8222-2222222222${String(id).padStart(2, "0")}`;
 }
 
 function loadFixture(name: string): { document: FigureDocumentV1; assets: Record<string, LayoutAssetFacts>; request: LayoutRequest; fixture: Fixture } {
@@ -174,9 +174,10 @@ describe("guided layout", () => {
   });
 });
 
-function assertCandidateLaw(document: FigureDocumentV1, assets: Record<string, LayoutAssetFacts>, candidate: SolvedCandidate): void {
+function assertCandidateLaw(document: FigureDocumentV1, assets: Record<string, LayoutAssetFacts>, candidate: SolvedCandidate, allowSettings = false): void {
   expect(candidate.commands.length).toBeGreaterThan(0);
-  expect(candidate.commands.every((command) => command.type === "panel.setFrames" || command.type === "canvas.set")).toBe(true);
+  expect(candidate.commands.every(command => command.type === "panel.setFrames" || command.type === "canvas.set" ||
+    (allowSettings && command.type === "layout.setSettings"))).toBe(true);
   const applied = applyCommands(document, candidate.commands, (id) => {
     const facts = assets[id];
     if (!facts) return null;
@@ -283,6 +284,175 @@ describe("layout fixtures", () => {
       expect(solveLayout({ document, request, assets })).toEqual(result);
     });
   }
+});
+
+describe("automatic layouts for many panels", () => {
+  function figure(aspects: Array<[number, number]>) {
+    return materialize({
+      id: "many-panels",
+      expect: "candidates",
+      panels: aspects.map(([w, h], index) => ({
+        id: index + 1,
+        aspect: [w, h],
+        frame: [12, 12, 40, 40 * h / w],
+      })),
+    });
+  }
+
+  const tenAspects: Array<[number, number]> = [
+    [169, 100], [169, 100], [148, 100], [148, 100], [169, 100],
+    [156, 100], [156, 100], [121, 100], [305, 100], [305, 100],
+  ];
+
+  it("gives each wide multipart plot its own row and scales grouped rows proportionately", () => {
+    const input = figure(tenAspects);
+    const [candidate] = solved(solveLayout(input));
+    assertCandidateLaw(input.document, input.assets, candidate!);
+    const d = candidate!.previewDocument;
+    const wide = [9, 10].map((index) => d.panels[panelId(index)]!.frameMm);
+    for (const frame of wide) {
+      const availableWidth = d.canvas.widthMm - d.canvas.marginsMm.left - d.canvas.marginsMm.right;
+      expect(frame.width).toBeGreaterThan(availableWidth * 0.98);
+      const sharingBand = d.panelOrder.map((id) => d.panels[id]!.frameMm)
+        .filter((other) => other.y < frame.y + frame.height - 1e-4 && other.y + other.height > frame.y + 1e-4);
+      expect(sharingBand).toEqual([frame]);
+    }
+    expect(d.panels[panelId(1)]!.frameMm.width).toBeLessThan(wide[0]!.width);
+    for (const [first, second] of [[1, 2], [3, 4], [6, 7]]) {
+      expect(d.panels[panelId(first!)]!.frameMm.y).toBeCloseTo(d.panels[panelId(second!)]!.frameMm.y);
+    }
+  });
+
+  it("keeps the requested hero and paired comparison rows", () => {
+    const input = figure(tenAspects);
+    const [candidate] = solved(solveLayout({ ...input, request: {
+      family: "hero-top",
+      primaryPanelId: panelId(8),
+      rows: [[1, 2], [3, 4, 5], [6, 7], [9], [10]]
+        .map((row) => row.map((id) => "panel:" + panelId(id))),
+    } }));
+    assertCandidateLaw(input.document, input.assets, candidate!);
+    const d = candidate!.previewDocument;
+    const frame = (index: number) => d.panels[panelId(index)]!.frameMm;
+    expect(frame(8).y).toBeLessThan(frame(1).y);
+    expect(frame(8).width).toBeGreaterThan(frame(1).width);
+    expect(frame(6).y).toBeCloseTo(frame(7).y);
+    expect(frame(6).width).toBeCloseTo(frame(7).width);
+  });
+
+  it("lays out 32 assets with standard and guided requests, preserving the panel count", () => {
+    const input = figure(Array.from({ length: 32 }, () => [3, 2] as [number, number]));
+    const [standard] = solved(solveLayout(input));
+    assertCandidateLaw(input.document, input.assets, standard!);
+    const [guided] = solved(solveLayout({ ...input, request: { family: "guided", preferences: { gapMm: 4 } } }));
+    assertCandidateLaw(input.document, input.assets, guided!);
+  });
+
+  it("respects fixed and customized height limits for large explicit layouts", () => {
+    const input = figure(tenAspects);
+    const request: LayoutRequest = { family: "rows", rows: [
+      [1, 2], [3, 4], [5, 6], [7, 8], [9], [10],
+    ].map((row) => row.map((id) => "panel:" + panelId(id))) };
+    const [candidate] = solved(solveLayout({ ...input, request }));
+    expect(candidate!.previewDocument.canvas.heightMm).toBeGreaterThan(input.document.layoutSettings.maxAutoHeightMm);
+    input.document.layoutSettings.maxAutoHeightMm = 200;
+    expect(solveLayout({ ...input, request })).toMatchObject({ ok: false, details: { reason: "layout-max-height" } });
+    input.document.canvas.heightMode = "fixed";
+    expect(solveLayout({ ...input, request })).toMatchObject({ ok: false, details: { reason: "layout-max-height" } });
+  });
+
+  it("compacts a tall singleton while preserving the exact comparison pairs at full width", () => {
+    const input = figure([
+      [2269, 1346], [2337, 1576], [2269, 1879], [2268, 1458],
+      [2269, 1458], [3913, 1285], [3914, 1285],
+    ]);
+    const request: LayoutRequest = { family: "rows", rows: [[1, 2], [3], [4, 5], [6, 7]]
+      .map(row => row.map(id => "panel:" + panelId(id))) };
+    const frameOf = (doc: FigureDocumentV1, panel: number) => doc.panels[panelId(panel)]!.frameMm;
+    const configured = input.document.layoutSettings.maxAutoHeightMm;
+    input.document.layoutSettings.maxAutoHeightMm = 350;
+    const [original] = solved(solveLayout({ ...input, request }));
+    input.document.layoutSettings.maxAutoHeightMm = configured;
+
+    const [compact] = solved(solveLayout({ ...input, request }));
+    expect(original!.previewDocument.canvas.heightMm).toBeGreaterThan(configured);
+    expect(compact!.previewDocument.canvas.heightMm).toBeCloseTo(configured);
+    assertCandidateLaw(input.document, input.assets, compact!);
+    expect(frameOf(compact!.previewDocument, 3).width).toBeLessThan(frameOf(original!.previewDocument, 3).width);
+    expect(frameOf(compact!.previewDocument, 3).width).toBeGreaterThan(95);
+    for (const [a, b] of [[1, 2], [4, 5], [6, 7]] as const) {
+      const f = frameOf(compact!.previewDocument, a);
+      const g = frameOf(compact!.previewDocument, b);
+      expect(f.y).toBeCloseTo(g.y);
+      expect(f.width).toBeCloseTo(frameOf(original!.previewDocument, a).width);
+      expect(g.width).toBeCloseTo(frameOf(original!.previewDocument, b).width);
+      expect(f.x).toBeLessThan(g.x);
+    }
+    expect(frameOf(compact!.previewDocument, 6).width).toBeGreaterThan(80);
+    expect(frameOf(compact!.previewDocument, 7).width).toBeGreaterThan(80);
+
+    input.document.canvas.heightMode = "fixed";
+    input.document.canvas.heightMm = 230;
+    const [fixed] = solved(solveLayout({ ...input, request }));
+    expect(fixed!.previewDocument.canvas.heightMm).toBe(230);
+    assertCandidateLaw(input.document, input.assets, fixed!);
+    input.document.canvas.heightMm = 140;
+    expect(solveLayout({ ...input, request })).toMatchObject({ ok: false, details: { reason: "layout-max-height" } });
+  });
+
+  it("keeps an explicit primary at full width when shortening another singleton", () => {
+    const input = figure([[24, 10], [11, 10], [18, 10], [18, 10]]);
+    const request: LayoutRequest = {
+      family: "hero-top", primaryPanelId: panelId(1),
+      rows: [[2], [3, 4]].map(row => row.map(id => "panel:" + panelId(id))),
+    };
+    const [candidate] = solved(solveLayout({ ...input, request }));
+    const frames = candidate!.previewDocument.panels;
+    expect(frames[panelId(1)]!.frameMm.width).toBeCloseTo(172);
+    expect(frames[panelId(2)]!.frameMm.width).toBeLessThan(172);
+    expect(frames[panelId(3)]!.frameMm.y).toBeCloseTo(frames[panelId(4)]!.frameMm.y);
+    assertCandidateLaw(input.document, input.assets, candidate!);
+  });
+
+  it("promotes a middle panel while keeping paired rows aligned and an automatic height extension replayable", () => {
+    const { document, assets } = figure([[17, 10], [15, 10], [12, 10], [15, 10], [15, 10], [30, 10], [32, 10]]);
+    const unit = (id: number) => "panel:" + panelId(id);
+    const [compact] = solved(solveLayout({ document, assets, request: {
+      family: "rows", rows: [[1, 2], [3, 4, 5], [6], [7]].map(row => row.map(unit)),
+    } }));
+    const before = compact!.previewDocument;
+    const request: LayoutRequest = {
+      family: "rows", primaryPanelId: panelId(3), rows: [[1, 2], [3], [4, 5], [6], [7]].map(row => row.map(unit)),
+      emphasis: { minimumWidthMm: 100, maxAutoHeightMm: 320, alignedRows: [[unit(6), unit(7)]] },
+    };
+    const [candidate] = solved(solveLayout({ document: before, assets, request }));
+    assertCandidateLaw(before, assets, candidate!, true);
+    const after = candidate!.previewDocument;
+    const frame = (id: number) => after.panels[panelId(id)]!.frameMm;
+    expect(frame(3).width).toBeGreaterThan(100);
+    expect(frame(3).width).toBeGreaterThan(before.panels[panelId(3)]!.frameMm.width * 1.5);
+    expect(frame(3).y).toBeGreaterThan(frame(1).y);
+    expect(frame(4).y).toBeGreaterThan(frame(3).y);
+    expect(frame(6).width).toBeGreaterThan(154);
+    expect(frame(6).width).toBeCloseTo(frame(7).width, 8);
+    expect(frame(6).x).toBeCloseTo(frame(7).x, 8);
+    expect(frame(7).y).toBeGreaterThan(frame(6).y + frame(6).height);
+    expect(after.canvas.heightMm).toBeGreaterThan(before.layoutSettings.maxAutoHeightMm);
+    expect(after.canvas.heightMm).toBeLessThanOrEqual(320);
+    expect(after.layoutSettings.maxAutoHeightMm).toBe(after.canvas.heightMm);
+    expect(after.layoutSettings.primaryPanelId).toBe(panelId(3));
+    expect(after.panelOrder).toEqual(before.panelOrder);
+
+    const custom = { ...before, layoutSettings: { ...before.layoutSettings, maxAutoHeightMm: 250 } };
+    expect(solveLayout({ document: custom, assets, request })).toMatchObject({ ok: false, details: { reason: "layout-max-height" } });
+    const fixed = { ...before, canvas: { ...before.canvas, heightMode: "fixed" as const, heightMm: 320 } };
+    const [fixedCandidate] = solved(solveLayout({ document: fixed, assets, request }));
+    expect(fixedCandidate!.previewDocument.canvas).toEqual(fixed.canvas);
+    expect(fixedCandidate!.previewDocument.layoutSettings.maxAutoHeightMm).toBe(before.layoutSettings.maxAutoHeightMm);
+    expect(solveLayout({ document: before, assets, request: {
+      ...request, emphasis: { ...request.emphasis!, alignedRows: [[unit(3), unit(7)]] },
+    } })).toMatchObject({ ok: false, code: "REQUEST_INVALID" });
+  });
 });
 
 describe("layout families", () => {

@@ -139,7 +139,16 @@ const LAYOUT_CHOICES_SCHEMA = `CREATE TABLE IF NOT EXISTS layout_choices (
 );
 `;
 
-const DATABASE_VERSION = 4;
+const FIGURE_READINGS_SCHEMA = `
+CREATE TABLE IF NOT EXISTS figure_readings (
+  projectId TEXT NOT NULL, assetId TEXT NOT NULL, fingerprint TEXT NOT NULL, reader TEXT NOT NULL, resultJson TEXT NOT NULL,
+  PRIMARY KEY (projectId, assetId, reader), FOREIGN KEY (projectId,assetId) REFERENCES assets(projectId,id) ON DELETE CASCADE
+);
+CREATE TABLE IF NOT EXISTS figure_identities (
+  projectId TEXT NOT NULL, assetId TEXT NOT NULL, fingerprint TEXT NOT NULL, decisionJson TEXT NOT NULL,
+  PRIMARY KEY (projectId, assetId), FOREIGN KEY (projectId,assetId) REFERENCES assets(projectId,id) ON DELETE CASCADE
+);`;
+const DATABASE_VERSION = 5;
 const ASSET_COLUMNS = `id, projectId, createdAt, originalFilename, originalMediaType, originalByteLength,
   originalSha256, status, importJobId, normalizedJson, diagnosticsJson, removedFromLibraryAt,
   originalBlobPath, renderBlobPath, thumbnailBlobPath`;
@@ -316,6 +325,7 @@ export function openDatabase(dataDir: string): Database.Database {
         }
         if (current < 3) migrateProjectAssetIds(db);
         db.exec(LAYOUT_CHOICES_SCHEMA);
+        db.exec(FIGURE_READINGS_SCHEMA);
         db.pragma(`user_version = ${DATABASE_VERSION}`);
       });
     }

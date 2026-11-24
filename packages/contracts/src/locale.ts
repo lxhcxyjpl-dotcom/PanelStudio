@@ -20,7 +20,7 @@ export const LocalePackSchema = object(
 export const REPRESENTATIVE_MESSAGES = {
   "zh-CN": {
     "toolbar.import": "导入图片",
-    "toolbar.autoLayout": "一键排版",
+    "toolbar.autoLayout": "比较布局",
     "layout.preview": "布局预览",
     "layout.apply": "应用此版",
     "inspector.mixed": "混合",
@@ -31,7 +31,7 @@ export const REPRESENTATIVE_MESSAGES = {
   },
   "en-US": {
     "toolbar.import": "Import images",
-    "toolbar.autoLayout": "Auto layout",
+    "toolbar.autoLayout": "Compare layouts",
     "layout.preview": "Layout preview",
     "layout.apply": "Apply layout",
     "inspector.mixed": "Mixed",

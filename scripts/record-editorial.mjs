@@ -10,7 +10,7 @@ await ctx.addInitScript(()=>localStorage.setItem('panelstudio.prefs',JSON.string
 const page=await ctx.newPage(), errors=[];page.on('pageerror',error=>errors.push(error.message));
 const action=name=>page.locator(`[data-action="${name}"]`), beat=(n=1000)=>page.waitForTimeout(n);
 await page.goto(process.env.PANELSTUDIO_PREVIEW_URL||'http://127.0.0.1:5283');
-await page.getByTestId('hero-showcase').locator('img').first().waitFor();await page.evaluate(()=>document.fonts.ready);
+await page.locator('[data-action=wish-demo] img').first().waitFor();await page.evaluate(()=>document.fonts.ready);
 await beat(16800);
 await page.screenshot({path:path.join(out,'home-desktop.png')});
 await action('home-gallery').click();await page.locator('#laboratory').scrollIntoViewIfNeeded();
@@ -20,7 +20,7 @@ await page.screenshot({path:path.join(out,'home-replay.png')});
 await page.locator('#examples').scrollIntoViewIfNeeded();await beat(1500);
 await action('open-scientific-example').first().click();await page.locator('.panel-frame').first().waitFor();await beat(1200);
 await page.screenshot({path:path.join(out,'editor.png')});
-await page.getByTestId('layout-button').click();await page.getByTestId('candidate-card').first().locator('img').waitFor();
+await page.locator('[data-action=layout-tools]').click();await page.getByTestId('layout-button').click();await page.getByTestId('candidate-card').first().locator('img').waitFor();
 await beat(1200);await page.getByTestId('candidate-card').last().click();await beat(1200);await page.getByTestId('candidate-card').first().click();await beat(1200);
 await page.screenshot({path:path.join(out,'arrange.png')});await action('apply-layout').click();
 await action('tab-properties').click();await page.locator('.panel-frame').first().click();await beat(800);

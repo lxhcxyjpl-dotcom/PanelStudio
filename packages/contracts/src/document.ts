@@ -184,6 +184,20 @@ export const PublicationContextSchema = object({
 });
 export type PublicationContext = Static<typeof PublicationContextSchema>;
 
+export const FigurePickSchema = object({
+  id: UuidSchema,
+  reason: Type.String({ minLength: 1, maxLength: 200 }),
+});
+export type FigurePick = Static<typeof FigurePickSchema>;
+export const FigureCurationSchema = object({
+  summary: Type.String({ minLength: 1, maxLength: 1000 }),
+  main: Type.Array(FigurePickSchema, { minItems: 1, maxItems: RESOURCE_LIMITS.maxPanelsPerProject }),
+  supplementary: Type.Array(FigurePickSchema, { maxItems: RESOURCE_LIMITS.maxPanelsPerProject }),
+  suggestedSupplementary: Type.Optional(Type.Array(FigurePickSchema, { maxItems: RESOURCE_LIMITS.maxPanelsPerProject })),
+  rowSizes: Type.Array(Type.Integer({ minimum: 1, maximum: 3 }), { minItems: 1, maxItems: RESOURCE_LIMITS.maxPanelsPerProject }),
+});
+export type FigureCuration = Static<typeof FigureCurationSchema>;
+
 export const FigureDocumentSchema = object(
   {
     schemaVersion: Type.Literal(SCHEMA_VERSION),
@@ -208,6 +222,7 @@ export const FigureDocumentSchema = object(
     labelStyle: LabelStyleSchema,
     layoutSettings: LayoutSettingsSchema,
     publicationContext: Type.Optional(PublicationContextSchema),
+    curation: Type.Optional(FigureCurationSchema),
   },
   {
     description:

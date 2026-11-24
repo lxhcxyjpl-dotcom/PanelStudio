@@ -129,7 +129,7 @@ function ProviderConnection() {
     finally { setBusy(null); }
   }
   return <section className="provider-connection" data-testid="ai-settings" aria-label={t("connection.title")}>
-    <form noValidate onSubmit={event => { event.preventDefault(); if (!busy) void persist(false); }}>
+    <form noValidate onSubmit={event => { event.preventDefault(); if (!busy && !settings.isPending) void persist(true); }}>
       <fieldset disabled={Boolean(busy) || settings.isPending} className="connection-fields">
         <div className="field connection-service">
           <label htmlFor="connection-service">{t("connection.service")}</label>
@@ -169,6 +169,9 @@ function ProviderConnection() {
             </select></label>
             <label className="check"><input data-testid="ai-local" type="checkbox" checked={form.allowLocalEndpoint} onChange={event => edit({ ...form, allowLocalEndpoint: event.target.checked })} />{t("connection.local")}</label>
             <p className="field-hint">{t("connection.localHint")}</p>
+            <Button action="save-connection" variant="quiet" disabled={!dirty && keepSecret} onClick={() => void persist(false)}>
+              {t("connection.saveOnly")}
+            </Button>
             {settings.data?.hasSecret && <Button action="delete-secret" variant="quiet" onClick={() => void removeSecret()}>{t("settings.deleteSecret")}</Button>}
           </div>
         </details>
@@ -178,8 +181,7 @@ function ProviderConnection() {
         {message && <p data-testid="ai-provider-status" className={"connection-feedback " + message.kind} role="status"><Icon name={message.kind === "success" ? "check" : "close"} />{message.text}</p>}
         {busy && <p role="status">{t(busy === "test" ? "connection.testing" : "connection.saving")}</p>}
         <div className="connection-actions">
-          <Button action="save-connection" type="submit" variant="quiet" disabled={Boolean(busy) || settings.isPending || (!dirty && keepSecret)}>{t("connection.save")}</Button>
-          <Button action="test-provider" variant="primary" disabled={Boolean(busy) || settings.isPending} onClick={() => void persist(true)}><Icon name="check" />{t(dirty || !keepSecret ? "connection.saveTest" : "ai.test")}</Button>
+          <Button action="test-provider" type="submit" variant="primary" disabled={Boolean(busy) || settings.isPending}><Icon name="check" />{t(dirty || !keepSecret ? "connection.saveTest" : "ai.test")}</Button>
         </div>
         <p className="connection-test-note">{t("connection.testHint")}</p>
       </div>

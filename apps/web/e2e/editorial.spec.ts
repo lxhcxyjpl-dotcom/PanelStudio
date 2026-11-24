@@ -35,19 +35,28 @@ for (const [width, height, locale, theme] of [[1440,900,"zh-CN","light"], [1280,
     await preferences(page, locale, theme); await page.setViewportSize({ width, height });
     await page.goto("/");
     await expect(page.getByTestId("home-page")).toBeVisible();
+    await expect(action(page,"wish-demo")).toBeVisible();
+    await expect(page.getByTestId("start-brief")).toBeVisible();
+    await action(page,"home-gallery").click();
     const papers = page.getByTestId("hero-showcase").locator(".hero-paper");
     await expect(papers).toHaveCount(3);
     await expect(papers.locator("img")).toHaveCount(3);
-    await expect(page.getByTestId("demo-stage")).toBeHidden();
-    await expect(action(page, "hero-playback")).toBeHidden();
+    await expect(page.getByTestId("demo-stage")).toBeAttached();
+    await expect(action(page, "hero-playback")).toHaveCount(0);
+    await expect(page.locator(".brand-example-grid button")).toHaveCount(4);
+    await expect(papers.locator("button")).toHaveCount(0);
     await action(page, "choose-example").nth(2).focus();
     await page.keyboard.press("Enter");
     await expect(papers.nth(2)).toHaveAttribute("data-role", "front");
     await expect(papers.nth(2)).toHaveCSS("opacity", "1");
     await expect(papers.nth(1)).toHaveCSS("opacity", "0.42");
     await action(page, "choose-example").first().click();
+    await action(page,"close-gallery").click();
     await expect(page.locator(".brand-intro h1")).toHaveCSS("font-size", width < 768 ? "24px" : "56px");
-    await expect.poll(() => papers.locator("img").evaluateAll(images => images.every(img => (img as HTMLImageElement).complete && (img as HTMLImageElement).naturalWidth > 0))).toBe(true);
+    const composer=page.locator(".chat-home .chat-composer"), rect=await composer.boundingBox();
+    expect(rect).toBeTruthy();expect(Math.abs(rect!.x+rect!.width/2-width/2)).toBeLessThan(2);
+    await expect(action(page,"start-send")).toBeDisabled();
+    await expect(page.locator(".chat-home .wish-demo-images")).toHaveCount(0);
     await boundsAndType(page);
     await page.evaluate(() => window.scrollTo(0, 0));
     await page.screenshot({ path: info.outputPath("home.png"), fullPage: true });
@@ -67,12 +76,14 @@ for (const [width, height, locale, theme] of [[1440,900,"zh-CN","light"], [1280,
 
 test("real recorded geometry plays once, pauses, compares and exports the demonstrated SVG", async ({ page }) => {
   await preferences(page,"en-US","light","off"); await page.goto("/");
-  const choices = action(page,"choose-example");
-  await expect(choices.nth(0)).toHaveAttribute("aria-pressed","true");
-  await expect(choices.nth(1)).toHaveAttribute("aria-pressed","true", {timeout:9000});
-  await action(page,"hero-playback").click();
-  await page.waitForTimeout(5700); await expect(choices.nth(1)).toHaveAttribute("aria-pressed","true");
   await action(page,"home-gallery").click();
+  const choices = action(page,"choose-example");
+  await choices.first().scrollIntoViewIfNeeded();
+  await expect(choices.nth(0)).toHaveAttribute("aria-pressed","true");
+  await choices.nth(1).click();
+  await expect(choices.nth(1)).toHaveAttribute("aria-pressed","true");
+  await expect(action(page,"hero-playback")).toHaveCount(0);
+  await expect(action(page,"demo-playback")).toHaveCount(1);
   await page.locator("#laboratory").scrollIntoViewIfNeeded();
   await action(page,"demo-step").nth(0).click();
   await expect(page.getByTestId("demo-source-panels").locator("img")).toHaveCount(6);
@@ -91,6 +102,9 @@ test("real recorded geometry plays once, pauses, compares and exports the demons
 });
 
 test("home, browser history and deep links preserve the editing session; examples are separate projects", async ({ page }) => {
+  await page.route("**/settings/ai-provider", route => route.fulfill({
+    json: { hasSecret: true, configRevision: 1, config: { model: "fixture", capabilities: { imageInput: false } } },
+  }));
   await preferences(page); await page.goto("/"); const first = await sample(page);
   const saved = await snapshot(page,first);
   await action(page,"zoom-in").click();
@@ -135,6 +149,7 @@ test("crop and unsaved edits prevent navigation until resolved, including browse
 test("inspector candidates preserve the viewport, readonly previews and saved export revision", async ({ page }, info) => {
   await preferences(page); await page.goto("/"); const id = await sample(page);
   const original = await snapshot(page,id), before = await page.getByTestId("canvas").boundingBox();
+  await page.locator("[data-action=layout-tools]").click();
   await page.getByTestId("layout-button").click();
   await expect(page.getByTestId("candidate-card").first()).toBeVisible();
   expect(await page.getByTestId("canvas").boundingBox()).toEqual(before);
@@ -179,6 +194,7 @@ test("inspector candidates preserve the viewport, readonly previews and saved ex
 for (const width of [1440, 320]) test(`compares real artwork, reopens kept candidates and discards without committing at ${width}`, async ({page}) => {
   await page.setViewportSize({ width, height: width === 320 ? 740 : 900 });
   await preferences(page); await page.goto("/"); const id = await sample(page), saved = await snapshot(page,id);
+  await page.locator("[data-action=layout-tools]").click();
   await action(page,"guided-layout").click(); await page.getByTestId("guide-words").fill("间距 4 mm");
   await action(page,"generate-guided").click();
   const cards = page.getByTestId("candidate-card");
@@ -192,7 +208,7 @@ for (const width of [1440, 320]) test(`compares real artwork, reopens kept candi
   expect(ratios[0]).toBeCloseTo(ratios[1]!, 1);
   await boundsAndType(page); await expect(action(page,"apply-layout")).toBeInViewport();
   await cards.nth(1).click(); await expect(cards.nth(1)).toHaveAttribute("aria-pressed", "true");
-  await page.getByRole("button",{name:"保留候选，返回编辑"}).click();
+  await page.getByRole("button",{name:"返回编辑并保留备选"}).click();
   await expect(page.locator(".board-info strong")).toHaveText("画板");
   if (width < 768) await action(page,"mobile-properties").click();
   await page.getByRole("tab",{name:"候选版式"}).click();
@@ -210,6 +226,7 @@ test("cancelling layout before the server replies cannot reopen a discarded prev
   const waitForCancel = new Promise<void>(resolve => { release = resolve; });
   await page.route("**/layout-candidates", async route => { const response = await route.fetch(); await waitForCancel; await route.fulfill({response}); });
   try {
+    await page.locator("[data-action=layout-tools]").click();
     await page.getByTestId("layout-button").click();
     await expect(page.getByText("正在计算布局候选", {exact:true})).toBeVisible();
     await action(page,"cancel-layout").click();

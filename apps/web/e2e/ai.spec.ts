@@ -76,16 +76,14 @@ test.describe.serial("phase 5 AI", () => {
     });
     await page.goto("/app");
     await importFigures(page, [raster, photo]);
-    await page.getByRole("tab", { name: "AI 布局" }).click();
+    await page.getByRole("tab", { name: "AI 精修" }).click();
     await expect(page.getByTestId("ai-status")).toHaveText("未连接");
     await expect(page.locator('[data-action="fill-example"]:visible')).toHaveCount(0);
-    await expect(page.getByTestId("ai-scope").locator("option:checked")).toHaveText("全图 · 2");
-    await page.locator(".composer-options > summary").click();
-    await page.getByRole("button", { name: "把 A 向右移动 2 mm" }).click();
-    await expect(page.getByTestId("ai-prompt")).toHaveValue("把 A 向右移动 2 mm");
-    await expect(page.getByRole("button", { name: "发送" })).toBeDisabled();
+    await expect(page.getByTestId("ai-prompt")).toHaveCount(0);
+    await expect(page.getByTestId("wish-input")).toBeEditable();
     await page.getByRole("tab", { name: "属性" }).click();
     await expect(page.getByTestId("panel-row")).toHaveCount(2);
+    await page.locator("[data-action=layout-tools]").click();
     await page.getByTestId("layout-button").click();
     await expect(page.getByTestId("candidate-card").first()).toBeVisible();
     await page.getByRole("button", { name: "应用此版" }).click();
@@ -97,9 +95,44 @@ test.describe.serial("phase 5 AI", () => {
     await expect(page.getByTestId("save-status")).toHaveText("已保存");
     const download = page.waitForEvent("download");
     await page.getByTestId("export-button").click();
-    await page.getByRole("button", { name: "可编辑 SVG" }).click();
+    await page.getByRole("button", { name: "下载 SVG" }).click();
     expect((await download).suggestedFilename()).toMatch(/\.svg$/);
     expect(aiCalls).toEqual([]);
+  });
+
+  test("advanced clarification offers one-click answers and the same editable answer field",async({page})=>{
+    mode="fixture";await page.goto("/app");await configure(page,port);await importFigures(page,[raster,photo]);
+    await page.getByRole("tab",{name:"AI 精修"}).click();
+    await page.getByTestId("ai-prompt").fill("我想先选一个修改方向");await page.locator("[data-action=ai-send]").click();
+    const card=page.getByTestId("ai-question");await expect(card).toContainText("先调整哪个部分");
+    await expect(page.getByTestId("ai-prompt")).toHaveAccessibleDescription(/先调整哪个部分/);await expect(page.getByTestId("ai-prompt")).toBeEditable();await expect(page.getByTestId("ai-prompt")).toHaveCount(1);
+    await card.getByRole("button",{name:"把 A 向右移动 2 mm",exact:true}).click();await expect(page.getByTestId("ai-proposal")).toBeVisible();
+    await expect(card).toHaveCount(0);
+  });
+
+  test("edits an already applied AI instruction against its original input and keeps both versions", async ({page})=>{
+    mode = "fixture";
+    await page.goto("/app"); await configure(page,port); await importFigures(page,[raster,photo]);
+    await page.getByRole("tab",{name:"AI 精修"}).click();
+    const project=()=>new URL(page.url()).pathname.split("/").at(-1)!;
+    const doc=async(id:string)=>(await page.request.get("/api/v1/projects/"+id+"/document")).json();
+    const source=project(), base=await doc(source);
+    await page.getByTestId("ai-prompt").fill("把 A 向右移动 2 mm"); await page.locator('[data-action="ai-send"]').click();
+    await expect(page.getByTestId("ai-proposal")).toBeVisible(); await page.locator('[data-action="ai-apply"]').click();
+    await expect.poll(async()=>(await doc(source)).revision).toBe(base.revision+1);
+    const applied=await doc(source);
+    await page.getByRole("tab",{name:"AI 精修"}).click();
+    await page.locator('[data-action="ai-history-toggle"]').click();
+    const turn=page.getByTestId("ai-turn").filter({hasText:"把 A 向右移动"});
+    await turn.hover(); await turn.getByRole("button",{name:"编辑这条消息"}).click();
+    await page.getByTestId("edit-message-input").fill("编号加括号"); await page.locator('[data-action="resend-edit"]').click();
+    await expect.poll(project).not.toBe(source); await expect(page.getByTestId("ai-proposal")).toBeVisible();
+    const edited=project();
+    expect((await doc(edited)).documentHash).toBe(base.documentHash);
+    await page.locator('[data-action="previous-version"]:visible').click(); await expect.poll(project).toBe(source);
+    expect((await doc(source)).documentHash).toBe(applied.documentHash);
+    await page.locator('[data-action="next-version"]:visible').click(); await expect.poll(project).toBe(edited);
+    await expect(page.getByTestId("ai-proposal")).toBeVisible();
   });
 
   test("compiles a fixture proposal, and the preview matches the accepted document", async ({ page }) => {
@@ -109,7 +142,7 @@ test.describe.serial("phase 5 AI", () => {
     const stored = await page.request.get("/api/v1/settings/ai-provider");
     expect(await stored.text()).not.toContain(SECRET);
     await importFigures(page, [raster, photo]);
-    await page.getByRole("tab", { name: "AI 布局" }).click();
+    await page.getByRole("tab", { name: "AI 精修" }).click();
     const original = await frames(page);
     await page.getByTestId("ai-prompt").fill("把 A 向右移动 2 mm");
     await page.getByRole("button", { name: "发送" }).click();
@@ -119,7 +152,7 @@ test.describe.serial("phase 5 AI", () => {
     await page.getByRole("button", { name: "应用修改" }).click();
     await expect(page.getByTestId("save-status")).toHaveText("已保存");
     expect(await frames(page)).toEqual(preview);
-    await page.getByRole("tab", { name: "AI 布局" }).click();
+    await page.getByRole("tab", { name: "AI 精修" }).click();
     await page.getByTestId("ai-prompt").fill("撤销");
     await page.getByRole("button", { name: "发送" }).click();
     await expect(page.getByTestId("live")).toContainText("已撤销");
@@ -224,7 +257,7 @@ test.describe.serial("phase 5 AI", () => {
     await page.goto("/app");
     await importFigures(page, [raster, photo]);
     const original = await frames(page);
-    await page.getByRole("tab", { name: "AI 布局" }).click();
+    await page.getByRole("tab", { name: "AI 精修" }).click();
     await page.getByTestId("ai-prompt").fill("删除所有面板");
     await page.getByRole("button", { name: "发送" }).click();
     await expect(page.getByTestId("ai-status")).toContainText("模型返回的内容无效");
@@ -255,7 +288,7 @@ test.describe.serial("phase 5 AI", () => {
     mode = "hold";
     await page.goto("/app");
     await importFigures(page, [raster, photo]);
-    await page.getByRole("tab", { name: "AI 布局" }).click();
+    await page.getByRole("tab", { name: "AI 精修" }).click();
     await page.getByTestId("ai-prompt").fill("把 A 向右移动 2 mm");
     await page.getByRole("button", { name: "发送" }).click();
     await expect(page.getByRole("button", { name: "取消请求" })).toBeVisible();
@@ -270,7 +303,7 @@ test.describe.serial("phase 5 AI", () => {
     mode = "fixture";
     await page.goto("/app");
     await importFigures(page, [raster, photo]);
-    await page.getByRole("tab", { name: "AI 布局" }).click();
+    await page.getByRole("tab", { name: "AI 精修" }).click();
     await page.getByTestId("ai-prompt").fill("把 A 向右移动 2 mm");
     await page.getByRole("button", { name: "发送" }).click();
     await expect(page.getByTestId("ai-proposal")).toBeVisible();
@@ -288,8 +321,9 @@ test.describe.serial("phase 5 AI", () => {
     await page.getByRole("button", { name: "基于当前稿重新生成" }).click();
     await expect(page.getByRole("button", { name: "取消请求" })).toBeVisible();
     await page.getByRole("button", { name: "设置" }).click();
-  await page.locator("[data-action=settings-ai]").click();
+    await page.locator("[data-action=settings-ai]").click();
     await page.getByTestId("ai-model").fill("other-fixture-model");
+    await page.locator(".connection-advanced > summary").click();
     await page.locator("[data-action=save-connection]").click();
     await expect(page.getByText("模型设置已变化").first()).toBeVisible();
     release();
@@ -322,7 +356,9 @@ test.describe.serial("phase 5 AI", () => {
     await page.getByTestId("ai-thread").evaluate(element => { element.scrollTop = 0; });
     await expect(prompt).toBeInViewport();
     await page.setViewportSize({ width: 390, height: 844 });
-    if (!await page.getByTestId("right-sidebar").isVisible()) await page.locator("[data-action=drawer-inspector]").click();
+    if (!await page.getByTestId("right-sidebar").isVisible()) {
+      await page.locator((page.viewportSize()?.width ?? 1440) < 768 ? "[data-action=mobile-properties]" : "[data-action=drawer-inspector]").click();
+    }
     await expect(prompt).toBeInViewport();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     await page.screenshot({ animations: "disabled", path: path.join(output, "chat-draft-mobile.png") });
@@ -335,6 +371,7 @@ function intentFor(body: unknown) {
   if (!text) return { version: 1, kind: "unsupported", reason: "No prompt." };
   const prompt = text.slice(text.indexOf("PROMPT:\n") + "PROMPT:\n".length, text.indexOf("\nSCENE:\n"));
   const scene = JSON.parse(text.slice(text.indexOf("\nSCENE:\n") + "\nSCENE:\n".length)) as FrozenScene;
+  if(prompt==="我想先选一个修改方向")return {version:1,kind:"clarification",question:"先调整哪个部分？",options:["把 A 向右移动 2 mm","编号加括号"]};
   return fixtureIntent(prompt, scene) ?? { version: 1, kind: "unsupported", reason: "Unknown prompt." };
 }
 
@@ -353,8 +390,10 @@ async function configure(page: Page, providerPort: number): Promise<void> {
 }
 
 async function importFigures(page: Page, files: string[]): Promise<void> {
+  const panels = page.locator(".panel-frame");
+  const existing = await panels.count();
   await page.getByTestId("import-input").setInputFiles(files);
-  await expect(page.getByText(/已导入|失败/).first()).toBeVisible();
+  await expect(panels).toHaveCount(existing + files.length);
   await page.getByRole("tab", { name: "面板" }).click();
 }
 

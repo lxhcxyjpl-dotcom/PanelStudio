@@ -1,5 +1,6 @@
 import { AIIntentSchema, toJsonSchema, type AIProviderConfig } from "@panelstudio/contracts";
 import { AiTransportError } from "./errors.js";
+import { readStreamedReply } from "./streamed-reply.js";
 import { chatCompletionsUrl, endpointProblem } from "./endpoint.js";
 
 export type ChatContent =
@@ -21,10 +22,16 @@ export async function postChatCompletion(input: {
   signal?: AbortSignal;
   maxTokens?: number;
   connectionTest?: boolean;
+  onReplyText?: (text: string) => void;
+  disableThinking?: boolean;
+  replyFormat?: {name:string; schema:Record<string,unknown>};
 }): Promise<string> {
   const problem = endpointProblem(input.config.baseUrl, input.config.allowLocalEndpoint);
   if (problem) throw new AiTransportError(problem);
   const fetchImpl = input.fetchImpl ?? fetch;
+  const stream = Boolean(input.onReplyText && new URL(input.config.baseUrl).origin === "https://api.deepseek.com");
+  const body = requestBody(input.config, input.messages, input.maxTokens, input.connectionTest === true, input.replyFormat, input.disableThinking === true);
+  if (stream) body.stream = true;
   let response: Response;
   try {
     response = await fetchImpl(chatCompletionsUrl(input.config.baseUrl), {
@@ -35,7 +42,7 @@ export async function postChatCompletion(input: {
         "content-type": "application/json",
         authorization: `Bearer ${input.secret}`,
       },
-      body: JSON.stringify(requestBody(input.config, input.messages, input.maxTokens, input.connectionTest === true)),
+      body: JSON.stringify(body),
     });
   } catch (error) {
     if (isTimeout(error)) throw new AiTransportError("The provider request timed out.");
@@ -48,15 +55,17 @@ export async function postChatCompletion(input: {
   if (!response.ok) {
     throw new AiTransportError(`The provider rejected the request (HTTP ${response.status}).`);
   }
+  if (stream && response.headers.get("content-type")?.includes("text/event-stream"))
+    return readStreamedReply(response, input.secret, input.onReplyText!, MAX_BODY_CHARS);
   const text = await response.text();
   if (text.length > MAX_BODY_CHARS) throw new AiTransportError("The provider response was too large.");
-  let body: unknown;
+  let decoded: unknown;
   try {
-    body = JSON.parse(text);
+    decoded = JSON.parse(text);
   } catch {
     throw new AiTransportError("The provider response was not a chat completion.");
   }
-  const content = messageContent(body);
+  const content = messageContent(decoded);
   if (content === null) throw new AiTransportError("The provider response was not a chat completion.");
   return scrub(content, input.secret);
 }
@@ -66,32 +75,41 @@ export function pngDataUrl(bytes: Uint8Array): string {
   return `data:image/png;base64,${binary}`;
 }
 
-function requestBody(config: AIProviderConfig, messages: ChatMessage[], maxTokens: number | undefined, connectionTest: boolean) {
+function requestBody(config: AIProviderConfig, messages: ChatMessage[], maxTokens: number | undefined, connectionTest: boolean, replyFormat?: {name:string;schema:Record<string,unknown>}, disableThinking = false) {
+  // JSON object and plain-text modes do not transmit a response schema on the wire.
+  // Preserve the image blocks and give those models the same contract as strict providers.
+  let wireMessages = messages;
+  if (replyFormat && config.capabilities.structuredOutput !== "json_schema") {
+    const instruction = "Return exactly one JSON object matching this schema. Use its exact property names and literal values.\n" + JSON.stringify(replyFormat.schema);
+    const first = messages[0];
+    wireMessages = first?.role === "system" && typeof first.content === "string"
+      ? [{ ...first, content: first.content + "\n" + instruction }, ...messages.slice(1)]
+      : [{ role: "system", content: instruction }, ...messages];
+  }
   const body: Record<string, unknown> = {
     model: config.model,
     temperature: 0,
-    messages,
+    messages: wireMessages,
   };
   if (maxTokens !== undefined) body.max_tokens = maxTokens;
-  // Current official DeepSeek models think by default; a short connectivity probe
-  // must reserve its small output budget for the actual JSON reply.
-  if (connectionTest && new URL(config.baseUrl).hostname === "api.deepseek.com" &&
+  // Short probes and pre-upload clarifications need only the public answer.
+  if ((connectionTest || disableThinking) && new URL(config.baseUrl).origin === "https://api.deepseek.com" &&
       ["deepseek-flash", "deepseek-v4-pro", "deepseek-v4-flash", "deepseek-v4-flash-vision-exp"].includes(config.model)) {
     body.thinking = { type: "disabled" };
   }
-  const format = responseFormat(config, connectionTest);
+  const format = responseFormat(config, connectionTest, replyFormat);
   if (format) body.response_format = format;
   return body;
 }
 
-function responseFormat(config: AIProviderConfig, connectionTest: boolean): Record<string, unknown> | null {
+function responseFormat(config: AIProviderConfig, connectionTest: boolean, replyFormat?: {name:string;schema:Record<string,unknown>}): Record<string, unknown> | null {
   if (config.capabilities.structuredOutput === "json_schema") {
     return {
       type: "json_schema",
       json_schema: {
-        name: connectionTest ? "ConnectionTest" : "AIIntent",
+        name: replyFormat?.name ?? (connectionTest ? "ConnectionTest" : "AIIntent"),
         strict: true,
-        schema: connectionTest ? { type: "object", properties: { ok: { type: "boolean" } }, required: ["ok"], additionalProperties: false } : toJsonSchema(AIIntentSchema),
+        schema: replyFormat?.schema ?? (connectionTest ? { type: "object", properties: { ok: { type: "boolean" } }, required: ["ok"], additionalProperties: false } : toJsonSchema(AIIntentSchema)),
       },
     };
   }

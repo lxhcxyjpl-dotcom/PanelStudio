@@ -87,6 +87,7 @@ test("explains a locked overflowing panel and leaves it in place", async ({ page
 test("a failed target width cannot apply a previous layout", async ({ page }) => {
   const snapshot = await openMicroscopy(page);
   const original = await snapshot();
+  await page.locator("[data-action=layout-tools]").click();
   await page.getByTestId("layout-button").click();
   await expect(page.getByTestId("candidate-card").first()).toContainText("180 ×");
   await action(page, "manual-edit").click();

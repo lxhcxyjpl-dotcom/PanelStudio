@@ -51,12 +51,14 @@ for (const { width, locale } of [{ width: 1440, locale: "zh-CN" }, { width: 320,
     await expect(page.locator(".panel-frame")).toHaveCount(2);
     await expect(page.getByTestId("save-status")).toHaveCSS("font-size", "13px");
     await expectStudioType(page);
-    if (width < 1024) await page.locator("[data-action=drawer-assets]").click();
+    if (width < 1024) await page.locator("[data-action=mobile-assets]").click();
     await page.locator("[data-action=asset-menu]").first().click();
     await expect(page.getByRole("menuitem").first()).toBeVisible();
     await expectStudioType(page);
     await page.keyboard.press("Escape");
     if (width < 1024) await page.locator("[data-action=close-assets]").click();
+
+    await page.locator("[data-action=layout-tools]").click();
 
     await page.locator("[data-action=guided-layout]").click();
     await expect(page.getByRole("dialog").getByRole("heading", { level: 2 })).toHaveCSS("font-size", "24px");

@@ -149,7 +149,7 @@ export const AILayoutActionSchema = object({
 export const AIReferenceLayoutActionSchema = object({
   type: Type.Literal("reference_layout"),
   referenceId: Type.String({ minLength: 1, maxLength: 160 }),
-  orderedUnitIds: Type.Array(UnitIdSchema, { minItems: 2, maxItems: 8, uniqueItems: true }),
+  orderedUnitIds: Type.Array(UnitIdSchema, { minItems: 2, maxItems: RESOURCE_LIMITS.maxAutoLayoutPanels, uniqueItems: true }),
   preferences: GuidedPreferencesSchema,
 });
 
@@ -163,10 +163,10 @@ export const LayoutExampleSchema = object({
   title: Type.Optional(Type.String({ maxLength: 500 })),
   sourceUrl: Type.Optional(Type.String({ maxLength: 500, pattern: "^https?://" })),
   aspect: Type.Number({ exclusiveMinimum: 0, maximum: 1000 }),
-  panelTypes: Type.Array(Type.String({ maxLength: 40 }), { minItems: 2, maxItems: 8 }),
+  panelTypes: Type.Array(Type.String({ maxLength: 40 }), { minItems: 2, maxItems: RESOURCE_LIMITS.maxAutoLayoutPanels }),
   slots: Type.Array(object({
     x: normalizedPosition, y: normalizedPosition, width: normalizedExtent, height: normalizedExtent,
-  }), { minItems: 2, maxItems: 8 }),
+  }), { minItems: 2, maxItems: RESOURCE_LIMITS.maxAutoLayoutPanels }),
 });
 export type LayoutExample = Static<typeof LayoutExampleSchema>;
 

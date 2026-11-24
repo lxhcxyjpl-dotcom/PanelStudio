@@ -20,20 +20,20 @@ export function assertCustomLabelText(text: string): void {
 
 /**
  * Index 0 is A/a for alpha sequences and 1 for numeric sequences.
- * More than 26 alpha labels is out of range. v0.1 panels stop at 8.
+ * Alpha sequences continue with AA/aa after Z/z.
  */
 export function labelCore(index: number, sequence: LabelSequence): string {
-  if (!Number.isInteger(index) || index < 0) {
+  if (!Number.isSafeInteger(index) || index < 0) {
     throw new Error("label index must be a non-negative integer");
   }
   if (sequence === "number") {
     return String(index + 1);
   }
-  const letter = ALPHA[index];
-  if (letter === undefined) {
-    throw new Error("alpha label index is out of range");
+  let label = "";
+  for (let position = index; position >= 0; position = Math.floor(position / ALPHA.length) - 1) {
+    label = ALPHA.charAt(position % ALPHA.length) + label;
   }
-  return sequence === "lower-alpha" ? letter.toLowerCase() : letter;
+  return sequence === "lower-alpha" ? label.toLowerCase() : label;
 }
 
 /** plain → A, parentheses → (A), dot → A. */

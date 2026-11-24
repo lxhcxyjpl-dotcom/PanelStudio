@@ -179,7 +179,7 @@ describe("editable SVG compile", () => {
             text: "B",
             x: 60,
             y: 8.825,
-            fontFamily: "Noto Sans",
+            fontFamily: "Noto Sans SC",
             fontSizeUser: fontSizePtToSvgUserUnits(9),
             fontWeight: 700,
             color: "#000000",
@@ -211,6 +211,24 @@ describe("editable SVG compile", () => {
     expect(contentA?.getElementsByTagName("text").length).toBe(1);
     const label = document.getElementById(`panel-${PANEL_A}-label`);
     expect(label?.parentNode).toBe(document.getElementById(`panel-${PANEL_A}`));
+    expect(label?.getAttribute("font-family")).toBe("Noto Sans");
+    expect(label?.getAttribute("style")).toBe("font-family:'Noto Sans',sans-serif");
+    const secondLabel = document.getElementById(`panel-${PANEL_B}-label`);
+    expect(secondLabel?.getAttribute("font-family")).toBe("Noto Sans SC");
+    expect(secondLabel?.getAttribute("style")).toBe("font-family:'Noto Sans SC',sans-serif");
+    expect(contentA?.getElementsByTagName("text").item(0)?.getAttribute("style")).toBeNull();
+    expect(compiled.fontFamilies).toEqual(["Noto Sans", "Noto Sans SC"]);
+    const reimported = normalizeSvg(compiled.svg);
+    expect(reimported.fonts.map(font => font.family)).toEqual(["Noto Sans", "Noto Sans SC"]);
+    expect(reimported.diagnostics).toEqual([]);
+    const recompiled = compileFigureSvg({
+      widthMm: 180,
+      heightMm: 120,
+      revision: 3,
+      includeMetadata: false,
+      panels: [{ ...vector, panelId: PANEL_A, frame: { x: 10, y: 12, width: 40, height: 20 }, label: null, normalizedSvg: reimported.svg }],
+    });
+    expect(recompiled.fontFamilies).toEqual(["Noto Sans", "Noto Sans SC"]);
     expect(compiled.svg.match(/<image\b/gu)).toBeNull();
     const again = instantiateSvg(normalized.svg, PANEL_A);
     expect(normalized.svg).toContain('id="fade"');

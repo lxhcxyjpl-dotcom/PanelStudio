@@ -18,6 +18,8 @@ import {
 } from "../state/session";
 import { patch, useWorkspace, useWorkspaceFields } from "../state/store";
 import { Button, Icon } from "./widgets";
+import { publicationFrom } from "../model/wish";
+import { changeWish, lastPublication, rememberPublication, useWish } from "../state/wish-session";
 import { baseDocument } from "../state/types";
 import type { PublicationContext } from "@panelstudio/contracts";
 
@@ -44,8 +46,12 @@ function PublicationDialog({ open }: { open: boolean }) {
   const [value, setValue] = useState<PublicationContext>({ journal: "", field: "", message: "", preference: "auto" });
   const [busy, setBusy] = useState(false);
   useEffect(() => {
-    if (open) setValue(baseDocument(useWorkspace.getState())?.publicationContext ??
-      { journal: "", field: "", message: useWorkspace.getState().startMessage, preference: "auto" });
+    if (open) {
+      const saved = baseDocument(useWorkspace.getState())?.publicationContext;
+      const wish = useWish.getState();
+      setValue(wish.phase === "select" || !saved ? publicationFrom(wish.goal || useWorkspace.getState().startMessage,
+        saved ?? {...lastPublication(),message:"",preference:"auto"}) : saved);
+    }
   }, [open, state.projectId]);
   return <Shell open={open} title={t("publication.title")} className="brief-dialog">
     <form className="publication-form" onSubmit={(event) => {
@@ -55,7 +61,11 @@ function PublicationDialog({ open }: { open: boolean }) {
         journal: value.journal.trim(), field: value.field.trim(), message: value.message.trim(), preference: value.preference,
       } }]).then(() => {
         const now = useWorkspace.getState();
-        if (now.saveState === "saved" && now.dialog === "publication") patch({ dialog: null, startMessage: "" });
+        if (now.saveState === "saved" && now.dialog === "publication" && now.confirmed?.document.publicationContext) {
+          rememberPublication(now.confirmed.document.publicationContext);
+          changeWish({goal:now.confirmed.document.publicationContext.message});
+          patch({ dialog: null, startMessage: "" });
+        }
       }).finally(() => setBusy(false));
     }}>
       <label className="field brief-message"><span>{t("publication.focusLabel")}</span>
@@ -138,6 +148,7 @@ function SvgDialog({ open }: { open: boolean }) {
 
 function AssetDialog({ open }: { open: boolean }) {
   const { t } = useTranslation();
+  const [clipboardResult, setClipboardResult] = useState<{ id: string; copied: boolean } | null>(null);
   const projectId = useWorkspace((state) => state.projectId);
   const assetId = useWorkspace((state) => state.assetInfoId);
   const assets = useQuery({
@@ -146,22 +157,37 @@ function AssetDialog({ open }: { open: boolean }) {
     queryFn: () => api.assets(projectId ?? ""),
   });
   const asset = assets.data?.items.find((item) => item.id === assetId);
+  useEffect(() => { if (!open) setClipboardResult(null); }, [open]);
   return (
     <Shell open={open} title={t("dialog.assetTitle")}>
-      {asset ? (
+      {asset ? <>
         <dl>
           <div><dt>{t("panels.name")}</dt><dd>{asset.originalFilename}</dd></div>
-          <div><dt>{t("assets.mediaType")}</dt><dd>{asset.originalMediaType}</dd></div>
+          <div><dt>{t("assets.mediaType")}</dt><dd>{asset.originalMediaType.split("/")[1]?.split("+")[0]?.toUpperCase()}</dd></div>
           {asset.normalized && (asset.normalized.rasterPixelSize
             ? <div><dt>{t("assets.pixelDimensions")}</dt><dd>{asset.normalized.rasterPixelSize.width} × {asset.normalized.rasterPixelSize.height} px</dd></div>
             : <div><dt>{t("assets.viewport")}</dt><dd>{asset.normalized.viewport.width} × {asset.normalized.viewport.height}</dd></div>)}
-          <div><dt>{t("assets.fileSize")}</dt><dd>{asset.originalByteLength.toLocaleString()} B</dd></div>
-          <div><dt>{t("assets.status")}</dt><dd>{t("assets." + asset.status)}</dd></div>
-          <div><dt>SHA-256</dt><dd>{asset.originalSha256}</dd></div>
-          {asset.diagnostics.map((item, index) => <div key={`${item.code}-${index}`}><dt>{formatDiagnostic(t, item)}</dt><dd>{item.severity}</dd></div>)}
-          {asset.status === "ready" ? asset.normalized.normalizationNotes.map((note) => <p key={note}>{note}</p>) : null}
+          {asset.status !== "ready" && <div><dt>{t("assets.status")}</dt><dd>{t("assets." + asset.status)}</dd></div>}
         </dl>
-      ) : <p>{t("errors.NOT_FOUND")}</p>}
+        {asset.diagnostics.map((item, index) => <p key={`${item.code}-${index}`}>{formatDiagnostic(t, item)}</p>)}
+        <details className="asset-technical" key={asset.id}>
+          <summary>{t("assets.technicalDetails")}</summary>
+          <dl>
+            <div><dt>{t("assets.fileSize")}</dt><dd>{asset.originalByteLength.toLocaleString()} B</dd></div>
+            <div><dt>SHA-256</dt><dd><code>{asset.originalSha256}</code></dd></div>
+          </dl>
+          {navigator.clipboard && <Button action="copy-checksum" variant="quiet" onClick={async () => {
+            try {
+              await navigator.clipboard.writeText(asset.originalSha256);
+              setClipboardResult({ id: asset.id, copied: true });
+            } catch {
+              setClipboardResult({ id: asset.id, copied: false });
+            }
+          }}>{t("assets.copyChecksum")}</Button>}
+          {clipboardResult?.id === asset.id && <p role="status">{t(clipboardResult.copied ? "assets.copiedChecksum" : "assets.copyChecksumFailed")}</p>}
+          {asset.status === "ready" && asset.normalized.normalizationNotes.map(note => <p key={note}>{note}</p>)}
+        </details>
+      </> : <p>{t("errors.NOT_FOUND")}</p>}
     </Shell>
   );
 }

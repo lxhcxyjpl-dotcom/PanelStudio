@@ -73,23 +73,22 @@ test("opens, soft-deletes, and restores a project from the project menu", async 
   await rename(page, "Gap Beta");
   await expect(page.getByTestId("panel-row")).toHaveCount(0);
 
-  await openMenu(page);
-  await page.getByTestId("open-project").hover();
-  await page.getByRole("menuitem", { name: "Gap Alpha" }).click();
+  await openLibrary(page);
+  await page.getByRole("button", { name: "Gap Alpha", exact: true }).click();
   await expect(page.getByRole("textbox", { name: "名称" })).toHaveValue("Gap Alpha");
   await expect(page.getByTestId("panel-row")).toHaveCount(1);
 
-  await openMenu(page);
+  await openLibrary(page);
   const deleted = page.waitForResponse((response) => response.request().method() === "DELETE" && response.url().includes("/api/v1/projects/"));
-  await page.getByTestId("delete-project").click();
+  await page.getByRole("button", { name: /删除项目.*Gap Alpha/ }).click();
   expect((await deleted).ok()).toBe(true);
   await expect(page.getByRole("textbox", { name: "名称" })).toHaveCount(0);
   await expect(page.getByTestId("save-status")).toHaveText("还没有项目");
 
-  await openMenu(page);
-  await page.getByTestId("restore-project").hover();
+  await openLibrary(page);
+  await page.locator('[data-action="project-trash"]').click();
   const restored = page.waitForResponse((response) => response.request().method() === "POST" && response.url().includes("/restore"));
-  await page.getByRole("menuitem", { name: "Gap Alpha" }).click();
+  await page.locator(".project-library-row").filter({ hasText: "Gap Alpha" }).locator('[data-action="restore-listed-project"]').click();
   expect((await restored).ok()).toBe(true);
   await expect(page.getByRole("textbox", { name: "名称" })).toHaveValue("Gap Alpha");
   await page.getByRole("tab", { name: "面板" }).click();
@@ -97,12 +96,39 @@ test("opens, soft-deletes, and restores a project from the project menu", async 
   await expect(page.getByTestId("live")).toContainText("项目已恢复");
 });
 
-async function openMenu(page: Page): Promise<void> {
-  const listed = page.waitForResponse(
-    (response) => response.request().method() === "GET" && response.url().includes("/api/v1/projects?") && response.url().includes("includeDeleted=true"),
-  );
+test("two imports of the same package keep distinct project rows on a phone", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const example = path.join(root, "apps/web/public/showcase/experimental.figurezip");
+  await page.goto("/");
+  await page.locator("#package-input").setInputFiles(example);
+  await expect(page).toHaveURL(/\/app\/[0-9a-f-]{36}$/);
+  const original = page.url();
+  const title = await page.getByRole("textbox", { name: "名称", exact: true }).inputValue();
+  await page.locator("#package-input").setInputFiles(example);
+  await expect(page).not.toHaveURL(original);
+
+  await openLibrary(page);
+  const rows = page.locator(".project-library-row").filter({ has: page.getByRole("button", { name: title, exact: true }) });
+  const times = rows.locator(".project-created");
+  await expect(times.first()).toBeVisible();
+  await expect(times.nth(1)).toBeVisible();
+  expect((await times.allTextContents())[0]).not.toBe((await times.allTextContents())[1]);
+  await rows.nth(1).getByRole("button", { name: title, exact: true }).click();
+  await expect(page).toHaveURL(original);
   await page.getByRole("button", { name: "项目菜单" }).click();
-  expect((await listed).ok()).toBe(true);
+  await page.locator('[data-action="return-home"]').click();
+  await page.locator('[data-action="home-menu"]').click();
+  const recentTimes = page.locator('[data-action="open-recent-project"]').filter({ hasText: title }).locator("time");
+  await expect(recentTimes).toHaveCount(2);
+  await expect(recentTimes.first()).toBeVisible();
+  await expect(recentTimes.last()).toBeVisible();
+  expect((await recentTimes.allTextContents())[0]).not.toBe((await recentTimes.allTextContents())[1]);
+});
+
+async function openLibrary(page: Page): Promise<void> {
+  await page.getByRole("button", { name: "项目菜单" }).click();
+  await page.getByRole("menuitem", { name: "所有项目" }).click();
+  await expect(page.getByRole("dialog", { name: "所有项目" })).toBeVisible();
 }
 
 async function rename(page: Page, title: string): Promise<void> {

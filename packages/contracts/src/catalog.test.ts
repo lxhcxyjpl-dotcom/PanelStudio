@@ -34,6 +34,10 @@ describe("units and labels", () => {
     expect(labelCore(0, "upper-alpha")).toBe("A");
     expect(labelCore(0, "number")).toBe("1");
     expect(labelCore(2, "number")).toBe("3");
+    expect(labelCore(8, "upper-alpha")).toBe("I");
+    expect(labelCore(25, "upper-alpha")).toBe("Z");
+    expect(labelCore(26, "upper-alpha")).toBe("AA");
+    expect(labelCore(31, "lower-alpha")).toBe("af");
     expect(
       resolveLabelText({
         index: 0,
@@ -79,7 +83,8 @@ describe("catalogs", () => {
     for (const code of ["AI_CONTEXT_INVALID", "AI_SCOPE_VIOLATION", "AI_CHAIN_LIMIT", "TEXT_METRICS_UNAVAILABLE"] as const) {
       expect(ERROR_CODES[code].httpStatus).toBe(422);
     }
-    expect(Object.keys(ERROR_CODES)).toHaveLength(25);
+    expect(ERROR_CODES.SPEECH_UNAVAILABLE.httpStatus).toBe(502);
+    expect(Object.keys(ERROR_CODES)).toHaveLength(26);
   });
 
   it("records the SVG preserve and reject lists", () => {
@@ -103,7 +108,8 @@ describe("catalogs", () => {
       height: 0.1,
       movement: 0.1,
     });
-    expect(RESOURCE_LIMITS.maxPanelsPerProject).toBe(8);
+    expect(RESOURCE_LIMITS.maxPanelsPerProject).toBe(RESOURCE_LIMITS.maxAssetsPerProject);
+    expect(RESOURCE_LIMITS.maxAutoLayoutPanels).toBe(RESOURCE_LIMITS.maxPanelsPerProject);
     expect(RESOURCE_LIMITS.maxUploadBytes).toBe(25 * 1024 * 1024);
     expect(RESOURCE_LIMITS.maxAiPromptCharacters).toBe(4000);
     expect(RESOURCE_LIMITS.aiModelCallBudget).toBe(3);

@@ -47,8 +47,9 @@ test("imports six drawings, lays them out, applies one sentence, and exports SVG
     await expect(page.getByTestId("panel-row")).toHaveCount(6);
     await beat(page);
     await shot(page, "02-imported");
+    await page.locator("[data-action=layout-tools]").click();
     await page.getByTestId("layout-button").click();
-    await expect(page.getByTestId("candidate-card").first()).toContainText("均衡分行");
+    await expect(page.getByTestId("candidate-card").first()).toContainText(/单行|上排|每行/);
     await expect(page.getByTestId("candidate-card").first().locator("img")).toBeVisible();
     await beat(page);
     await shot(page, "03-layout");
@@ -57,7 +58,7 @@ test("imports six drawings, lays them out, applies one sentence, and exports SVG
     await beat(page);
     await shot(page, "04-laid-out");
     await configure(page, provider.port);
-    await page.getByRole("tab", { name: "AI 布局" }).click();
+    await page.getByRole("tab", { name: "AI 精修" }).click();
     await page.getByTestId("ai-prompt").fill("把 C 放左边作为主图");
     await page.getByRole("button", { name: "发送" }).click();
     await expect(page.getByTestId("ai-proposal")).toBeVisible();
@@ -67,7 +68,7 @@ test("imports six drawings, lays them out, applies one sentence, and exports SVG
     await expect(page.getByTestId("save-status")).toHaveText("已保存");
     const download = page.waitForEvent("download");
     await page.getByTestId("export-button").click();
-    await page.getByRole("button", { name: "可编辑 SVG" }).click();
+    await page.getByRole("button", { name: "下载 SVG" }).click();
     const file = await download;
     expect(file.suggestedFilename()).toMatch(/\.svg$/);
     const svg = await readAll(await file.createReadStream());
@@ -101,6 +102,7 @@ test("v0.2 six-panel continuous refinement, local row and editable export", asyn
     await button("tab-panels").click();
     await expect(page.getByTestId("panel-row")).toHaveCount(6);
     await shotStage("01-six-panels");
+    await page.locator("[data-action=layout-tools]").click();
     await page.getByTestId("layout-button").click();
     await expect(page.getByTestId("candidate-card").first().locator("img")).toBeVisible();
     const commit = async (action: () => Promise<unknown>) => {

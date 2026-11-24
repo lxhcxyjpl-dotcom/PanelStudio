@@ -116,9 +116,9 @@ export async function normalizeRaster(
 }
 
 /** Raster preview only. Editable SVG is not produced here. */
-export function rasterizeSvg(svg: string, pixelWidth: number): Buffer {
+export function rasterizeSvg(svg: string, edge: number, dimension: "width" | "height" = "width"): Buffer {
   const resvg = new Resvg(svg, {
-    fitTo: { mode: "width", value: Math.max(1, Math.round(pixelWidth)) },
+    fitTo: { mode: dimension, value: Math.max(1, Math.round(edge)) },
     font: resvgFontOptions(),
   });
   return Buffer.from(resvg.render().asPng());

@@ -1,0 +1,22 @@
+.project-library-identity {
+  flex: 1;
+  min-width: 0;
+}
+
+.project-library-identity button {
+  display: block;
+  width: 100%;
+  padding-inline: 0;
+  border: 0;
+  background: none;
+  text-align: start;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-library-row .project-created {
+  display: block;
+  margin-top: 2px;
+  white-space: normal;
+}
