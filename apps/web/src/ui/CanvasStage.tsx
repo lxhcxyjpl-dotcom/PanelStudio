@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, type CSSProperties, type PointerEvent as ReactPointerEvent, type RefObject } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, type CSSProperties, type PointerEvent as ReactPointerEvent, type RefObject } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ARTWORK_COLOR_PRESETS, type DomainCommand, type FigureDocumentV1 } from "@panelstudio/contracts";
+import { type DomainCommand, type FigureDocumentV1 } from "@panelstudio/contracts";
 import { applyCommands } from "@panelstudio/core/apply";
 import { scalePanel, translateSelection } from "@panelstudio/core/arrange";
 import { contentPlacement, type FrameAnchor } from "@panelstudio/core/geometry";
@@ -10,13 +10,16 @@ import { i18n } from "../i18n";
 import { clickedSelection, completePanelIds, geometryLocked, panelIdsOf, withCrop } from "../model/document-ui";
 import { PX_PER_MM } from "../model/place";
 import { boundsOf, snapTranslation, type Guide } from "../model/snap";
-import { fitCamera, snapToleranceMm } from "../model/view";
+import { fitCamera, keepFrameVisible, resizeCamera, snapToleranceMm, type Camera } from "../model/view";
 import { assetLookup, labelMove, openSample, readyViewport, transact } from "../state/session";
 import { patch, useWorkspace } from "../state/store";
 import { errorText } from "../model/feedback";
 import { cancelGesture, trackGesture } from "./gesture";
 import { CanvasTools } from "./CanvasTools";
 import { baseDocument, type WorkspaceState } from "../state/types";
+import { isCurrentWishEdit, useWish } from "../state/wish-session";
+
+type SavedView = { camera: Camera; viewport: WorkspaceState["viewport"] };
 
 export function CanvasStage() {
   const state = useWorkspace();
@@ -30,28 +33,10 @@ export function CanvasStage() {
   const art = useArt(state);
   const base = baseDocument(state);
   const previewing = state.compareMode !== "editing";
+  useStageCamera(state, art, viewportRef);
+  const edit = useWish(w => !previewing && !state.draft && !state.optimistic && !state.crop &&
+    w.projectId === state.projectId && isCurrentWishEdit(w.editFeedback, state.confirmed) ? w.editFeedback : null);
   useEffect(() => () => { cancelGesture(); }, [state.projectId]);
-
-  useEffect(() => {
-    const node = viewportRef.current;
-    if (!node) return;
-    const observer = new ResizeObserver(() => {
-      patch({ viewport: { width: node.clientWidth, height: node.clientHeight } });
-    });
-    observer.observe(node);
-    patch({ viewport: { width: node.clientWidth, height: node.clientHeight } });
-    return () => observer.disconnect();
-  }, []);
-
-  useEffect(() => {
-    if (!art || !state.projectId || state.fittedProjectId === state.projectId) return;
-    const node = viewportRef.current;
-    if (!node || node.clientWidth < 40 || node.clientHeight < 40) return;
-    patch({
-      camera: fitCamera({width:node.clientWidth, height:node.clientHeight}, { width: art.canvas.widthMm, height: art.canvas.heightMm }),
-      fittedProjectId: state.projectId,
-    });
-  }, [art, state.fittedProjectId, state.projectId, state.viewport]);
 
   useEffect(() => {
     const node = viewportRef.current;
@@ -87,7 +72,7 @@ export function CanvasStage() {
 
   const px = PX_PER_MM;
   return <>
-    <CanvasTools art={art} />
+    <CanvasTools widthMm={art.canvas.widthMm} heightMm={art.canvas.heightMm} />
     <div
       ref={viewportRef}
       className="canvas-viewport"
@@ -131,12 +116,13 @@ export function CanvasStage() {
                 className="panel-frame"
                 data-panel-id={panelId}
                 data-selected={selected}
+                data-wish-changed={edit?.changes.some(change => "panelId" in change && change.panelId === panelId) || undefined}
                 data-frame={`${panel.frameMm.x},${panel.frameMm.y},${panel.frameMm.width},${panel.frameMm.height}`}
                 style={{
                   transform: `translate(${panel.frameMm.x * px}px, ${panel.frameMm.y * px}px)`,
                   width: panel.frameMm.width * px,
                   height: panel.frameMm.height * px,
-                  boxShadow: selected ? `0 0 0 1px ${ARTWORK_COLOR_PRESETS[1]}, 0 0 0 2px var(--document-paper)` : undefined,
+                  boxShadow: selected ? "0 0 0 1px var(--ui-accent), 0 0 0 2px var(--document-paper)" : undefined,
                 }}
                 onPointerDown={(event) => {
                   event.stopPropagation();
@@ -233,6 +219,94 @@ export function CanvasStage() {
       {state.projectId && art.panelOrder.length === 0 ? <EmptyCanvas overlay /> : null}
     </div>
   </>;
+}
+
+function useStageCamera(state: WorkspaceState, art: FigureDocumentV1 | null, viewportRef: RefObject<HTMLDivElement | null>) {
+  const history = useRef<{ project: string; active: string; saved: Map<string, SavedView> } | null>(null);
+  const phoneDrawer = useRef(false);
+  const displayed = useRef(art);
+  const view = state.compareMode === "draft" ? state.activeCandidateId ?? "editing" : state.compareMode;
+  const drawer = state.mode === "phone" && (state.leftOpen || state.rightOpen);
+  const focus = art && drawer ? focusedPanel(state, art) : undefined;
+  const focusedFrame = focus ? state.confirmed?.document.panels[focus]?.frameMm : undefined;
+
+  useLayoutEffect(() => { displayed.current = art; }, [art]);
+
+  useLayoutEffect(() => {
+    const node = viewportRef.current;
+    const project = state.projectId;
+    if (!node || !art || !project || node.clientWidth < 40 || node.clientHeight < 40) return;
+    const viewport = { width: node.clientWidth, height: node.clientHeight };
+    const size = { width: art.canvas.widthMm, height: art.canvas.heightMm };
+    const current = useWorkspace.getState();
+    if (current.fittedProjectId !== project) {
+      history.current = { project, active: view, saved: new Map() };
+      patch({ viewport, camera: fitCamera(viewport, size), fittedProjectId: project });
+      return;
+    }
+    if (history.current?.project !== project) history.current = { project, active: "editing", saved: new Map() };
+    const session = history.current;
+    if (session.active === view) return;
+    session.saved.set(session.active, { camera: current.camera, viewport: current.viewport });
+    const saved = session.saved.get(view);
+    const editing = session.saved.get("editing");
+    const source = current.candidateRoot?.document.canvas ?? current.confirmed?.document.canvas;
+    const sameSize = size.width === source?.widthMm && size.height === source?.heightMm;
+    const baseView = saved ?? (view === "original" || sameSize ? editing : undefined);
+    const camera = baseView ? resizeCamera(baseView.camera, baseView.viewport, viewport) : fitCamera(viewport, size);
+    session.active = view;
+    const candidates = new Set(current.cards.map(card => card.candidate.id));
+    for (const key of session.saved.keys()) {
+      if (key !== "editing" && !candidates.has(key) && (key !== "original" || !candidates.size)) session.saved.delete(key);
+    }
+    patch({ viewport, camera });
+  }, [art, state.fittedProjectId, state.projectId, state.viewport, view, viewportRef]);
+
+  useLayoutEffect(() => {
+    const node = viewportRef.current;
+    if (!node) return;
+    const measure = () => {
+      const viewport = { width: node.clientWidth, height: node.clientHeight };
+      if (!viewport.width || !viewport.height) return;
+      const current = useWorkspace.getState();
+      const previous = current.viewport;
+      const drawerWasOpen = phoneDrawer.current;
+      const drawerOpen = current.mode === "phone" && (current.leftOpen || current.rightOpen);
+      phoneDrawer.current = drawerOpen;
+      if (viewport.width === previous.width && viewport.height === previous.height) return;
+      const art = displayed.current;
+      if (current.mode !== "phone" || !art || !previous.width || !previous.height || current.fittedProjectId !== current.projectId) {
+        patch({ viewport });
+        return;
+      }
+      const size = { width: art.canvas.widthMm, height: art.canvas.heightMm };
+      const fitted = fitCamera(previous, size);
+      const camera = current.camera;
+      const wasFitted = Math.abs(fitted.zoom - camera.zoom) < 0.001 &&
+        Math.abs(fitted.panX - camera.panX) < 1 && Math.abs(fitted.panY - camera.panY) < 1;
+      const next = !drawerOpen && !drawerWasOpen && wasFitted ? fitCamera(viewport, size) : resizeCamera(camera, previous, viewport);
+      const id = drawerOpen ? focusedPanel(current, art) : undefined;
+      const frame = id ? art.panels[id]?.frameMm : undefined;
+      patch({ viewport, camera: frame ? keepFrameVisible(next, viewport, frame) : next });
+    };
+    const observer = new ResizeObserver(measure);
+    observer.observe(node);
+    measure();
+    return () => observer.disconnect();
+  }, [viewportRef]);
+
+  useLayoutEffect(() => {
+    if (!focusedFrame) return;
+    const { camera, viewport } = useWorkspace.getState();
+    const next = keepFrameVisible(camera, viewport, focusedFrame);
+    if (next !== camera) patch({ camera: next });
+  }, [focusedFrame]);
+}
+
+function focusedPanel(state: WorkspaceState, document: FigureDocumentV1) {
+  if (state.compareMode !== "editing") return;
+  const ids = panelIdsOf(state.selection, document);
+  return state.crop?.panelId ?? (ids.length === 1 ? ids[0] : undefined);
 }
 
 function EmptyCanvas({ overlay = false }: { overlay?: boolean }) {
@@ -369,7 +443,7 @@ function beginMove(event: ReactPointerEvent, paper: HTMLDivElement | null, docum
   trackGesture(event, {
     drag(pointer) {
       if (locked) return patch({ liveMessage: i18n.t("errors.LOCKED_ELEMENT") });
-      patch({ selection: selected });
+      if (useWorkspace.getState().selection !== selected) patch({ selection: selected });
       previewCommand(document, () => make(pointer));
     },
     finish(pointer, dragged) {

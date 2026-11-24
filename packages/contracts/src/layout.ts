@@ -1,7 +1,8 @@
 import Type, { type Static } from "typebox";
-import { LAYOUT_SCORE_WEIGHTS } from "./constants.js";
+import { LAYOUT_SCORE_WEIGHTS, RESOURCE_LIMITS } from "./constants.js";
 import { NonEmptyStringSchema, NonNegativeMmSchema, PositiveMmSchema, RectMmSchema, UuidSchema } from "./primitives.js";
 import { nullable, object } from "./schema.js";
+import { DEFAULT_MAX_AUTO_HEIGHT_MM } from "./defaults.js";
 import type { FigureDocumentV1 } from "./document.js";
 
 const GlobalLayoutFamilySchema = Type.Union(
@@ -65,6 +66,13 @@ export const LayoutRequestByRowsSchema = object(
       description:
         "Hero rows describe only the secondary region. Each row has 1 to 3 units.",
     }),
+    emphasis: Type.Optional(object({
+      minimumWidthMm: PositiveMmSchema,
+      maxAutoHeightMm: Type.Optional(Type.Number({ exclusiveMinimum: 0, maximum: DEFAULT_MAX_AUTO_HEIGHT_MM * 2 })),
+      alignedRows: Type.Optional(Type.Array(Type.Array(UnitIdSchema, {
+        minItems: 2, maxItems: RESOURCE_LIMITS.maxAutoLayoutPanels, uniqueItems: true,
+      }), { maxItems: Math.floor(RESOURCE_LIMITS.maxAutoLayoutPanels / 2) })),
+    }, { description: "With a primary panel in a complete rows layout, keep it at least this wide. Each alignment group names consecutive singleton rows that share a width and left edge. The height budget applies only to the default automatic canvas." })),
   },
   { description: "rows is set and orderedUnitIds is absent." },
 );
@@ -101,10 +109,11 @@ export const GuidedPreferencesSchema = object({
 export const GuidedLayoutRequestSchema = object({
   family: Type.Literal("guided"),
   preferences: GuidedPreferencesSchema,
+  widthMm: Type.Optional(PositiveMmSchema),
   referenceAspect: Type.Optional(Type.Number({ exclusiveMinimum: 0, maximum: 1000 })),
   referenceSlots: Type.Optional(Type.Array(object({
     unitId: UnitIdSchema, x: coordinate, y: coordinate, width: extent, height: extent,
-  }), { minItems: 2, maxItems: 8 })),
+  }), { minItems: 2, maxItems: RESOURCE_LIMITS.maxAutoLayoutPanels })),
 }, { description: "Reviewed reference regions in normalized image coordinates and explicit composition preferences." });
 export const LayoutRequestSchema = Type.Union([...standardRequests, GuidedLayoutRequestSchema], requestOptions);
 

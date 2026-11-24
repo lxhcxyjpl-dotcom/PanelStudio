@@ -1,0 +1,36 @@
+import {createRequire} from 'node:module';
+import {mkdirSync,writeFileSync} from 'node:fs';
+import path from 'node:path';
+const {chromium}=createRequire(new URL('../package.json',import.meta.url))('playwright');
+const out=process.argv[2];
+if(!out)throw new Error('Pass a new output directory');
+const results=[];
+for(const factor of [1,2]){
+ const profile=path.join(out,'profile-'+factor);
+ mkdirSync(path.join(profile,'Default'),{recursive:true});
+ const ctx=await chromium.launchPersistentContext(profile,{channel:'msedge',headless:true,viewport:null,args:['--window-size=1440,900']});
+ await ctx.addInitScript(()=>localStorage.setItem('panelstudio.prefs',JSON.stringify({locale:'en-US',theme:'light',motion:'on'})));
+ const page=ctx.pages()[0];
+ await page.goto('edge://settings/appearance');
+ await page.waitForFunction(()=>typeof chrome.settingsPrivate?.setDefaultZoom==='function');
+ const applied=await page.evaluate(factor=>new Promise(resolve=>chrome.settingsPrivate.setDefaultZoom(factor,resolve)),factor);
+ if(!applied)throw new Error('Browser rejected the zoom preference');
+ const actual=await page.evaluate(()=>new Promise(resolve=>chrome.settingsPrivate.getDefaultZoom(resolve)));
+ if(actual!==factor)throw new Error('Browser did not retain the requested zoom');
+ await page.goto('http://127.0.0.1:5283');
+ await page.locator('[data-action=wish-demo] img').first().waitFor();await page.locator('[data-action=wish-demo] img').evaluateAll(images=>Promise.all(images.map(img=>img.decode())));await page.evaluate(()=>document.fonts.ready);
+ const cdp=await ctx.newCDPSession(page);
+ const capture=async name=>writeFileSync(path.join(out,name),Buffer.from((await cdp.send('Page.captureScreenshot',{format:'png',captureBeyondViewport:false,fromSurface:true})).data,'base64'));
+ const read=()=>page.evaluate(()=>({outerWidth,innerWidth,devicePixelRatio,overflow:document.documentElement.scrollWidth-innerWidth}));
+ const home=await read();await capture('home-zoom-'+factor+'.png');
+ await page.locator('[data-action=home-gallery]').click();
+ await page.locator('[data-action=open-scientific-example]').first().click();await page.locator('.panel-frame').first().waitFor();
+ await page.waitForFunction(()=>[...document.querySelectorAll('.panel-artwork img')].length>0&&[...document.querySelectorAll('.panel-artwork img')].every(img=>img.complete&&img.naturalWidth>0));
+ const editor=await read();await capture('editor-zoom-'+factor+'.png');
+ await page.getByTestId('export-button').click();await page.getByRole('dialog').waitFor();
+ const dialog=await read();await capture('export-zoom-'+factor+'.png');
+ const download=page.waitForEvent('download');await page.locator('[data-action=export-svg]').click();await (await download).saveAs(path.join(out,'zoom-'+factor+'.svg'));
+ results.push({factor,home,editor,dialog});await ctx.close();
+}
+writeFileSync(path.join(out,'zoom-results.json'),JSON.stringify(results,null,2));console.log(JSON.stringify(results,null,2));
+if(results[1].home.innerWidth!==Math.round(results[0].home.innerWidth/2)||results.some(r=>[r.home,r.editor,r.dialog].some(s=>s.overflow>0)))process.exitCode=1;

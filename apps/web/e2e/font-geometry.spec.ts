@@ -12,7 +12,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../.
 const metricsUrl = "/@fs/" + path.join(root, "packages/text-metrics/src/index.ts").replaceAll("\\", "/");
 
 test("registered ink and advance agree with Chromium rendering the same SVG text", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/app");
   const cases = await page.evaluate(async (url) => {
     const metrics: typeof import("../../../packages/text-metrics/src/index.js") = await import(url);
     await metrics.initializeLabelFonts();
@@ -46,7 +46,14 @@ test("registered ink and advance agree with Chromium rendering the same SVG text
         rendered.setAttribute("font-weight",String(sample.weight));
         rendered.setAttributeNS("http://www.w3.org/XML/1998/namespace","xml:space","preserve");
         rendered.textContent = text; svg.append(rendered); document.body.append(svg);
+        const screenAdvance = rendered.getComputedTextLength();
+        // FreeType can grid-fit each glyph's advance to a whole device pixel on Linux.
+        // Measure the design-unit advance at 100 px/mm, keeping the original 20 px/mm
+        // raster check below. This bounds pixel quantization without relaxing either
+        // millimetre tolerance or changing the fonts/artwork rendering under test.
+        svg.setAttribute("width", String(width * 5)); svg.setAttribute("height", String(height * 5));
         const advance = rendered.getComputedTextLength();
+        svg.setAttribute("width", String(width)); svg.setAttribute("height", String(height));
         const nativeBox = rendered.getBBox();
         const box = { x:nativeBox.x - originX, y:nativeBox.y - originY, width:nativeBox.width, height:nativeBox.height };
         // SVG getBBox includes font cells. Rasterizing the same SVG measures its actual visible ink.
@@ -70,11 +77,13 @@ test("registered ink and advance agree with Chromium rendering the same SVG text
         }
         const ink = x1 === -1 ? null : { x:x0/pxPerMm-originX, y:y0/pxPerMm-originY,
           width:(x1-x0+1)/pxPerMm, height:(y1-y0+1)/pxPerMm };
-        output.push({text,weight:sample.weight,measured,advance,ink,box});
+        output.push({text,weight:sample.weight,measured,screenAdvance,advance,ink,box});
       }
     }
     return output;
   },metricsUrl);
+  console.log("Font advance residuals (mm):", JSON.stringify(cases.map(item => ({text:item.text,weight:item.weight,
+    at20pxPerMm:item.screenAdvance-item.measured.advanceMm,at100pxPerMm:item.advance-item.measured.advanceMm}))));
   for (const {text,weight,measured,advance,ink,box} of cases) {
     const note = JSON.stringify({text,weight,measured,advance,ink,box});
     expect(Math.abs(advance - measured.advanceMm),note).toBeLessThan(0.03);

@@ -1,0 +1,44 @@
+[
+  {
+    "factor": 1,
+    "home": {
+      "outerWidth": 1440,
+      "innerWidth": 1406,
+      "devicePixelRatio": 1,
+      "overflow": 0
+    },
+    "editor": {
+      "outerWidth": 1440,
+      "innerWidth": 1406,
+      "devicePixelRatio": 1,
+      "overflow": 0
+    },
+    "dialog": {
+      "outerWidth": 1440,
+      "innerWidth": 1406,
+      "devicePixelRatio": 1,
+      "overflow": 0
+    }
+  },
+  {
+    "factor": 2,
+    "home": {
+      "outerWidth": 1440,
+      "innerWidth": 703,
+      "devicePixelRatio": 2,
+      "overflow": 0
+    },
+    "editor": {
+      "outerWidth": 1440,
+      "innerWidth": 703,
+      "devicePixelRatio": 2,
+      "overflow": 0
+    },
+    "dialog": {
+      "outerWidth": 1440,
+      "innerWidth": 703,
+      "devicePixelRatio": 2,
+      "overflow": 0
+    }
+  }
+]

@@ -1,36 +1,21 @@
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { useEffect, useRef, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { RESOURCE_LIMITS, type Project } from "@panelstudio/contracts";
-import { api, ApiClientError } from "../api/client";
-import { writeProjectId } from "../prefs";
+import { RESOURCE_LIMITS } from "@panelstudio/contracts";
 import {
-  cancelCrop,
-  commitCrop,
-  deleteCurrentProject,
-  ensureProject,
-  importFiles,
-  importPackage,
-  openListedProject,
-  reloadFromServer,
+  newProject,
   renameTitle,
   requestLayout,
-  restoreListedProject,
   returnToStart,
-  sendAiPrompt,
 } from "../state/session";
-import { patch, useWorkspace } from "../state/store";
-import { resetCandidateSession, setScope } from "../state/candidate-session";
-import { cropInvalid } from "../model/document-ui";
+import { patch, useWorkspace, useWorkspaceFields } from "../state/store";
 import { Button, Icon } from "./widgets";
 
 export function Toolbar({ inert }: { inert: boolean }) {
   const { t } = useTranslation();
-  const state = useWorkspace();
-  const provider = useQuery({ queryKey: ["ai-provider"], queryFn: () => api.providerSettings() });
-  const contentLayout = Boolean(state.confirmed?.document.publicationContext &&
-    provider.data?.hasSecret && provider.data.config?.capabilities.imageInput);
+  const state = useWorkspaceFields(
+    "projectId", "confirmed", "draft", "backend", "saveState", "mode", "exportState", "compareMode",
+  );
   const count = state.confirmed?.document.panelOrder.length ?? 0;
   const importPrimary = count === 0;
   const layoutReason = !state.confirmed
@@ -40,21 +25,9 @@ export function Toolbar({ inert }: { inert: boolean }) {
       : state.draft
         ? t("save.failed")
         : undefined;
-  const cropInvalidNow = state.crop ? cropInvalid(state.crop.crop) : false;
-  const [listed, setListed] = useState<Project[]>([]);
-  const openable = listed.filter((project) => !project.deletedAt);
-  const deleted = listed.filter((project) => project.deletedAt);
   return (
     <header className="toolbar" data-testid="toolbar" data-editor={Boolean(state.projectId)} inert={inert}>
-      <DropdownMenu.Root
-        onOpenChange={(open) => {
-          if (!open) return;
-          void api.projects({ includeDeleted: true }).then(
-            (page) => setListed(page.items),
-            (error: unknown) => patch({ liveMessage: error instanceof ApiClientError ? error.message : t("errors.generic") }),
-          );
-        }}
-      >
+      <DropdownMenu.Root>
         <DropdownMenu.Trigger asChild>
           <Button action="project-menu" variant="quiet" className="studio-brand" aria-label={t("toolbar.projectMenu")} title={t("toolbar.projectMenu")}>
             <span className="studio-mark" aria-hidden="true"><i /><i /><i /></span><span className="wordmark">PanelStudio</span><Icon name="chevron" />
@@ -62,48 +35,22 @@ export function Toolbar({ inert }: { inert: boolean }) {
         </DropdownMenu.Trigger>
         <DropdownMenu.Portal>
           <DropdownMenu.Content className="menu" align="start" sideOffset={4}>
-            {state.projectId && <DropdownMenu.Item className="menu-item" onSelect={() => void returnToStart()}>
+            {state.projectId && <DropdownMenu.Item className="menu-item" data-action="return-home" onSelect={() => void returnToStart()}>
               {t("toolbar.home")}
             </DropdownMenu.Item>}
-            <DropdownMenu.Item className="menu-item" onSelect={() => void newProject()}>
+            <DropdownMenu.Item className="menu-item" onSelect={() => void newProject().catch((error: unknown) => patch({ liveMessage: error instanceof Error ? error.message : t("errors.generic") }))}>
               {t("toolbar.newProject")}
             </DropdownMenu.Item>
-            <ProjectSubmenu
-              label={t("toolbar.openProject")}
-              testId="open-project"
-              projects={openable}
-              empty={t("app.noProject")}
-              onSelect={(projectId) => void openListedProject(projectId).catch((error: unknown) => patch({ liveMessage: error instanceof ApiClientError ? error.message : t("errors.generic") }))}
-            />
-            <DropdownMenu.Item
-              className="menu-item"
-              data-testid="delete-project"
-              disabled={!state.projectId}
-              title={state.projectId ? undefined : t("app.noProject")}
-              onSelect={() => void deleteCurrentProject().catch((error: unknown) => patch({ liveMessage: error instanceof ApiClientError ? error.message : t("errors.generic") }))}
-            >
-              {t("toolbar.deleteProject")}
+            <DropdownMenu.Item className="menu-item" data-action="all-projects" onSelect={() => patch({ dialog: "projects" })}>
+              {t("brand.allProjects")}
             </DropdownMenu.Item>
-            <ProjectSubmenu
-              label={t("toolbar.restoreProject")}
-              testId="restore-project"
-              projects={deleted}
-              empty={t("toolbar.noDeletedProjects")}
-              onSelect={(projectId) => void restoreListedProject(projectId).catch((error: unknown) => patch({ liveMessage: error instanceof ApiClientError ? error.message : t("errors.generic") }))}
-            />
             <DropdownMenu.Item className="menu-item" onSelect={() => document.getElementById("package-input")?.click()}>
               {t("toolbar.importPackage")}
-            </DropdownMenu.Item>
-            <DropdownMenu.Item className="menu-item" disabled={!state.projectId} title={state.projectId ? undefined : t("app.noProject")} onSelect={() => void reloadFromServer()}>
-              {t("toolbar.reload")}
-            </DropdownMenu.Item>
-            <DropdownMenu.Item className="menu-item" disabled={!state.projectId} onSelect={() => patch({ dialog: "publication" })}>
-              {t("publication.title")}
             </DropdownMenu.Item>
             <DropdownMenu.Item className="menu-item" onSelect={() => patch({ dialog: "shortcuts" })}>
               {t("toolbar.shortcuts")}
             </DropdownMenu.Item>
-            <DropdownMenu.Item className="menu-item" onSelect={() => patch({ dialog: "onboarding" })}>
+            <DropdownMenu.Item className="menu-item" data-action="open-onboarding" onSelect={() => patch({ dialog: "onboarding" })}>
               {t("onboarding.title")}
             </DropdownMenu.Item>
           </DropdownMenu.Content>
@@ -117,35 +64,22 @@ export function Toolbar({ inert }: { inert: boolean }) {
       </div>
       <span className="toolbar-spacer" />
       {state.projectId ? <div className="document-actions">
-        <Button action="import" variant={importPrimary ? "primary" : "quiet"} onClick={() => document.getElementById("import-input")?.click()}>
+        {!importPrimary && <Button action="import" variant="quiet" onClick={() => document.getElementById("import-input")?.click()}>
           <Icon name="import" />{t("toolbar.import")}
-        </Button>
-        <Button action="auto-layout" data-testid="layout-button" disabledReason={layoutReason}
-          title={contentLayout ? t("ai.contentDisclosure") : undefined} onClick={() => {
-            if (contentLayout) {
-              setScope("document");
-              void sendAiPrompt(t("ai.contentPrompt"), { includePreviewImage: true, visualReview: false, fromCurrent: true });
-            } else void requestLayout();
-          }}>
-          <Icon name="layout" />{t(contentLayout ? "ai.contentLayout" : "toolbar.autoLayout")}
-        </Button>
-        <Button action="guided-layout" className="guided-action" disabledReason={layoutReason} onClick={() => patch({ dialog: "guided" })}>
-          <Icon name="reference" />{t("layout.guide")}
-        </Button>
+        </Button>}
+        <DropdownMenu.Root>
+          <DropdownMenu.Trigger asChild><Button action="layout-tools" variant="quiet" aria-label={t("wish.tools")} title={t("wish.tools")}>
+            <Icon name="layout"/><span>{t("wish.tools")}</span><Icon name="chevron"/>
+          </Button></DropdownMenu.Trigger>
+          <DropdownMenu.Portal><DropdownMenu.Content className="menu" align="end">
+            <DropdownMenu.Item className="menu-item" data-action="auto-layout" data-testid="layout-button" disabled={Boolean(layoutReason)} onSelect={()=>void requestLayout()}>{t("toolbar.autoLayout")}</DropdownMenu.Item>
+            <DropdownMenu.Item className="menu-item" data-action="guided-layout" disabled={Boolean(layoutReason)} onSelect={()=>patch({dialog:"guided"})}>{t("layout.guide")}</DropdownMenu.Item>
+            <DropdownMenu.Item className="menu-item" data-action="edit-publication" onSelect={() => patch({ dialog: "publication" })}>{t("publication.title")}</DropdownMenu.Item>
+          </DropdownMenu.Content></DropdownMenu.Portal>
+        </DropdownMenu.Root>
       </div> : <Button action="start-open-package" variant="quiet" aria-label={t("app.openBundle")} title={t("app.openBundle")} onClick={() => document.getElementById("package-input")?.click()}>
         <Icon name="sheets" /><span className="bundle-label">{t("app.openBundle")}</span>
       </Button>}
-      {state.crop ? (
-        <>
-          <Button action="crop-done" variant="primary" disabledReason={cropInvalidNow ? t("crop.invalid") : undefined} onClick={() => void commitCrop()}>
-            {t("crop.done")}
-          </Button>
-          <Button action="crop-cancel" onClick={cancelCrop}>
-            {t("crop.cancel")}
-          </Button>
-        </>
-      ) : null}
-      <Button action="open-onboarding" variant="quiet" className="help-button" aria-label={t("onboarding.title")} title={t("onboarding.title")} onClick={() => patch({ dialog: "onboarding" })}><Icon name="book" /></Button>
       <Button action="settings" variant="quiet" className="settings-button" aria-label={t("toolbar.settings")} onClick={() => patch({ dialog: "settings" })}>
         <Icon name="settings" />
       </Button>
@@ -171,79 +105,15 @@ export function Toolbar({ inert }: { inert: boolean }) {
         data-testid="export-button"
         variant={importPrimary ? "default" : "primary"}
         disabledReason={state.confirmed ? undefined : t("app.noProject")}
-        onClick={() => patch({ dialog: "export", exportState: null })}
+        onClick={() => patch({ dialog: "export", exportState: state.exportState?.status === "running" ? state.exportState : null })}
       >
         <Icon name="export" />
         {t("toolbar.export")}
       </Button>}
-      <input
-        id="import-input"
-        data-testid="import-input"
-        className="hidden-input"
-        type="file"
-        multiple
-        accept="image/png,image/jpeg,image/webp,image/svg+xml,.png,.jpg,.jpeg,.webp,.svg"
-        aria-hidden="true"
-        tabIndex={-1}
-        onChange={(event) => {
-          const files = [...(event.target.files ?? [])];
-          event.target.value = "";
-          void importFiles(files);
-        }}
-      />
-      <input
-        id="package-input"
-        className="hidden-input"
-        type="file"
-        accept=".figurezip,application/zip"
-        aria-hidden="true"
-        tabIndex={-1}
-        onChange={(event) => {
-          const file = event.target.files?.[0];
-          event.target.value = "";
-          if (file) void importPackage(file);
-        }}
-      />
       {state.compareMode !== "editing" ? (
         <span className="sr-only">{t("layout.preview")}</span>
       ) : null}
     </header>
-  );
-}
-
-function ProjectSubmenu(props: {
-  label: string;
-  testId: string;
-  projects: Project[];
-  empty: string;
-  onSelect: (projectId: string) => void;
-}) {
-  return (
-    <DropdownMenu.Sub>
-      <DropdownMenu.SubTrigger className="menu-item" data-testid={props.testId}>
-        {props.label}
-      </DropdownMenu.SubTrigger>
-      <DropdownMenu.Portal>
-        <DropdownMenu.SubContent className="menu menu-scroll" sideOffset={4} alignOffset={-4}>
-          {props.projects.length === 0 ? (
-            <DropdownMenu.Item className="menu-item" disabled title={props.empty}>
-              {props.empty}
-            </DropdownMenu.Item>
-          ) : (
-            props.projects.map((project) => (
-              <DropdownMenu.Item
-                key={project.id}
-                className="menu-item menu-project"
-                title={project.title}
-                onSelect={() => props.onSelect(project.id)}
-              >
-                {project.title}
-              </DropdownMenu.Item>
-            ))
-          )}
-        </DropdownMenu.SubContent>
-      </DropdownMenu.Portal>
-    </DropdownMenu.Sub>
   );
 }
 
@@ -252,12 +122,15 @@ function ProjectName() {
   const title = useWorkspace((state) => state.title);
   const projectId = useWorkspace((state) => state.projectId);
   const cancelled = useRef(false);
+  const input = useRef<HTMLInputElement>(null);
   const [editing, setEditing] = useState(false);
   const [text, setText] = useState(title);
   useEffect(() => setText(title), [title]);
   if (!projectId) return null;
   return (
+    <div className="project-name-field">
     <input
+      ref={input}
       className="project-name"
       aria-label={t("panels.name")}
       value={editing ? text : title}
@@ -289,6 +162,11 @@ function ProjectName() {
         }
       }}
     />
+    <Button action="rename-figure" variant="quiet" aria-label={t("project.rename")} title={t("project.rename")} onClick={() => {
+      input.current?.focus();
+      input.current?.select();
+    }}><Icon name="edit" /></Button>
+    </div>
   );
 }
 
@@ -299,21 +177,4 @@ function saveLabel(saveState: string, backend: string, t: (key: string) => strin
   if (saveState === "conflict") return t("save.conflict");
   if (saveState === "saved") return t("save.saved");
   return t("app.noProject");
-}
-
-async function newProject(): Promise<void> {
-  resetCandidateSession(null);
-  writeProjectId(null);
-  patch({
-    startMessage: "",
-    projectId: null,
-    confirmed: null,
-    title: "",
-    draft: null,
-    cards: [],
-    activeCandidateId: null,
-    selection: { kind: "none" },
-    imports: [],
-  });
-  await ensureProject();
 }

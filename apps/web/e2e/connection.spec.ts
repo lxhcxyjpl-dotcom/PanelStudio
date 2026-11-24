@@ -26,7 +26,7 @@ test.beforeAll(async () => {
 test.afterAll(() => mock.close());
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem("panelstudio.prefs", JSON.stringify({ theme: "light", locale: "zh-CN", motion: "off" })));
-  await page.goto("/");
+  await page.goto("/app");
 });
 
 async function openConnection(page: Page) {
@@ -44,11 +44,25 @@ async function checkFourSizes(page: Page) {
 }
 
 test("explains a key in the URL field and supports provider presets without calling them", async ({ page }) => {
+  // This is the first-time connection flow. Other specs use a mock provider in this test server.
+  const cleared = await page.request.delete("/api/v1/settings/ai-provider/secret", {
+    headers: { "Idempotency-Key": crypto.randomUUID() },
+  });
+  expect(cleared.ok()).toBe(true);
   const saves: string[] = [];
   page.on("request", request => { if (request.method() === "PUT" && request.url().includes("/settings/")) saves.push(request.url()); });
-  await openConnection(page);
+  await page.locator("[data-action=settings]").click();
+  await expect(page.getByText("通用", { exact: true })).toHaveCount(1);
+  await page.locator("[data-action=settings-ai]").click();
+  const address = page.getByRole("textbox", { name: "API 服务地址" });
+  await expect(address).toHaveAccessibleDescription("使用兼容 Chat Completions 的地址。");
   await page.getByTestId("ai-service").selectOption("deepseek");
-  await expect(page.getByTestId("ai-base-url")).toHaveValue("https://api.deepseek.com");
+  await expect(address).toHaveValue("https://api.deepseek.com");
+  await expect(page.getByText(/Chat Completions/)).toHaveCount(0);
+  await expect(address).toHaveAccessibleDescription("");
+  await expect(page.getByText("待配置", { exact: true })).toBeVisible();
+  await expect(page.getByText("密钥加密保存，不随图稿导出。")).toBeVisible();
+  await expect(page.getByText("测试仅发送示例文字，不上传图稿。")).toBeVisible();
   await expect(page.getByTestId("ai-model")).toHaveValue("deepseek-flash");
   await expect(page.getByTestId("ai-image")).toBeChecked();
   await expect(page.getByTestId("ai-local")).not.toBeChecked();
@@ -57,14 +71,17 @@ test("explains a key in the URL field and supports provider presets without call
   await page.getByTestId("ai-model").fill("deepseek-v4-pro");
   await expect(page.getByTestId("ai-image")).toBeDisabled();
   await expect(page.getByTestId("ai-image")).not.toBeChecked();
-  await page.getByTestId("ai-base-url").fill("sk-test-value-in-the-wrong-field");
-  await page.locator("[data-action=save-connection]").click();
+  await address.fill("sk-test-value-in-the-wrong-field");
+  await expect(page.locator("[data-action=save-connection]")).toBeHidden();
+  await page.locator("[data-action=test-provider]").click();
   await expect(page.getByText(/这里需要网址/)).toBeVisible();
+  await expect(address).toHaveAccessibleDescription(/这里需要网址/);
   expect(saves).toEqual([]);
   await page.getByTestId("ai-service").selectOption("openrouter");
   await expect(page.getByTestId("ai-base-url")).toHaveValue("https://openrouter.ai/api/v1");
   await page.getByTestId("ai-service").selectOption("custom");
-  await expect(page.getByTestId("ai-base-url")).toHaveValue("");
+  await expect(address).toHaveValue("");
+  await expect(address).toHaveAccessibleDescription("使用兼容 Chat Completions 的地址。");
   await expect(page.getByTestId("ai-model")).toHaveValue("");
   expect(calls).toBe(0);
 });
@@ -83,6 +100,7 @@ test("saves a complete connection once, tests it, preserves its key and requires
   expect(response.ok()).toBe(true);
   expect(await response.text()).not.toContain("test-only-browser-connection-key");
   await expect(page.getByTestId("ai-provider-status")).toContainText("连接成功");
+  await expect(page.getByText("连接可用", { exact: true })).toBeVisible();
   await expect(page.getByTestId("ai-secret")).toHaveValue("");
   await expect(page.getByTestId("ai-secret-state")).toHaveText("已保存密钥");
   expect(calls).toBe(1);

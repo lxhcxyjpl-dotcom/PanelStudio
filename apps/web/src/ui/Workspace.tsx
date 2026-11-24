@@ -1,15 +1,14 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { NUDGE_MM } from "@panelstudio/contracts";
 import { api } from "../api/client";
-import { formatDiagnostic } from "../i18n/diagnostic";
-import { workspaceMode, sidebarWidth, localizedSummary } from "../model/chrome";
+import { errorText } from "../model/feedback";
+import { artworkFontNotices, formatDiagnostic } from "../i18n/diagnostic";
+import { workspaceMode, sidebarWidth } from "../model/chrome";
 import { geometryLocked, panelIdsOf } from "../model/document-ui";
-import { fitCamera } from "../model/view";
+import { actualSize, fitCamera } from "../model/view";
 import {
-  acceptCandidate,
-  boot,
   cancelCrop,
   cancelNudge,
   commitCrop,
@@ -22,40 +21,53 @@ import {
   importFiles,
   queueNudge,
   redo,
-  requestLayout,
   selectAll,
-  selectCandidate,
   undo,
 } from "../state/session";
-import { patch, useWorkspace } from "../state/store";
-import { baseDocument, candidatesStale } from "../state/types";
+import { patch, useWorkspace, useWorkspaceFields } from "../state/store";
+import { baseDocument } from "../state/types";
+import { useWish } from "../state/wish-session";
+import { stageFiles } from "../state/opening";
+import { WishComposer } from "./WishComposer";
+import type { VersionPosition } from "./conversation-scroll";
 import { CanvasStage } from "./CanvasStage";
-import { proposalChanges, labelName } from "../model/changes";
+import { labelName } from "../model/changes";
 import { cancelGesture } from "./gesture";
 import { labelDiagnostics } from "@panelstudio/core/labels";
-import { Dialogs } from "./Dialogs";
-import { GuidedDialog } from "./GuidedDialog";
 import { Inspector } from "./Inspector";
 import { LeftSidebar } from "./LeftSidebar";
 import { Toolbar } from "./Toolbar";
 import { StartScreen } from "./StartScreen";
-import { Onboarding } from "./Onboarding";
 import { Button } from "./widgets";
+import "./canvas-interactions.css";
 
-export function Workspace() {
+export function Workspace({ active = true }: { active?: boolean }) {
   const { t } = useTranslation();
-  const state = useWorkspace();
+  const state = useWorkspaceFields(
+    "projectId", "confirmed", "mode", "leftOpen", "rightOpen", "leftWidth", "rightWidth", "booting", "draggingFiles", "liveMessage",
+    "assetTab", "inspectorMode",
+  );
   const drawerSide = state.confirmed && (state.mode === "drawer" || state.mode === "phone")
     ? state.leftOpen ? "assets" : state.rightOpen ? "inspector" : null : null;
+  const phoneTab = state.mode === "phone"
+    ? drawerSide === "assets" ? state.assetTab : state.inspectorMode
+    : null;
+  const choosing = useWish(s=>s.phase==="select") && state.confirmed?.document.panelOrder.length===0;
+  const overlayDrawer = !choosing && Boolean(drawerSide) && state.mode === "drawer";
   useEffect(() => {
-    if (!drawerSide) return;
-    const trigger = document.querySelector<HTMLButtonElement>('[data-action="drawer-' + drawerSide + '"]');
-    document.getElementById("studio-" + drawerSide)?.querySelector<HTMLButtonElement>('[role="tab"][aria-selected="true"]')?.focus({preventScroll:true});
+    if (!active || !drawerSide) return;
+    const current = useWorkspace.getState();
+    const action = state.mode === "phone"
+      ? drawerSide === "assets" ? "mobile-" + current.assetTab : current.inspectorMode === "ai" ? "mobile-refine" : "mobile-properties"
+      : "drawer-" + drawerSide;
+    const trigger = document.querySelector<HTMLButtonElement>(`[data-action="${action}"]`);
+    document.getElementById("studio-" + drawerSide)?.querySelector<HTMLElement>('[data-drawer-heading], [role="tab"][aria-selected="true"]')?.focus({preventScroll:true});
     return () => { if (trigger?.isConnected && trigger.getClientRects().length) trigger.focus({preventScroll:true}); };
-  }, [drawerSide]);
+  }, [drawerSide, active, state.mode, phoneTab]);
   useEffect(() => {
-    void boot();
+    if (!active) return;
     const onResize = () => patch({ mode: workspaceMode(window.innerWidth) });
+    onResize();
     window.addEventListener("resize", onResize);
     const onDragEnter = (event: DragEvent) => {
       if (useWorkspace.getState().dialog === "guided") return;
@@ -70,7 +82,11 @@ export function Workspace() {
       patch({ draggingFiles: false });
       if (useWorkspace.getState().dialog === "guided") return;
       const files = [...(event.dataTransfer?.files ?? [])];
-      if (files.length > 0) void importFiles(files);
+      if (files.length > 0) {
+        const state = useWorkspace.getState();
+        if(state.projectId)void importFiles(files).catch(err=>patch({liveMessage:errorText(err)}));
+        else stageFiles(files);
+      }
     };
     const onDragOver = (event: DragEvent) => {
       if ([...(event.dataTransfer?.types ?? [])].includes("Files")) event.preventDefault();
@@ -86,9 +102,10 @@ export function Workspace() {
       window.removeEventListener("dragover", onDragOver);
       window.removeEventListener("drop", onDrop);
     };
-  }, []);
+  }, [active]);
 
   useEffect(() => {
+    if (!active) return;
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.isComposing || event.key === "Process") return;
       const current = useWorkspace.getState();
@@ -165,7 +182,7 @@ export function Workspace() {
       }
       if (event.code === "Digit0" && event.shiftKey && !command) {
         event.preventDefault();
-        patch({ camera: { ...current.camera, zoom: 1 } });
+        patch({ camera: actualSize(current.camera, current.viewport) });
         return;
       }
       if ((event.key === "+" || event.key === "=" || event.key === "-") && !command) {
@@ -203,53 +220,64 @@ export function Workspace() {
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("keyup", onKeyUp);
     };
-  }, []);
+  }, [active]);
 
   const left = sidebarWidth("left", state.mode, state.leftWidth);
   const right = sidebarWidth("right", state.mode, state.rightWidth);
-  const stale = candidatesStale(state);
   return (
-    <div className="app" data-testid="workspace" data-editor={Boolean(state.confirmed)}>
-      <Toolbar inert={Boolean(drawerSide)} />
+    <div className="app" data-choosing={Boolean(choosing)} data-testid="workspace" data-editor={Boolean(state.confirmed)}>
+      <Toolbar inert={overlayDrawer} />
       <div className={"workspace" + (state.confirmed ? "" : " home-workspace")}>
-        <div className="editor-panes" hidden={!state.confirmed}>
+        <div className="editor-panes" data-open-panel={choosing ? undefined : drawerSide ?? undefined} hidden={!state.confirmed}>
           <LeftSidebar />
           {state.mode === "full" ? <Divider side="left" width={left} /> : <div className="divider" />}
-          <div className="canvas-column" inert={Boolean(drawerSide)}>
-            {state.confirmed && <><Banners /><CanvasStage /></>}
-            <CandidateDock />
+          <div className="canvas-column" inert={overlayDrawer}>
+            {state.confirmed && <><Banners /><WishCanvas key={state.projectId} /></>}
           </div>
           {state.mode === "full" ? <Divider side="right" width={right} /> : <div className="divider" />}
           <Inspector />
-          {drawerSide &&
+          {overlayDrawer &&
             <button className="drawer-backdrop" type="button" tabIndex={-1} data-action="close-drawer" aria-label={t("a11y.close")}
               onClick={() => patch({ leftOpen: false, rightOpen: false })} />}
         </div>
         {!state.confirmed && <><Banners />{state.booting ? <p className="start-loading" role="status">{t("app.opening")}</p> : <StartScreen />}</>}
         {state.draggingFiles ? <div className="drop-overlay">{t("assets.drop")}</div> : null}
       </div>
-      {state.confirmed && <footer className="bottombar">
+      {state.confirmed && !choosing && <footer className="bottombar">
         <span>{t("status.panels", { count: state.confirmed?.document.panelOrder.length ?? 0 })}</span>
-        {stale ? <span>{state.cards.some((card) => card.candidate.origin === "ai") ? t("ai.stale") : t("layout.stale")}</span> : null}
       </footer>}
+      {state.confirmed && <nav className="mobile-workspace-nav" aria-label={t("toolbar.more")}>
+        <Button action="mobile-assets" variant="quiet" aria-controls="studio-assets" aria-expanded={state.leftOpen && state.assetTab === "assets"} onClick={() => patch({ assetTab: "assets", leftOpen: true, rightOpen: false })}>{t("assets.tab")}</Button>
+        <Button action="mobile-panels" variant="quiet" aria-controls="studio-assets" aria-expanded={state.leftOpen && state.assetTab === "panels"} onClick={() => patch({ assetTab: "panels", leftOpen: true, rightOpen: false })}>{t("panels.tab")}</Button>
+        <Button action="mobile-properties" variant="quiet" aria-controls="studio-inspector" aria-expanded={state.rightOpen && state.inspectorMode === "properties"} onClick={() => patch({ inspectorMode: "properties", rightOpen: true, leftOpen: false })}>{t("inspector.tab")}</Button>
+        <Button action="mobile-refine" variant="quiet" aria-controls="studio-inspector" aria-expanded={state.rightOpen && state.inspectorMode === "ai"} onClick={() => patch({ inspectorMode: "ai", rightOpen: true, leftOpen: false })}>{t("ai.tab")}</Button>
+      </nav>}
       <div className="sr-only" aria-live="polite" data-testid="live">{state.liveMessage}</div>
-      <Dialogs />
-      <Onboarding open={state.dialog === "onboarding"} />
-      {state.confirmed && <GuidedDialog key={state.projectId} document={state.confirmed.document} open={state.dialog === "guided"} />}
     </div>
   );
 }
 
+function WishCanvas() {
+  const choosing = useWish(s=>s.phase==="select");
+  const empty = useWorkspace(s=>s.confirmed?.document.panelOrder.length===0);
+  const reviewing = choosing && empty;
+  const versionPosition = useRef<VersionPosition | null>(null);
+  return <>
+    {!reviewing && <CanvasStage />}
+    <div className={reviewing ? "wish-review-stage" : "wish-composer-host"}><WishComposer versionPosition={versionPosition} /></div>
+  </>;
+}
+
 function Banners() {
   const { t } = useTranslation();
-  const state = useWorkspace();
+  const state = useWorkspaceFields("projectId", "backend", "saveState");
   const assets = useQuery({
     queryKey: ["assets", state.projectId],
     enabled: Boolean(state.projectId),
     queryFn: () => api.assets(state.projectId ?? ""),
   });
-  const art = baseDocument(state);
-  const missing = (assets.data?.items ?? []).flatMap((asset) => asset.diagnostics.filter((item) => item.code === "FONT_MISSING"));
+  const art = useWorkspace(baseDocument);
+  const missing = art && assets.data ? artworkFontNotices(art, assets.data.items) : [];
   const labelIssues = art ? labelDiagnostics(art) : [];
   return (
     <div className="banners">
@@ -261,65 +289,12 @@ function Banners() {
         </p>
       ) : null}
       {state.saveState === "conflict" ? <p className="banner">{t("save.conflict")}</p> : null}
-      {state.layoutState === "conflict" || state.layoutState === "error" ? <p className="banner">{state.layoutMessage}</p> : null}
-      {state.layoutState === "loading" ? <p className="banner">{t("layout.loading")}</p> : null}
-      {candidatesStale(state) ? (
-        <p className="banner">
-          {state.cards.some((card) => card.candidate.origin === "ai") ? t("ai.stale") : t("layout.stale")}
-          {state.cards.some((card) => card.candidate.origin === "ai") ? null : (
-            <Button action="regenerate-layout" onClick={() => void requestLayout(state.cardLayoutRequest ?? { family: "auto" })}>{t("layout.regenerate")}</Button>
-          )}
-        </p>
-      ) : null}
-      {labelIssues.map((issue, index) => <p className="banner quiet" key={`label-${index}`}>{issue.panelIds?.map((id) => art ? labelName(art, id) : "").join(", ")} · {formatDiagnostic(t, issue)}</p>)}
-      {missing.length > 0 ? (
-        <p className="banner quiet">
-          {t("status.fontMissing")}
-          {missing.map((item, index) => <span key={`${item.messageKey}-${index}`}> {formatDiagnostic(t, item)}</span>)}
-        </p>
-      ) : null}
+      {labelIssues.length + missing.length > 0 && <details className="banner quiet artwork-notices"><summary>{t("status.artworkNotices", { count: labelIssues.length + missing.length })}</summary>
+        {labelIssues.map((issue, index) => <p key={`label-${index}`}>{issue.panelIds?.map((id) => art ? labelName(art, id) : "").join(", ")} · {formatDiagnostic(t, issue)}</p>)}
+        {missing.map(({ diagnostic, panels }, index) =>
+          <p key={`font-${index}`}><strong>{panels.join(", ")}</strong> · {formatDiagnostic(t, diagnostic)}</p>)}
+      </details>}
     </div>
-  );
-}
-
-function CandidateDock() {
-  const { t, i18n } = useTranslation();
-  const state = useWorkspace();
-  if (state.cards.some((card) => card.candidate.origin === "ai")) return null;
-  if (state.cards.length === 0 && state.layoutState === "idle") return null;
-  const stale = candidatesStale(state);
-  const applyReason = !state.activeCandidateId ? t("layout.pick") : stale ? t("layout.stale") : undefined;
-  return (
-    <section className="candidates" aria-label={t("layout.preview")} data-keys="candidates">
-      <header>
-        <strong>{t("layout.preview")}</strong>
-        <Button action="apply-layout" variant="primary" disabledReason={applyReason} onClick={() => void acceptCandidate()}>{t("layout.apply")}</Button>
-        <Button action="cancel-layout" onClick={dismissCandidates}>{t("layout.cancel")}</Button>
-        <Button action="manual-edit" onClick={continueEditing}>{t("layout.manual")}</Button>
-      </header>
-      <div className="candidate-row">
-        {state.cards.map((card) => {
-          const canvas = card.candidate.previewDocument.canvas;
-          const active = card.candidate.id === state.activeCandidateId;
-          return (
-            <button
-              key={card.candidate.id}
-              type="button"
-              data-action="select-candidate"
-              data-testid="candidate-card"
-              className={active ? "candidate active" : "candidate"}
-              onClick={() => selectCandidate(card.candidate.id)}
-            >
-              {card.previewUrl ? <img alt="" src={card.previewUrl} /> : <span>{card.previewError ?? t("layout.loading")}</span>}
-              <strong>{localizedSummary(card.candidate.summary, i18n.language)}</strong>
-              <span>{t("layout.canvasSize", { width: round(canvas.widthMm), height: round(canvas.heightMm) })}</span>
-              {state.cards.length === 1 && state.candidateRoot ? proposalChanges(state.candidateRoot.document, card.candidate.previewDocument).filter((change) => change.kind === "size").map((change) => <span key={change.label}>{t("ai.changeSize", change)}</span>) : null}
-              {card.candidate.diagnostics.map((item, index) => <em key={`${item.code}-${index}`}>{formatDiagnostic(t, item)}</em>)}
-            </button>
-          );
-        })}
-      </div>
-    </section>
   );
 }
 
@@ -366,8 +341,4 @@ function isTyping(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
   if (target.isContentEditable) return true;
   return target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.tagName === "SELECT";
-}
-
-function round(value: number): number {
-  return Math.round(value * 100) / 100;
 }

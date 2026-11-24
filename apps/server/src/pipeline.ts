@@ -1,3 +1,5 @@
+import { Check } from "typebox/value";
+import { currentEngines, frozenInput, materializeParent, messageParents } from "./ai-context.js";
 import { createHash, randomUUID } from "node:crypto";
 import path from "node:path";
 import {
@@ -5,6 +7,7 @@ import {
   ENGINE_VERSIONS,
   NORMALIZATION_VERSION,
   RESOURCE_LIMITS,
+  MessageBranchRequestSchema,
   isExportRequest,
   isHistoryRequest,
   isLayoutCandidatesRequest,
@@ -44,6 +47,8 @@ import {
   getCandidate,
   getIdempotency,
   getJob,
+  getJobDetail,
+  readProvider,
   getProject,
   getRevision,
   immediate,
@@ -74,7 +79,7 @@ import {
 import { buildProjectPackage, readProjectPackage, type PackagedAsset } from "./figure-package.js";
 import { packagedFontFiles } from "./fonts.js";
 import { ApiException } from "./http.js";
-import { normalizeRaster, rasterizeSvg, sniffMediaType, type RasterMediaType } from "./raster.js";
+import { normalizeRaster, pngWithDensity, rasterizeSvg, sniffMediaType, type RasterMediaType } from "./raster.js";
 import { PNG_RENDERER, type RenderPool } from "./render-pool.js";
 import { compileSnapshot, type RenderSnapshot } from "./render-task.js";
 import { queueRenderJob } from "./render-jobs.js";
@@ -132,6 +137,78 @@ export function createProject(ctx: AppContext, title: unknown, key: string, requ
     };
     remember(ctx, "project-create", key, requestHash, 201, body);
     return { status: 201, body };
+  });
+}
+
+/** Branch from immutable input, sharing content-addressed artwork without modifying the source document. */
+export function branchEditedMessage(ctx: AppContext, sourceId: string, body: unknown, key: string, requestHash: string): Response {
+  if (!Check(MessageBranchRequestSchema, body) || !body.title.trim() || (body.kind === "ai" && !body.prompt.trim()))
+    throw new ApiException("REQUEST_INVALID", "Invalid message edit.");
+  const scope = "message-branch:" + sourceId;
+  return immediate(ctx.db, () => {
+    const replay = takeReplay(ctx, scope, key, requestHash);
+    if (replay) return replay;
+    assertMutable(requireProject(ctx, sourceId));
+    const original = body.kind === "ai" ? getJobDetail(ctx.db, body.jobId) : null;
+    const frozen = original?.projectId === sourceId && original.kind === "ai_layout" ? frozenInput(original) : null;
+    if (body.kind === "ai" && (!frozen || !currentEngines(frozen)))
+      throw new ApiException("AI_CONTEXT_INVALID", "The original input of this turn could not be restored.");
+    const revision = requireRevision(ctx, sourceId, body.kind === "figure" ? body.revision : frozen!.request.baseRevision);
+    let document = revision.document;
+    if (frozen) {
+      if (frozen.rootHash !== revision.documentHash) throw new ApiException("CANDIDATE_STALE", "The original input has changed.");
+      document = materializeParent(ctx, sourceId, revision.revision, document, frozen.parentCandidateId, id => readyFacts(ctx, sourceId, id)).document;
+      if (hashFigureDocument(document) !== frozen.sourceHash) throw new ApiException("CANDIDATE_STALE", "The original draft could not be verified.");
+    }
+    const onCanvas = document.panelOrder.map(id => document.panels[id]!.assetId);
+    const ids = new Set(body.kind === "figure" ? [...body.assetIds, ...onCanvas] : onCanvas);
+    if (original) for (const asset of listAssets(ctx.db,sourceId)) {
+      if (asset.status === "ready" && asset.createdAt <= original.createdAt &&
+        (!asset.removedFromLibraryAt || asset.removedFromLibraryAt > original.createdAt)) ids.add(asset.id);
+    }
+    if (ids.size > RESOURCE_LIMITS.maxAssetsPerProject) throw new ApiException("REQUEST_INVALID", "Too many source images.");
+    const assets = [...ids].map(id => {
+      const asset = getAsset(ctx.db, sourceId, id);
+      if (!asset || asset.status !== "ready" || !asset.normalized) throw new ApiException("NOT_FOUND", "An image used by this message is unavailable.");
+      return asset;
+    });
+    const projectId = randomUUID(), importId = randomUUID(), now = ctx.now(), documentHash = hashFigureDocument(document);
+    insertProject(ctx.db, { id:projectId, title:body.title.trim(), createdAt:now, updatedAt:now, deletedAt:null,
+      currentRevision:0, undoStack:[], redoStack:[] }, { document, documentHash, kind:"import", engineVersion:ENGINE_VERSIONS.svg, createdAt:now });
+    const copyReading = ctx.db.prepare("INSERT INTO figure_readings(projectId,assetId,fingerprint,reader,resultJson) SELECT ?,assetId,fingerprint,reader,resultJson FROM figure_readings WHERE projectId=? AND assetId=?");
+    for (const asset of assets) {
+      insertAsset(ctx.db, { ...asset, projectId, importJobId:importId, removedFromLibraryAt:null });
+      copyReading.run(projectId, sourceId, asset.id);
+    }
+    if (body.kind === "figure") {
+      if (new Set(body.identities?.map(item => item.id)).size !== (body.identities?.length ?? 0))
+        throw new ApiException("REQUEST_INVALID", "An image identity occurs twice.");
+      const writeIdentity = ctx.db.prepare("INSERT INTO figure_identities(projectId,assetId,fingerprint,decisionJson) VALUES (?,?,?,?)");
+      for (const decision of body.identities ?? []) {
+        if (!ids.has(decision.id)) throw new ApiException("REQUEST_INVALID", "An identity is outside the selected source images.");
+        writeIdentity.run(projectId, decision.id, decision.fingerprint, JSON.stringify({ choice:decision.choice, value:decision.value }));
+      }
+    }
+    writeJob(ctx, { id:importId, projectId, kind:"project_import", status:"succeeded", phase:"ready", createdAt:now,
+      startedAt:now, finishedAt:now, inputJson:{sourceId, revision:revision.revision}, result:{projectId,revision:0}, error:null });
+    let jobId: string | null = null;
+    if (body.kind === "ai" && frozen) {
+      const provider = readProvider(ctx.db);
+      if (!provider?.encryptedSecret || (body.includePreviewImage || body.visualReview) && !provider.config.capabilities.imageInput)
+        throw new ApiException("PROVIDER_NOT_CONFIGURED", "A compatible AI connection is required.", {}, 409);
+      const request = { ...frozen.request, prompt:body.prompt.trim(), baseRevision:0, context:{kind:"revision" as const},
+        replyLocale:body.replyLocale, includePreviewImage:body.includePreviewImage, visualReview:body.includePreviewImage && body.visualReview };
+      const { imageReadings, ...context } = frozen;
+      jobId = randomUUID();
+      insertJob(ctx.db, { id:jobId, projectId, kind:"ai_layout", status:"queued", phase:"queued", createdAt:now,
+        startedAt:null, finishedAt:null, error:null, result:null, inputJson:{ ...context, request, parentCandidateId:null, branchParents:messageParents(ctx,original!),
+          rootHash:documentHash, sourceHash:documentHash, configRevision:provider.configRevision,
+          ...(request.includePreviewImage && imageReadings ? {imageReadings} : {}) } });
+      insertJobEvent(ctx.db, { jobId, seq:0, event:"job.queued", payloadJson:{status:"queued",phase:"queued",progress:null}, createdAt:now });
+    }
+    const response = {projectId, jobId};
+    remember(ctx, scope, key, requestHash, 201, response);
+    return { status:201, body:response };
   });
 }
 
@@ -535,17 +612,27 @@ export function createLayoutCandidates(
       });
     }
     const current = requireRevision(ctx, projectId, project.currentRevision);
+    const preparation = request.preparation ?? [];
+    let source = current.document;
+    if (preparation.length) {
+      try { source = applyCommands(source, preparation, id => readyFacts(ctx, projectId, id)); }
+      catch (error) {
+        if (error instanceof DocumentCommandError) throw new ApiException(error.code, error.message, error.details);
+        throw error;
+      }
+    }
     const solved = solveLayout({
-      document: current.document,
+      document: source,
       request: request.request,
-      assets: assetFactsForDocument(ctx, projectId, current.document),
+      assets: assetFactsForDocument(ctx, projectId, source),
       ...(request.maxCandidates ? { maxCandidates: request.maxCandidates } : {}),
     });
     if (!solved.ok) {
       throw new ApiException(solved.code, solved.message, solved.details);
     }
     const now = ctx.now();
-    const candidates = solved.candidates.map((candidate) => {
+    const candidates = solved.candidates.map((solvedCandidate) => {
+      const candidate = { ...solvedCandidate, commands: [...preparation, ...solvedCandidate.commands] };
       const id = deterministicUuid({
         projectId,
         baseRevision: request.baseRevision,
@@ -1027,7 +1114,7 @@ async function produceExport(
   }
   if (request.format === "png") {
     const image = await ctx.renders.render(snapshot, pngPixelsFromMm(document.canvas.widthMm, request.options.dpi));
-    return { bytes: Buffer.from(image.bytes), mediaType: "image/png", filename: stem + ".png",
+    return { bytes: pngWithDensity(image.bytes, request.options.dpi), mediaType: "image/png", filename: stem + ".png",
       rendererVersion: PNG_RENDERER, diagnostics: image.diagnostics };
   }
   const assets = packageAssets(ctx, project.id);
@@ -1392,6 +1479,6 @@ function isTitle(value: unknown): value is string {
 }
 
 function fileStem(title: string): string {
-  const cleaned = title.replace(/[^\w.-]+/gu, "-").replace(/^-+|-+$/gu, "");
-  return (cleaned.length > 0 ? cleaned : "figure").slice(0, 80);
+  const cleaned = title.normalize("NFC").replace(/[^\p{L}\p{M}\p{N}_.-]+/gu, "-").replace(/^[-.]+|[-.]+$/gu, "");
+  return Array.from(cleaned || "figure").slice(0, 80).join("");
 }

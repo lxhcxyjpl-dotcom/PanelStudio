@@ -9,9 +9,13 @@ import {
   SecretWriteRequestSchema,
   SecretWriteResponseSchema,
 } from "./ai.js";
+import { FigureReadingsRequestSchema, FigureReadingsResponseSchema, FigureIdentitySchema, ConfirmFigureIdentitySchema } from "./figure-reading.js";
+import { FigureBriefRequestSchema, FigureBriefReplySchema, FigureDiscussionRequestSchema, FigureDiscussionReplySchema } from "./figure-discussion.js";
 import { AssetAcceptedSchema, AssetSchema } from "./assets.js";
 import { CandidateSchema } from "./candidate.js";
 import { APP_VERSION } from "./constants.js";
+import { MessageBranchRequestSchema, MessageBranchResponseSchema } from "./message-branches.js";
+import { SpeechTranscriptSchema } from "./speech.js";
 import { ApiErrorSchema } from "./errors.js";
 import { JobAcceptedSchema, JobSchema } from "./jobs.js";
 import { ProjectManifestSchema } from "./project-package.js";
@@ -56,6 +60,13 @@ export function toJsonSchema(schema: TSchema): Record<string, unknown> {
 }
 
 const componentSchemas = {
+  FigureReadingsRequest: FigureReadingsRequestSchema, FigureReadingsResponse:FigureReadingsResponseSchema,
+  FigureIdentity:FigureIdentitySchema, ConfirmFigureIdentity:ConfirmFigureIdentitySchema,
+  FigureBriefRequest: FigureBriefRequestSchema, FigureBriefReply: FigureBriefReplySchema,
+  FigureDiscussionRequest: FigureDiscussionRequestSchema,
+  FigureDiscussionReply: FigureDiscussionReplySchema,
+  SpeechTranscript: SpeechTranscriptSchema,
+  MessageBranchRequest: MessageBranchRequestSchema, MessageBranchResponse: MessageBranchResponseSchema,
   ApiError: ApiErrorSchema,
   Uuid: UuidSchema,
   Revision: RevisionSchema,
@@ -284,6 +295,12 @@ const operations: Operation[] = [
     }),
   },
   {
+    operationId: "branchEditedMessage", method: "post", path: "/api/v1/projects/{projectId}/message-branches", tags: ["Projects"],
+    summary: "Create an independent figure at the original message input. Edited AI turns retain their preceding context.",
+    parameters: [projectId], requestBody: jsonBody("MessageBranchRequest"), idempotency: true,
+    responses: withError({ "201": jsonResponse("New project and optional edited AI job.", "MessageBranchResponse") }),
+  },
+  {
     operationId: "getProject",
     method: "get",
     path: "/api/v1/projects/{projectId}",
@@ -471,6 +488,28 @@ const operations: Operation[] = [
     summary: "Soft-remove an asset that the current document does not reference.",
     parameters: [projectId, assetId],
     responses: withError({ "200": jsonResponse("Updated asset record.", "Asset") }),
+  },
+  {
+    operationId:"readFigureAssets",method:"post",path:"/api/v1/projects/{projectId}/figure-readings",tags:["AI"],
+    summary:"Read printed text and figure types from project assets; optionally use the connected visual model.",
+    parameters:[projectId],requestBody:jsonBody("FigureReadingsRequest"),responses:withError({"200":jsonResponse("Content readings and outstanding identity questions.","FigureReadingsResponse")}),
+  },
+  {
+    operationId:"confirmFigureIdentity",method:"put",path:"/api/v1/projects/{projectId}/assets/{assetId}/figure-identity",tags:["Assets"],
+    summary:"Save the author’s interpretation of a conflicting file.",parameters:[projectId,assetId],requestBody:jsonBody("ConfirmFigureIdentity"),responses:withError({"200":jsonResponse("Confirmed interpretation.","FigureIdentity")}),
+  },
+  {
+    operationId: "transcribeSpeech", method: "post", path: "/api/v1/speech/transcriptions", tags: ["AI"],
+    summary: "Transcribe up to 120 seconds of 16 kHz mono 16-bit PCM WAV with the connected DeepSeek account.",
+    requestBody: { required: true, content: binaryContent(["audio/wav"]) },
+    responses: withError({ "200": jsonResponse("Editable transcript, empty if no speech was recognized.", "SpeechTranscript") }),
+  },
+  { operationId:"discussFigureBrief",method:"post",path:"/api/v1/figure-brief",tags:["AI"],summary:"Discuss a figure before uploading artwork.",requestBody:jsonBody("FigureBriefRequest"),responses:withError({"200":{description:"A question or ready brief. Clients accepting NDJSON may receive text previews followed by a complete result or an error.",content:{"application/json":{schema:ref("FigureBriefReply")},"application/x-ndjson":{schema:{type:"string",description:"Newline-delimited JSON. Events carry type text with text, complete with result, or error with status and an API error."}}}}}) },
+  {
+    operationId: "discussFigureAssets", method: "post", path: "/api/v1/projects/{projectId}/figure-discussion",
+    tags: ["AI"], summary: "Discuss or curate main and supplementary library assets without modifying the figure.",
+    parameters: [projectId], requestBody: jsonBody("FigureDiscussionRequest"),
+    responses: withError({ "200": jsonResponse("A material question or a proposal with ordered main panels and optional supplementary figures.", "FigureDiscussionReply") }),
   },
   {
     operationId: "createLayoutCandidates",

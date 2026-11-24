@@ -93,6 +93,40 @@ function candidate(job: Extract<Job, { kind: "ai_layout" }>): Candidate {
 }
 
 describe("v0.2 frozen AI drafts", () => {
+  it("edits a historical clarification answer from its frozen parent and leaves the original applied figure untouched", async () => {
+    const f = await setup((scene,prompt) => prompt === "first" ? proposal({type:"set_label_style",patch:{sequence:"lower-alpha"}}) :
+      prompt === "ask" ? {version:1,kind:"clarification",question:"How far?",options:["one", "two"]} :
+        proposal({type:"move_by_mm",targets:[{kind:"panel",id:scene.selectedPanelIds[0]!}],dxMm:prompt === "two" ? 2 : 1,dyMm:0}));
+    const b = f.original.document.panelOrder[1]!;
+    const parent = candidate(await f.turn("first"));
+    const question = await f.turn("ask",{context:{kind:"candidate",candidateId:parent.id},scope:"selection",selectedPanelIds:[b]});
+    const originalAnswer = await f.turn("one",{context:{kind:"clarification",jobId:question.id}});
+    const original = candidate(originalAnswer);
+    await f.post(f.project+"/transactions",{baseRevision:f.original.revision,candidateId:original.id});
+    const key = randomUUID(), payload = {kind:"ai",title:"Figure 2 · v2",jobId:originalAnswer.id,prompt:"two",replyLocale:"en-US",includePreviewImage:false,visualReview:false};
+    const fork = () => f.app.inject({method:"POST",url:f.project+"/message-branches",headers:{"idempotency-key":key},payload});
+    const reply = await fork(); expect(reply.statusCode,reply.body).toBe(201);
+    const created = reply.json();
+    expect((await fork()).json()).toEqual(created);
+    const branch = "/api/v1/projects/"+created.projectId;
+    const root = (await f.app.inject({url:branch+"/document"})).json();
+    expect(root.documentHash).toBe(parent.resultDocumentHash);
+    expect(root.revision).toBe(0);
+    await drainServerAiJobs(f.app);
+    const edited = candidate(await f.readJob(created.jobId));
+    expect(edited.previewDocument.panels[b]!.frameMm.x).toBeCloseTo(parent.previewDocument.panels[b]!.frameMm.x+2);
+    expect(f.seen.at(-1)!.previousTurns.map(turn=>turn.prompt)).toEqual(["first","ask"]);
+    expect(f.seen.at(-1)!.selectedPanelIds).toEqual([b]);
+    const history = (await f.app.inject({url:branch+"/ai-history"})).json();
+    expect(history.items[0].prefix.map((v:{prompt:string})=>v.prompt)).toEqual(["first","ask"]);
+    expect((await f.app.inject({url:f.project+"/document"})).json().documentHash).toBe(original.resultDocumentHash);
+    expect((await f.app.inject({url:branch+"/document"})).json().documentHash).toBe(parent.resultDocumentHash);
+    expect((await f.post(branch+"/message-branches",payload)).statusCode).toBe(422);
+    const count = async () => (await f.app.inject({url:"/api/v1/projects"})).json().items.length;
+    const n = await count();
+    expect((await f.post(f.project+"/message-branches",{kind:"figure",title:"Invalid asset",revision:f.original.revision,assetIds:[randomUUID()]})).statusCode).toBe(404);
+    expect(await count()).toBe(n);
+  });
   it("replays three turns once, scopes the delta against its immediate parent and undoes the complete chain", async () => {
     const f = await setup((scene, prompt) => prompt === "order"
       ? proposal({ type: "set_label_style", patch: { sequence: "lower-alpha" } })

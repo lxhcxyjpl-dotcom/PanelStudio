@@ -17,10 +17,11 @@ async function snapshot(page: Page): Promise<{document:FigureDocumentV1;document
 }
 test.beforeEach(async ({page}) => {
   await page.addInitScript(() => localStorage.setItem("panelstudio.prefs",JSON.stringify({locale:"zh-CN",motion:"off"})));
-  await page.goto("/");
+  await page.goto("/app");
   await page.getByTestId("import-input").setInputFiles([1,2,3].map(i => image(i+".svg",'<rect width="400" height="240" fill="#426c89"/>')));
   await expect(page.locator(".panel-frame")).toHaveCount(3);
   await expect(page.getByTestId("save-status")).toHaveText("已保存");
+  await page.locator("[data-action=layout-tools]").click();
   await action(page,"guided-layout").click();
 });
 test("reference only and combined input preview, commit, undo and export via the normal editor",async ({page}) => {
@@ -41,12 +42,14 @@ test("reference only and combined input preview, commit, undo and export via the
   expect(JSON.stringify(body)).not.toContain("<svg");
   await expect(page.getByTestId("candidate-card").first()).toBeVisible();
   expect((await snapshot(page)).documentHash).toBe(base.documentHash);
+  await page.locator("[data-action=layout-tools]").click();
   await action(page,"guided-layout").click();
   await page.getByTestId("guide-words").fill("突出 B，A 和 C 上下排列，留白多一点");
-  await expect(page.getByLabel("面板间距 (mm)",{exact:true})).toHaveValue("6");
+  await expect(page.getByTestId("guide-summary")).toHaveText("突出 B · A 与 C 上下对照 · 间距 6 mm");
+  await expect(page.getByLabel("面板间距 (mm)",{exact:true})).toBeHidden();
   await action(page,"generate-guided").click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
-  await page.getByRole("button",{name:"使用此布局"}).click();
+  await page.getByRole("button",{name:"应用此版"}).click();
   await expect.poll(async ()=>(await snapshot(page)).revision).toBe(base.revision+1);
   const applied = (await snapshot(page)).document;
   expect(applied.panelOrder).toEqual(base.document.panelOrder);
@@ -65,17 +68,24 @@ test("reference only and combined input preview, commit, undo and export via the
 });
 test("preference-only input exposes unknown phrases and accepts the recognized preferences explicitly",async ({page}) => {
   const words = page.getByTestId("guide-words");
+  await expect(page.getByTestId("guide-summary")).toHaveCount(0);
+  await expect(page.getByLabel("画布形状")).toBeHidden();
   await words.fill("高级感，突出 B，紧凑");
   await expect(page.getByText(/仍需确认的文字.*高级感/)).toBeVisible();
   await expect(action(page,"generate-guided")).toBeDisabled();
-  await page.getByRole("checkbox",{name:"跳过这些文字，使用下方设置"}).check();
+  await page.getByRole("checkbox",{name:"跳过未识别的文字"}).check();
+  const manual = page.getByTestId("guide-manual").locator("summary");
+  await manual.focus(); await page.keyboard.press("Enter");
   await page.getByLabel("面板间距 (mm)",{exact:true}).fill("3.5");
+  await manual.click();
+  await expect(page.getByTestId("guide-summary")).toHaveText("突出 B · 间距 3.5 mm");
+  await expect(page.getByLabel("面板间距 (mm)",{exact:true})).toBeHidden();
   const waiting=page.waitForResponse(r=>r.url().endsWith("/layout-candidates")&&r.request().method()==="POST");
   await action(page,"generate-guided").click();
   const r=await waiting, req=r.request().postDataJSON().request;
   expect(r.ok()).toBe(true); expect(req.referenceSlots).toBeUndefined();
   expect(req.preferences.gapMm).toBe(3.5); expect(JSON.stringify(req)).not.toContain("高级感");
-  await expect(page.getByTestId("candidate-card").first()).toContainText("按排版偏好");
+  await expect(page.getByTestId("candidate-card").first()).toBeVisible();
 });
 test("blank references can be redrawn, reassigned and removed",async({page})=>{
   await page.getByTestId("reference-file").setInputFiles(image("blank.svg",'<rect width="400" height="240" fill="white"/>'));

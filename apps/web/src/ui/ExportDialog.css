@@ -1,0 +1,13 @@
+.dialog.export-dialog {
+  box-sizing: border-box;
+  max-height: calc(100dvh - 32px);
+  overflow-wrap: anywhere;
+}
+
+.export-dialog .export-format-content { min-width: 0; }
+.export-dialog .export-actions { flex-wrap: wrap; row-gap: 8px; }
+.export-dialog .export-actions .primary { margin-inline-start: auto; }
+
+@media (max-width: 767px) {
+  .export-dialog .tabs { gap: 16px; padding-inline: 0; }
+}

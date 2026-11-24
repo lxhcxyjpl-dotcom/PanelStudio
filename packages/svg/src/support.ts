@@ -237,6 +237,17 @@ export function inspectAttributes(element: Element, notes: string[]): void {
       continue;
     }
     if (name.startsWith("on")) throw new SvgImportError(`event attribute ${rawName}`);
+    if (rawName === "textLength" || rawName === "lengthAdjust") {
+      const tag = localName(element);
+      if (tag !== "text" && tag !== "tspan") throw new SvgImportError(`attribute ${rawName} on ${tag}`);
+      const value = attr.value.trim();
+      const valid = rawName === "lengthAdjust"
+        ? value === "spacing" || value === "spacingAndGlyphs"
+        : /^\+?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?(?:px|pt|pc|mm|cm|in|em|ex)?$/u.test(value)
+          && Number.isFinite(parseFloat(value));
+      if (!valid) throw new SvgImportError(`unsupported ${rawName} value`);
+      continue;
+    }
     if (
       name === "filter" ||
       name === "mask" ||
@@ -286,6 +297,12 @@ export function inspectAttributes(element: Element, notes: string[]): void {
 export function applyStyleProperty(element: Element, name: string, value: string): void {
   const property = name.toLowerCase();
   if (DROPPED_PROPERTIES.has(property)) return;
+  if (property === "white-space" && value.toLowerCase() === "pre") {
+    // Chromium ignores white-space as an SVG attribute. xml:space preserves
+    // the text spacing in both browsers and SVG 1.1 renderers.
+    element.setAttributeNS("http://www.w3.org/XML/1998/namespace", "xml:space", "preserve");
+    return;
+  }
   if (!STYLE_PROPERTIES.has(property)) throw new SvgImportError(`style property ${property}`);
   if (/expression\s*\(|javascript:/iu.test(value)) throw new SvgImportError("script-like style");
   assertInternalUrls(value);

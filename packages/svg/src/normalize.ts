@@ -1,4 +1,5 @@
 import { BUNDLED_FONTS, NORMALIZATION_VERSION, type Diagnostic, type NormalizedAsset } from "@panelstudio/contracts";
+import { namedFontFamilies } from "./font-family.js";
 import { inlineStyles } from "./css.js";
 import { expandUses } from "./expand-use.js";
 import { SvgImportError } from "./errors.js";
@@ -51,6 +52,7 @@ const INHERITED = new Set([
   "font-weight",
   "font-style",
   "text-anchor",
+  "xml:space",
   "color",
   "visibility",
   "display",
@@ -174,10 +176,7 @@ function collectFonts(root: Element): NormalizedAsset["fonts"] {
   for (const element of [root, ...descendants(root)]) {
     const value = element.getAttribute("font-family");
     if (!value) continue;
-    for (const family of value.split(",")) {
-      const name = family.trim().replace(/^['"]|['"]$/gu, "");
-      if (name) families.add(name);
-    }
+    for (const name of namedFontFamilies(value)) families.add(name);
   }
   return [...families].map((family) => {
     const bundled = BUNDLED_FAMILIES.has(family);

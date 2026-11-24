@@ -1,24 +1,25 @@
 import { Shell } from "./DialogShell";
 export { Shell } from "./DialogShell";
 import { SettingsDialog } from "./SettingsDialog";
+import { ExportDialog } from "./ExportDialog";
+import { ProjectsDialog } from "./ProjectsDialog";
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { DEFAULT_PNG_DPI, PNG_DPI_OPTIONS, SVG_SUPPORT, type ExportRequest } from "@panelstudio/contracts";
+import { SVG_SUPPORT } from "@panelstudio/contracts";
 import { api } from "../api/client";
 import { formatDiagnostic } from "../i18n/diagnostic";
-import { BUNDLED_FONTS } from "@panelstudio/contracts";
 import {
   discardDraft,
-  downloadAgain,
   downloadRecovery,
-  exportFigure,
   offerAssets,
   retrySave,
   transact,
 } from "../state/session";
-import { patch, useWorkspace } from "../state/store";
+import { patch, useWorkspace, useWorkspaceFields } from "../state/store";
 import { Button, Icon } from "./widgets";
+import { publicationFrom } from "../model/wish";
+import { changeWish, lastPublication, rememberPublication, useWish } from "../state/wish-session";
 import { baseDocument } from "../state/types";
 import type { PublicationContext } from "@panelstudio/contracts";
 
@@ -29,6 +30,7 @@ export function Dialogs() {
       <SettingsDialog open={dialog === "settings" || dialog === "ai-settings"} initialSection={dialog === "ai-settings" ? "ai" : "general"} />
       <ShortcutsDialog open={dialog === "shortcuts"} />
       <ExportDialog open={dialog === "export"} />
+      <ProjectsDialog open={dialog === "projects"} />
       <SvgDialog open={dialog === "svg"} />
       <AssetDialog open={dialog === "asset"} />
       <RecoveryDialog open={dialog === "recovery"} />
@@ -40,12 +42,16 @@ export function Dialogs() {
 
 function PublicationDialog({ open }: { open: boolean }) {
   const { t } = useTranslation();
-  const state = useWorkspace();
+  const state = useWorkspaceFields("projectId", "draft");
   const [value, setValue] = useState<PublicationContext>({ journal: "", field: "", message: "", preference: "auto" });
   const [busy, setBusy] = useState(false);
   useEffect(() => {
-    if (open) setValue(baseDocument(useWorkspace.getState())?.publicationContext ??
-      { journal: "", field: "", message: useWorkspace.getState().startMessage, preference: "auto" });
+    if (open) {
+      const saved = baseDocument(useWorkspace.getState())?.publicationContext;
+      const wish = useWish.getState();
+      setValue(wish.phase === "select" || !saved ? publicationFrom(wish.goal || useWorkspace.getState().startMessage,
+        saved ?? {...lastPublication(),message:"",preference:"auto"}) : saved);
+    }
   }, [open, state.projectId]);
   return <Shell open={open} title={t("publication.title")} className="brief-dialog">
     <form className="publication-form" onSubmit={(event) => {
@@ -55,18 +61,21 @@ function PublicationDialog({ open }: { open: boolean }) {
         journal: value.journal.trim(), field: value.field.trim(), message: value.message.trim(), preference: value.preference,
       } }]).then(() => {
         const now = useWorkspace.getState();
-        if (now.saveState === "saved" && now.dialog === "publication") patch({ dialog: null, startMessage: "" });
+        if (now.saveState === "saved" && now.dialog === "publication" && now.confirmed?.document.publicationContext) {
+          rememberPublication(now.confirmed.document.publicationContext);
+          changeWish({goal:now.confirmed.document.publicationContext.message});
+          patch({ dialog: null, startMessage: "" });
+        }
       }).finally(() => setBusy(false));
     }}>
-      <div className="brief-intro"><span className="brief-symbol"><Icon name="spark" /></span><h3>{t("publication.heading")}</h3></div>
-      <label className="field brief-message"><span className="sr-only">{t("publication.message")}</span>
+      <label className="field brief-message"><span>{t("publication.focusLabel")}</span>
         <textarea autoFocus data-testid="figure-message" value={value.message} maxLength={1000} rows={3}
           placeholder={t("publication.messagePlaceholder")} onChange={(e) => setValue({ ...value, message: e.target.value })} />
       </label>
       <div className="brief-context-fields">
       <label className="field"><span>{t("publication.journal")}</span>
         <input data-testid="target-journal" value={value.journal} maxLength={160} list="journal-suggestions"
-          placeholder={t("publication.journalPlaceholder")} onChange={(e) => setValue({ ...value, journal: e.target.value })} />
+          onChange={(e) => setValue({ ...value, journal: e.target.value })} />
         <datalist id="journal-suggestions"><option value="Nature" /><option value="Nature Communications" /><option value="Science" /><option value="Cell" /></datalist>
       </label>
       <label className="field"><span>{t("publication.field")}</span>
@@ -126,64 +135,6 @@ function ShortcutsDialog({ open }: { open: boolean }) {
   );
 }
 
-function downloadFontBundle(): void {
-  const link = document.createElement("a");
-  link.href = "/api/v1/fonts/bundle";
-  link.download = "panelstudio-fonts.zip";
-  link.click();
-}
-
-function ExportDialog({ open }: { open: boolean }) {
-  const { t } = useTranslation();
-  const state = useWorkspace();
-  const [metadata, setMetadata] = useState(true);
-  const [dpi, setDpi] = useState<(typeof PNG_DPI_OPTIONS)[number]>(DEFAULT_PNG_DPI);
-  const [fonts, setFonts] = useState(true);
-  const revision = state.confirmed?.revision ?? 0;
-  const running = state.exportState?.status === "running" ? state.exportState : null;
-  return (
-    <Shell open={open} title={t("export.title")}>
-      <p className="export-fonts" data-testid="font-status">{t("export.fontList", { families: BUNDLED_FONTS.map((font) => font.family).join(", ") })}</p>
-      <Button action="download-fonts" title={t("export.fontBundleHint")} onClick={downloadFontBundle}>{t("export.downloadFonts")}</Button>
-      {running ? <p data-testid="export-phase">{t("export.running", { revision: running.revision, phase: running.phase })}</p> : null}
-      <Button action="export-svg" disabledReason={state.confirmed ? undefined : t("app.noProject")} onClick={() => void exportFigure({ revision, format: "svg", options: { includeMetadata: metadata } } satisfies ExportRequest)}>
-        {t("export.svg")}
-      </Button>
-      <label className="check">
-        <input type="checkbox" checked={metadata} onChange={(event) => setMetadata(event.target.checked)} />
-        {t("export.includeMetadata")}
-      </label>
-      <label className="field">
-        <span>{t("export.dpi")}</span>
-        <select value={dpi} onChange={(event) => setDpi(Number(event.target.value) as (typeof PNG_DPI_OPTIONS)[number])}>
-          {PNG_DPI_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
-        </select>
-      </label>
-      <Button action="export-png" disabledReason={state.confirmed ? undefined : t("app.noProject")} onClick={() => void exportFigure({ revision, format: "png", options: { dpi } })}>
-        {t("export.png")}
-      </Button>
-      <label className="check">
-        <input type="checkbox" checked={fonts} onChange={(event) => setFonts(event.target.checked)} />
-        {t("export.includeFonts")}
-      </label>
-      <Button action="export-project" disabledReason={state.confirmed ? undefined : t("app.noProject")} onClick={() => void exportFigure({ revision, format: "project", options: { includeBundledFonts: fonts } })}>
-        {t("export.project")}
-      </Button>
-      {state.exportState?.status === "ready" ? (
-        <>
-          <Button action="download-again" onClick={() => void downloadAgain()}>{t("export.downloadAgain")}</Button>
-          <ul data-testid="export-diagnostics">
-            {state.exportState.diagnostics.map((item, index) => (
-              <li key={`${item.code}-${index}`}>{formatDiagnostic(t, item)}</li>
-            ))}
-          </ul>
-        </>
-      ) : null}
-      {state.exportState?.status === "failed" ? <p>{state.exportState.message}</p> : null}
-    </Shell>
-  );
-}
-
 function SvgDialog({ open }: { open: boolean }) {
   const { t } = useTranslation();
   return (
@@ -197,6 +148,7 @@ function SvgDialog({ open }: { open: boolean }) {
 
 function AssetDialog({ open }: { open: boolean }) {
   const { t } = useTranslation();
+  const [clipboardResult, setClipboardResult] = useState<{ id: string; copied: boolean } | null>(null);
   const projectId = useWorkspace((state) => state.projectId);
   const assetId = useWorkspace((state) => state.assetInfoId);
   const assets = useQuery({
@@ -205,25 +157,44 @@ function AssetDialog({ open }: { open: boolean }) {
     queryFn: () => api.assets(projectId ?? ""),
   });
   const asset = assets.data?.items.find((item) => item.id === assetId);
+  useEffect(() => { if (!open) setClipboardResult(null); }, [open]);
   return (
     <Shell open={open} title={t("dialog.assetTitle")}>
-      {asset ? (
+      {asset ? <>
         <dl>
           <div><dt>{t("panels.name")}</dt><dd>{asset.originalFilename}</dd></div>
-          <div><dt>{t("assets.original")}</dt><dd>{asset.originalMediaType}</dd></div>
-          <div><dt>SHA-256</dt><dd>{asset.originalSha256}</dd></div>
-          <div><dt>{asset.originalByteLength}</dt><dd>{asset.status}</dd></div>
-          {asset.diagnostics.map((item, index) => <div key={`${item.code}-${index}`}><dt>{formatDiagnostic(t, item)}</dt><dd>{item.severity}</dd></div>)}
-          {asset.status === "ready" ? asset.normalized.normalizationNotes.map((note) => <p key={note}>{note}</p>) : null}
+          <div><dt>{t("assets.mediaType")}</dt><dd>{asset.originalMediaType.split("/")[1]?.split("+")[0]?.toUpperCase()}</dd></div>
+          {asset.normalized && (asset.normalized.rasterPixelSize
+            ? <div><dt>{t("assets.pixelDimensions")}</dt><dd>{asset.normalized.rasterPixelSize.width} × {asset.normalized.rasterPixelSize.height} px</dd></div>
+            : <div><dt>{t("assets.viewport")}</dt><dd>{asset.normalized.viewport.width} × {asset.normalized.viewport.height}</dd></div>)}
+          {asset.status !== "ready" && <div><dt>{t("assets.status")}</dt><dd>{t("assets." + asset.status)}</dd></div>}
         </dl>
-      ) : <p>{t("errors.NOT_FOUND")}</p>}
+        {asset.diagnostics.map((item, index) => <p key={`${item.code}-${index}`}>{formatDiagnostic(t, item)}</p>)}
+        <details className="asset-technical" key={asset.id}>
+          <summary>{t("assets.technicalDetails")}</summary>
+          <dl>
+            <div><dt>{t("assets.fileSize")}</dt><dd>{asset.originalByteLength.toLocaleString()} B</dd></div>
+            <div><dt>SHA-256</dt><dd><code>{asset.originalSha256}</code></dd></div>
+          </dl>
+          {navigator.clipboard && <Button action="copy-checksum" variant="quiet" onClick={async () => {
+            try {
+              await navigator.clipboard.writeText(asset.originalSha256);
+              setClipboardResult({ id: asset.id, copied: true });
+            } catch {
+              setClipboardResult({ id: asset.id, copied: false });
+            }
+          }}>{t("assets.copyChecksum")}</Button>}
+          {clipboardResult?.id === asset.id && <p role="status">{t(clipboardResult.copied ? "assets.copiedChecksum" : "assets.copyChecksumFailed")}</p>}
+          {asset.status === "ready" && asset.normalized.normalizationNotes.map(note => <p key={note}>{note}</p>)}
+        </details>
+      </> : <p>{t("errors.NOT_FOUND")}</p>}
     </Shell>
   );
 }
 
 function RecoveryDialog({ open }: { open: boolean }) {
   const { t } = useTranslation();
-  const state = useWorkspace();
+  const state = useWorkspaceFields("saveState", "serverSnapshot");
   return (
     <Shell open={open} title={t("dialog.recoveryTitle")}>
       <p>{state.saveState === "offline" ? t("save.offline") : state.saveState === "conflict" ? t("save.conflict") : t("save.failed")}</p>

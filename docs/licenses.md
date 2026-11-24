@@ -47,3 +47,9 @@ The font files may be bundled with this software. They are not sold by themselve
 `GET /api/v1/fonts/bundle` and a project package with `includeBundledFonts: true` include those OFL texts next to the font files.
 
 The example drawings in `examples/synthetic-six/` are original and MIT licensed. See `examples/synthetic-six/LICENSE.md`.
+
+## Editorial brand fonts and examples
+
+Newsreader (Copyright 2020 The Newsreader Project Authors), Inter (Copyright 2020 The Inter Project Authors), and Geist Mono (Copyright 2024 The Geist Project Authors) are distributed under SIL OFL 1.1. Full notices, upstream source hashes, subset settings and output hashes are in [`apps/web/public/brand-fonts`](../apps/web/public/brand-fonts/). The UI-only subsets total 149.2 KiB; the Noto artwork fonts and export bundle remain unchanged.
+
+The three-rectangle PanelStudio mark and [`examples/showcase`](../examples/showcase/) graphics are original MIT material. All showcase data and procedural microscopy/band images are synthetic and labeled as demonstration content. No Anthropic or Apple brand asset is included.

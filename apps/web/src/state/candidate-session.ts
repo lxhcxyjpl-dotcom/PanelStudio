@@ -16,7 +16,7 @@ type Origin = {
   cancelRequested: boolean;
 };
 type Root = NonNullable<WorkspaceState["candidateRoot"]>;
-type AIOptions = { includePreviewImage: boolean; visualReview: boolean; fromCurrent?: boolean };
+type AIOptions = { includePreviewImage: boolean; visualReview: boolean; fromCurrent?: boolean; onQueued?: (id:string) => void };
 let epoch = 0;
 let sequence = 0;
 let active: Origin | null = null;
@@ -48,6 +48,7 @@ export function resetCandidateSession(projectId: string | null) {
   releaseCards();
   patch({
     cardLayoutRequest: null,
+    inspectorMode: "properties",
     cards: [], activeCandidateId: null, candidateRoot: null, compareMode: "editing", aiScope: "document",
     frozenScope: null, scopeChanged: false, awaitingAnswer: null, aiHistory: [], historyCursor: null,
     aiStatus: { phase: "idle" }, layoutState: "idle", layoutMessage: null,
@@ -65,11 +66,14 @@ export function setPrompt(text: string) {
 export function setScope(scope: AIEditScope) {
   patch({ aiScope: scope, scopeChanged: true });
 }
-export function activeScope(state: WorkspaceState): FrozenScope {
+export function activeScope(state: Pick<WorkspaceState,
+  "aiStatus" | "awaitingAnswer" | "frozenScope" | "scopeChanged" | "cards" | "activeCandidateId" | "confirmed" | "aiScope" | "selection"
+>, fromCurrent = false): FrozenScope {
   if (state.aiStatus.phase === "running") return state.aiStatus.frozen;
-  if (state.awaitingAnswer) return state.awaitingAnswer;
-  if (state.frozenScope && !state.scopeChanged) return state.frozenScope;
-  const document = state.cards.find((card) => card.candidate.id === state.activeCandidateId)?.candidate.previewDocument ?? state.confirmed?.document;
+  if (!fromCurrent && state.awaitingAnswer) return state.awaitingAnswer;
+  if (!fromCurrent && state.frozenScope && !state.scopeChanged) return state.frozenScope;
+  const candidate = fromCurrent ? null : state.cards.find((card) => card.candidate.id === state.activeCandidateId)?.candidate;
+  const document = candidate?.previewDocument ?? state.confirmed?.document;
   return { scope: state.aiScope, selectedPanelIds: document ? completePanelIds(document, panelIdsOf(state.selection, document)) : [] };
 }
 
@@ -82,6 +86,7 @@ export function dismissCandidates() {
   sequence++;
   releaseCards();
   patch({
+    ...(get().inspectorMode === "layout" ? { inspectorMode: "properties" as const } : {}),
     cards: [], activeCandidateId: null, candidateRoot: null, compareMode: "editing",
     frozenScope: null, scopeChanged: false, awaitingAnswer: null, aiStatus: { phase: "idle" },
     layoutState: "idle", layoutMessage: null, liveMessage: i18n.t("ai.discarded"),
@@ -131,7 +136,7 @@ export async function generateLayout(request: LayoutRequest) {
   if (!projectId || !confirmed) return;
   if (draft) return patch({ dialog: "recovery" });
   const origin = begin(projectId, confirmed.revision);
-  patch({ layoutState: "loading", layoutMessage: null, aiStatus: { phase: "idle" }, awaitingAnswer: null });
+  patch({ layoutState: "loading", layoutMessage: null, compareMode: "editing", aiStatus: { phase: "idle" }, awaitingAnswer: null });
   try {
     const { candidates } = await api.layoutCandidates(projectId, { baseRevision: confirmed.revision, request, maxCandidates: request.family === "selection-row" ? 1 : 3 }, newKey());
     if (!current(origin)) return;
@@ -228,7 +233,7 @@ export async function generateAi(prompt: string, options: AIOptions) {
   const parent = fromCurrent ? null : state.cards.find((c) => c.candidate.id === state.activeCandidateId)?.candidate;
   if (!fromCurrent && (candidatesStale(state) || (answer && answer.baseRevision !== confirmed.revision))) return;
   const root = (parent || answer) && state.candidateRoot ? state.candidateRoot : confirmed;
-  const frozen = fromCurrent ? { scope: state.aiScope, selectedPanelIds: completePanelIds(confirmed.document, panelIdsOf(state.selection, confirmed.document)) } : activeScope(state);
+  const frozen = activeScope(state, fromCurrent);
   if (frozen.scope === "selection" && !frozen.selectedPanelIds.length) return patch({ liveMessage: i18n.t("reason.empty-selection") });
   const context: AIContext = answer ? { kind: "clarification", jobId: answer.jobId } : parent ? { kind: "candidate", candidateId: parent.id } : { kind: "revision" };
   const origin = begin(projectId, root.revision, contextId(context));
@@ -242,6 +247,7 @@ export async function generateAi(prompt: string, options: AIOptions) {
       includePreviewImage: options.includePreviewImage, visualReview: options.visualReview,
     }, newKey());
     origin.jobId = jobId;
+    options.onQueued?.(jobId);
     if (origin.cancelRequested) { await api.cancelJob(jobId, newKey()); return; }
     if (!current(origin)) return;
     // Clear only the submitted text; preserve anything typed while the request was queued.
@@ -285,6 +291,17 @@ async function finishAi(origin: Origin, root: Root, frozen: FrozenScope, show: b
     }
   }
   void refreshAiHistory();
+}
+export async function followEditedAi(jobId: string, prompt: string, frozen: FrozenScope) {
+  const state = get();
+  if (!state.projectId || !state.confirmed) return;
+  const origin = begin(state.projectId, state.confirmed.revision);
+  origin.jobId = jobId;
+  patch({ inspectorMode:"ai", rightOpen:true, aiScope:frozen.scope, frozenScope:frozen, scopeChanged:false,
+    aiStatus:{phase:"running",jobId,prompt,frozen,baseRevision:state.confirmed.revision,label:i18n.t("ai.running")} });
+  void refreshAiHistory();
+  try { await finishAi(origin,state.confirmed,frozen,true); }
+  catch (error) { if (current(origin)) failAi(error); }
 }
 export async function cancelAiPrompt() {
   const origin = active;

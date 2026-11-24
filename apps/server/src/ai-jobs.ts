@@ -430,6 +430,7 @@ async function runLayout(ctx: AppContext, job: JobDetail, signal: AbortSignal): 
     configRevision: input.configRevision, previousTurns: input.previousTurns };
   const scene = buildScene(work.document, sceneInput);
   scene.layoutExamples = input.layoutExamples ?? [];
+  if (input.imageReadings?.length) scene.imageReadings = input.imageReadings;
   const canRender = ready.config.capabilities.imageInput;
   const inputPng = canRender && (request.includePreviewImage || request.visualReview)
     ? await tryPng(ctx, projectId, work.document, request.baseRevision) : null;

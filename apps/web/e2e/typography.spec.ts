@@ -37,7 +37,7 @@ for (const { width, locale } of [{ width: 1440, locale: "zh-CN" }, { width: 320,
     await page.setViewportSize({ width, height: 900 });
     await page.addInitScript(locale => localStorage.setItem("panelstudio.prefs",
       JSON.stringify({ locale, theme: locale === "en-US" ? "dark" : "light", motion: "off" })), locale);
-    await page.goto("/");
+    await page.goto("/app");
     const title = page.getByRole("heading", { level: 1 });
     const headingSize = width < 760 ? uiFontSizes.heading : uiFontSizes.display;
     await expect(title).toHaveCSS("font-size", headingSize + "px");
@@ -51,19 +51,25 @@ for (const { width, locale } of [{ width: 1440, locale: "zh-CN" }, { width: 320,
     await expect(page.locator(".panel-frame")).toHaveCount(2);
     await expect(page.getByTestId("save-status")).toHaveCSS("font-size", "13px");
     await expectStudioType(page);
-    if (width < 1024) await page.locator("[data-action=drawer-assets]").click();
+    if (width < 1024) await page.locator("[data-action=mobile-assets]").click();
     await page.locator("[data-action=asset-menu]").first().click();
     await expect(page.getByRole("menuitem").first()).toBeVisible();
     await expectStudioType(page);
     await page.keyboard.press("Escape");
     if (width < 1024) await page.locator("[data-action=close-assets]").click();
 
+    await page.locator("[data-action=layout-tools]").click();
+
     await page.locator("[data-action=guided-layout]").click();
     await expect(page.getByRole("dialog").getByRole("heading", { level: 2 })).toHaveCSS("font-size", "24px");
     await expectStudioType(page);
     await page.locator("[data-action=close-dialog]").click();
     await page.getByTestId("export-button").click();
-    await expect(page.getByRole("dialog").getByTestId("font-status")).toContainText("Noto Sans");
+    const fonts = page.getByRole("dialog").getByTestId("font-status");
+    await expect(fonts).toBeHidden();
+    await page.locator(".export-font-details summary").click();
+    await expect(fonts).toBeVisible();
+    await expect(fonts).toContainText("Noto Sans");
     await expectStudioType(page);
   });
 }

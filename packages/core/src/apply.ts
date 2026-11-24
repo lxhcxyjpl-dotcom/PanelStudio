@@ -57,6 +57,17 @@ function applyOne(document: FigureDocumentV1, command: DomainCommand, assets: As
     case "figure.setPublicationContext":
       document.publicationContext = structuredClone(command.publicationContext);
       return;
+    case "figure.setCuration": {
+      const {main, supplementary, suggestedSupplementary, rowSizes} = command.curation;
+      const ids = [...main,...supplementary].map(pick => pick.id);
+      const suggested = suggestedSupplementary?.map(pick => pick.id) ?? [];
+      if (new Set(ids).size !== ids.length || ids.some(id => !assets(id)) ||
+          new Set(suggested).size !== suggested.length || suggested.some(id => !main.some(pick => pick.id === id)) ||
+          rowSizes.reduce((count,size) => count + size,0) !== main.length)
+        throw new DocumentCommandError("DOCUMENT_INVALID", "The selection does not match the available artwork.", { assetIds:ids });
+      document.curation = structuredClone(command.curation);
+      return;
+    }
     case "panel.add":
       applyAdd(document, command, assets);
       return;
@@ -126,7 +137,7 @@ function applyAdd(
     });
   }
   if (document.panelOrder.length >= RESOURCE_LIMITS.maxPanelsPerProject) {
-    throw new DocumentCommandError("DOCUMENT_INVALID", "A project can contain at most 8 panels.", {
+    throw new DocumentCommandError("DOCUMENT_INVALID", `A project can contain at most ${RESOURCE_LIMITS.maxPanelsPerProject} panels.`, {
       panelIds: [command.panelId],
     });
   }

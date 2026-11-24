@@ -34,6 +34,14 @@ export function GuidedDialog({ document, open }: { document: FigureDocumentV1; o
   if (shape) preferences.shape = shape as GuidedPreferences["shape"];
   if (focus) preferences.focus = focus;
   if (first && second) preferences.pair = { first, second, axis: axis as NonNullable<GuidedPreferences["pair"]>["axis"] };
+  const nameOf = (id: string) => units.find(unit => unit.id === id)?.name;
+  const summary = [
+    focus && nameOf(focus) && t("layout.summaryFocus", { name: nameOf(focus) }),
+    first && second && first !== second && nameOf(first) && nameOf(second) &&
+      t("layout.summaryPair." + axis, { first: nameOf(first), second: nameOf(second) }),
+    shape && t("layout.shape." + shape),
+    gap && Number.isFinite(Number(gap)) && Number(gap) >= 0 && Number(gap) <= 30 && t("layout.summaryGap", { value: gap }),
+  ].filter(Boolean).join(" · ");
   const invalidSlots = ref && (slots.length !== units.length || !units.every((u) => slots.some((s) => s.unitId === u.id)) ||
     slots.some((s) => s.width <= 0 || s.height <= 0 || s.x + s.width > 1.000001 || s.y + s.height > 1.000001));
   const problem = fileError ? "layout.fixReference" : units.length < 2 ? "layout.needUnits" :
@@ -111,25 +119,32 @@ export function GuidedDialog({ document, open }: { document: FigureDocumentV1; o
           <p>{t("layout.unresolved", { text: parsed.unresolved.join(" · ") })}</p>
           <label><input type="checkbox" checked={allowPartial} onChange={(e) => setAllowPartial(e.target.checked)} /> {t("layout.useRecognized")}</label>
         </div>}
-        <div className="guide-controls">
-          <label className="field"><span>{t("layout.focus")}</span><select value={focus} onChange={(e) => choose("focus", e.target.value)}>
-            <option value="">{t("layout.unspecified")}</option>{unitOptions}</select></label>
-          <label className="field"><span>{t("layout.shape")}</span><select value={shape} onChange={(e) => choose("shape", e.target.value)}>
-            <option value="">{t("layout.unspecified")}</option>{["wide", "tall", "square"].map((v) => <option value={v} key={v}>{t("layout.shape." + v)}</option>)}</select></label>
-          <label className="field"><span>{t("layout.guideGap")}</span><input type="number" min={0} max={30} step={0.5} value={gap}
-            placeholder={t("layout.unspecified")} onChange={(e) => choose("gap", e.target.value)} /></label>
-        </div>
-        <div className="guide-pair"><label className="field"><span>{t("layout.compareFirst")}</span><select value={first} onChange={(e) => choose("first", e.target.value)}>
-          <option value="">{t("layout.unspecified")}</option>{unitOptions}</select></label>
-          <label className="field"><span>{t("layout.compareSecond")}</span><select value={second} onChange={(e) => choose("second", e.target.value)}>
-            <option value="">{t("layout.unspecified")}</option>{unitOptions}</select></label>
-          <label className="field"><span>{t("layout.pairAxis")}</span><select disabled={!first && !second} value={axis} onChange={(e) => choose("axis", e.target.value)}>
-            {["any", "horizontal", "vertical"].map((v) => <option value={v} key={v}>{t("layout.axis." + v)}</option>)}</select></label></div>
+        <details className="guide-manual" data-testid="guide-manual">
+          <summary><span>{t("layout.manualSettings")}</span><Icon name="chevron" />
+            {summary && <span className="guide-manual-value" data-testid="guide-summary">{summary}</span>}
+          </summary>
+          <div className="guide-manual-fields">
+            <div className="guide-controls">
+              <label className="field"><span>{t("layout.focus")}</span><select value={focus} onChange={(e) => choose("focus", e.target.value)}>
+                <option value="">{t("layout.unspecified")}</option>{unitOptions}</select></label>
+              <label className="field"><span>{t("layout.shape")}</span><select value={shape} onChange={(e) => choose("shape", e.target.value)}>
+                <option value="">{t("layout.unspecified")}</option>{["wide", "tall", "square"].map((v) => <option value={v} key={v}>{t("layout.shape." + v)}</option>)}</select></label>
+              <label className="field"><span>{t("layout.guideGap")}</span><input type="number" min={0} max={30} step={0.5} value={gap}
+                placeholder={t("layout.unspecified")} onChange={(e) => choose("gap", e.target.value)} /></label>
+            </div>
+            <div className="guide-pair"><label className="field"><span>{t("layout.compareFirst")}</span><select value={first} onChange={(e) => choose("first", e.target.value)}>
+              <option value="">{t("layout.unspecified")}</option>{unitOptions}</select></label>
+              <label className="field"><span>{t("layout.compareSecond")}</span><select value={second} onChange={(e) => choose("second", e.target.value)}>
+                <option value="">{t("layout.unspecified")}</option>{unitOptions}</select></label>
+              <label className="field"><span>{t("layout.pairAxis")}</span><select disabled={!first && !second} value={axis} onChange={(e) => choose("axis", e.target.value)}>
+                {["any", "horizontal", "vertical"].map((v) => <option value={v} key={v}>{t("layout.axis." + v)}</option>)}</select></label></div>
+          </div>
+        </details>
       </section>
     </fieldset>
     <div className="guide-submit">
-      <span role={error ? "alert" : "status"}>{error || (problem ? t(problem) : "")}</span>
-      <Button action="generate-guided" variant="primary" disabled={!!problem || reading || busy} onClick={() => void generate()}>
+      {(error || (problem && problem !== "layout.needGuide")) && <span role={error ? "alert" : "status"}>{error || t(problem)}</span>}
+      <Button action="generate-guided" variant="primary" disabledReason={problem ? t(problem) : undefined} disabled={reading || busy} onClick={() => void generate()}>
         {t(busy ? "layout.guidedBusy" : "layout.guidedGenerate")}</Button>
     </div>
   </Shell>;

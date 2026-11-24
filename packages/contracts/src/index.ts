@@ -23,8 +23,10 @@ export {
   UuidSchema,
   uuidKeyed,
 } from "./primitives.js";
+export { SPEECH_SAMPLE_RATE, SPEECH_MAX_SECONDS, supportsDeepSeekSpeech, type SpeechTranscript } from "./speech.js";
 export { nullable, object } from "./schema.js";
-export { PublicationContextSchema } from "./document.js";
+export { FigureCurationSchema, FigurePickSchema, PublicationContextSchema } from "./document.js";
+export type { FigureCuration, FigurePick } from "./document.js";
 export type { PublicationContext } from "./document.js";
 export { LayoutExampleSchema, AIReferenceLayoutActionSchema } from "./ai.js";
 export type { LayoutExample } from "./ai.js";
@@ -32,7 +34,7 @@ export { DiagnosticParamsSchema, DiagnosticSchema } from "./diagnostics.js";
 export type { Diagnostic } from "./diagnostics.js";
 export { ERROR_CODES, ApiErrorDetailsSchema, ApiErrorSchema, ErrorCodeSchema } from "./errors.js";
 export type { ApiError, ErrorCode } from "./errors.js";
-export { UNITS, fontSizePtToSvgUserUnits, pngPixelsFromMm } from "./units.js";
+export { UNITS, fontSizePtToSvgUserUnits, pngPixelsFromMm, rasterPpi } from "./units.js";
 export { DOCUMENT_INVARIANTS } from "./invariants.js";
 export {
   CanvasSchema,
@@ -258,4 +260,8 @@ export {
   isSecretWriteRequest,
   isTransactionRequest,
 } from "./guards.js";
+export * from "./figure-reading.js";
+export * from "./message-branches.js";
+export { FigureDiscussionRequestSchema, FigureDiscussionReplySchema, FigureBriefRequestSchema, FigureBriefReplySchema, CurationDecisionSchema, CurationPlanSchema, CurationPromotionSchema } from "./figure-discussion.js";
+export type { CurationDecision, FigureDiscussionRequest, FigureDiscussionReply, FigureBriefRequest, FigureBriefReply, OpeningTurn } from "./figure-discussion.js";
 export type { LayoutCandidatesRequest } from "./guards.js";

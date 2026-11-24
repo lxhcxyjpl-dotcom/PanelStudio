@@ -1,5 +1,5 @@
 import {
-  MM_PER_INCH,
+  DEFAULT_MAX_AUTO_HEIGHT_MM,
   TOLERANCES,
   type FigureDocumentV1,
   type LayoutRequest,
@@ -137,17 +137,6 @@ export function croppedAspect(
   return width / height;
 }
 
-export function rasterPpi(
-  frameWidthMm: number,
-  cropWidth: number,
-  rasterWidth: number,
-): number | null {
-  if (!(frameWidthMm > 0) || !(rasterWidth > 0) || !(cropWidth > 0)) return null;
-  const inches = frameWidthMm / MM_PER_INCH;
-  if (!(inches > 0)) return null;
-  return (rasterWidth * cropWidth) / inches;
-}
-
 export function parseUnitId(value: string): { kind: "panel" | "group"; id: string } | null {
   const panel = PANEL_UNIT.exec(value);
   if (panel?.[1]) return { kind: "panel", id: panel[1] };
@@ -164,7 +153,39 @@ export function hasExplicitOrder(request: LayoutRequest): request is LayoutReque
   return "orderedUnitIds" in request && Array.isArray(request.orderedUnitIds);
 }
 
+const EXHAUSTIVE_PANEL_COUNT = 8;
+export const MAX_AUTO_ROW_UNITS = 5;
+export const MIN_WIDE_PANEL_ASPECT = 2.4;
+
+export function autoHeightLimit(document: FigureDocumentV1): number {
+  const { maxAutoHeightMm } = document.layoutSettings;
+  // Larger drafts can extend across the equivalent of two default-height pages.
+  const isLargeDefault = maxAutoHeightMm === DEFAULT_MAX_AUTO_HEIGHT_MM &&
+    document.panelOrder.length > EXHAUSTIVE_PANEL_COUNT;
+  return isLargeDefault ? maxAutoHeightMm * 2 : maxAutoHeightMm;
+}
+
+export function balancedRowCounts(count: number, maxColumns: number): number[] {
+  const rows = Math.ceil(count / maxColumns);
+  const normal = Math.floor(count / rows);
+  const extra = count % rows;
+  return Array.from({ length: rows }, (_, index) => normal + (index < extra ? 1 : 0));
+}
+
 export function compositions(count: number): number[][] {
+  if (count > EXHAUSTIVE_PANEL_COUNT) {
+    // Each width contributes a compact and a balanced arrangement in both directions.
+    // An exhaustive search over row lengths grows exponentially with the panel count.
+    const patterns = new Map<string, number[]>();
+    for (let columns = 2; columns <= MAX_AUTO_ROW_UNITS; columns++) {
+      const dense = Array.from({ length: Math.ceil(count / columns) }, (_, index) =>
+        Math.min(columns, count - columns * index));
+      const balanced = balancedRowCounts(count, columns);
+      for (const p of [dense, balanced, [...dense].reverse(), [...balanced].reverse()])
+        patterns.set(p.join("-"), p);
+    }
+    return [...patterns.values()];
+  }
   const found: number[][] = [];
   const walk = (remaining: number, prefix: number[]): void => {
     if (remaining === 0) {

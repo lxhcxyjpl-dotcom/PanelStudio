@@ -1,5 +1,6 @@
 import Type, { type Static } from "typebox";
 import { AILayoutRequestSchema, AIProviderConfigSchema, LayoutExampleSchema } from "./ai.js";
+import { PanelReadingClueSchema } from "./figure-reading.js";
 import { AssetSchema } from "./assets.js";
 import { DomainCommandSchema } from "./commands.js";
 import { DiagnosticSchema } from "./diagnostics.js";
@@ -17,6 +18,7 @@ import {
 import { LayoutScoreSchema } from "./layout.js";
 import { JobErrorSchema, JobEventDataSchema, JobEventNameSchema, JobResultSchema } from "./jobs.js";
 import { nullable, object } from "./schema.js";
+import { RESOURCE_LIMITS } from "./constants.js";
 
 export const MAX_AI_TURNS = 10;
 export const AIFrozenInputSchema = object({
@@ -26,8 +28,10 @@ export const AIFrozenInputSchema = object({
   rootHash: DocumentHashSchema,
   sourceHash: DocumentHashSchema,
   layoutExamples: Type.Optional(Type.Array(LayoutExampleSchema, { maxItems: 6 })),
+  imageReadings: Type.Optional(Type.Array(PanelReadingClueSchema, { maxItems: RESOURCE_LIMITS.maxPanelsPerProject })),
   engineVersion: NonEmptyStringSchema,
   fontRegistryVersion: NonEmptyStringSchema,
+  branchParents: Type.Optional(Type.Array(object({projectId:UuidSchema,jobId:UuidSchema}),{maxItems:MAX_AI_TURNS - 1})),
   previousTurns: Type.Array(object({
     prompt: Type.String(), response: Type.String(), options: Type.Optional(Type.Array(Type.String())),
   }), { maxItems: MAX_AI_TURNS - 1 }),

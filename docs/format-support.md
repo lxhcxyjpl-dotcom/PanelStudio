@@ -21,7 +21,7 @@ Preserved:
 
 - Containers: `svg`, `g`
 - Shapes: `path`, `rect`, `circle`, `ellipse`, `line`, `polyline`, `polygon`
-- Text: `text`, `tspan`
+- Text: `text`, `tspan`. Both preserve finite, nonnegative `textLength` values in user units, px, pt, pc, mm, cm, in, em or ex, and the `lengthAdjust` modes `spacing` and `spacingAndGlyphs`. CSS `white-space: pre` is normalized to `xml:space="preserve"`.
 - Common fill, stroke, opacity, dash, join, and cap
 - `clipPath` that the samples accept
 - Basic linear and radial gradients
@@ -44,6 +44,8 @@ Rejected. A feature that would change the picture is an error, not a silent dele
 Normalization parses without executing or loading external resources, strips a plain SVG doctype that has no internal subset, refuses internal entities, bakes supported CSS into attributes, bakes the root `viewBox` and `preserveAspectRatio`, expands allowed internal `use`, and removes old Adobe private editing data. The same asset used twice gets per-panel id prefixes at instantiation. The shared asset cache is not rewritten.
 
 Imported text keeps its `font-family`. It is not rewritten to Noto. A family other than `Noto Sans` or `Noto Sans SC` is a `font.notInstalled` warning. Preview falls back to Noto Sans for drawing only.
+
+The regression samples in [fixtures/scientific-svg](../fixtures/scientific-svg/) come from the same ggplot2 4.0.3 scatterplot saved with svglite 2.2.2. One uses the default fixed text widths and the other uses `fix_text_size = FALSE`. Both retain editable tick labels, axis titles, legend labels and points.
 
 ## Export
 
@@ -90,3 +92,5 @@ From handbook section 1.3. These are not in this release:
 ## 格式与限制（摘要）
 
 可导入 PNG、JPEG、WebP 和受支持的 SVG。一个项目最多 8 个面板、32 个素材。单个上传 25 MiB。脚本、滤镜、外链、`foreignObject`、复杂 mask 和 pattern 会被拒绝。导出的 SVG 保留文字和矢量，不转曲，也不把整张矢量图栅格化。PNG 可选 150、300、600 DPI，默认 600。v0.1 不导入 PDF、EPS 或 `.ai`，不在网页里改路径节点，也不提供字体转轮廓。
+
+实测 ggplot2 4.0.3 搭配 svglite 2.2.2 生成的散点图，可直接导入 `ggsave("figure.svg", plot = p)` 输出的文件。关闭 `fix_text_size` 的样稿也通过了导入与可编辑 SVG 导出。若某幅图使用了上表列出的未支持效果，可在制图软件中简化该效果后重新导出。需保留原样外观时，可从源文件按目标版面尺寸和分辨率另存 PNG，图内文字和图元将作为一个栅格对象导入。

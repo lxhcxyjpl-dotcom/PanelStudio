@@ -44,6 +44,11 @@ describe("bundled fonts", () => {
     expect(regular.subarray(0, 4).toString("hex")).toBe("89504e47");
     expect((await sharp(regular).stats()).channels[0]?.min).toBeLessThan(250);
     expect(Buffer.compare(regular, bold)).not.toBe(0);
+    const withFallback = (weight: number) => svg(weight).replace(
+      'font-family="Noto Sans"', 'font-family="Noto Sans" style="font-family:\'Noto Sans\',sans-serif"',
+    );
+    expect(rasterizeSvg(withFallback(400), 180)).toEqual(regular);
+    expect(rasterizeSvg(withFallback(700), 180)).toEqual(bold);
     const chinese = rasterizeSvg(
       `<?xml version="1.0" encoding="UTF-8"?><svg xmlns="http://www.w3.org/2000/svg" width="80" height="80"><text x="8" y="56" font-family="Noto Sans SC" font-size="48" font-weight="700" fill="#000000">图</text></svg>`,
       80,

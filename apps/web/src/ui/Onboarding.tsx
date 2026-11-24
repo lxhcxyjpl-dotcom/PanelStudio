@@ -1,8 +1,10 @@
-import { useEffect, useState } from "react";
+import { useLayoutEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { errorText } from "../model/feedback";
+import { parseRoute, useNavigation } from "../navigation";
 import { openSample } from "../state/session";
 import { patch, useWorkspace } from "../state/store";
+import { useWish } from "../state/wish-session";
 import { Shell } from "./Dialogs";
 import { markOnboardingSeen } from "./onboarding-preference";
 import { Button, Icon } from "./widgets";
@@ -12,8 +14,17 @@ export function Onboarding({ open }: { open: boolean }) {
   const [step, setStep] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const hasProject = useWorkspace(state => Boolean(state.projectId));
-  useEffect(() => { if (open) { setStep(0); setError(""); } }, [open]);
+  const inEditor = useNavigation(state => parseRoute(state.path).kind === "editor");
+  const hasProject = useWorkspace(state => Boolean(state.projectId)) && inEditor;
+  useLayoutEffect(() => {
+    if (!open) return;
+    const { confirmed, projectId, compareMode } = useWorkspace.getState();
+    const wish = useWish.getState();
+    const hasPanels = inEditor && Boolean(confirmed?.document.panelOrder.length);
+    const phase = inEditor && wish.projectId === projectId ? wish.phase : null;
+    setStep(hasPanels && compareMode === "editing" && phase === "editing" ? 2 : hasPanels || phase === "select" ? 1 : 0);
+    setError("");
+  }, [open, inEditor]);
   function close() { markOnboardingSeen(); patch({ dialog: null }); }
   async function sample() {
     setBusy(true); setError("");

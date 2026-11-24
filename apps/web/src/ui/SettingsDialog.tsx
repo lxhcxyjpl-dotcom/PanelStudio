@@ -5,7 +5,7 @@ import type { AIProviderConfig, AIProviderSettings } from "@panelstudio/contract
 import { api, newKey, waitForJob } from "../api/client";
 import { addressProblem, defaultProviderForm, endpointIdentity, inferProvider, knownVision, providerPresets, type ProviderPreset } from "../model/provider-form";
 import { queryClient } from "../state/query";
-import { patch, useWorkspace } from "../state/store";
+import { patch, useWorkspaceFields } from "../state/store";
 import { Shell } from "./DialogShell";
 import { Button, Icon } from "./widgets";
 
@@ -26,9 +26,8 @@ export function SettingsDialog({ open, initialSection }: { open: boolean; initia
 
 function GeneralSettings() {
   const { t, i18n } = useTranslation();
-  const state = useWorkspace();
-  return <section className="general-settings">
-    <h3>{t("connection.general")}</h3>
+  const state = useWorkspaceFields("theme", "locale", "motion", "reduceTransparency");
+  return <section aria-label={t("connection.general")}>
     <label className="settings-row"><span>{t("settings.theme")}</span>
       <select aria-label={t("settings.theme")} value={state.theme} onChange={event => patch({ theme: event.target.value === "dark" ? "dark" : "light" })}>
         <option value="light">{t("settings.light")}</option><option value="dark">{t("settings.dark")}</option>
@@ -74,6 +73,8 @@ function ProviderConnection() {
   const keepSecret = Boolean(sameEndpoint && settings.data?.hasSecret);
   const localOllama = preset === "ollama" && inferProvider(config.baseUrl) === "ollama" && config.allowLocalEndpoint;
   const urlError = addressProblem(config.baseUrl, config.allowLocalEndpoint);
+  const addressError = attempted || config.baseUrl ? urlError : null;
+  const addressHint = addressError ?? (preset === "custom" ? "connection.compatibility" : null);
   const keyError = /[\r\n]/u.test(secret.trim()) ? "connection.keyInvalid" : !secret.trim() && !keepSecret && !localOllama ? "connection.keyRequired" : null;
   const dirty = secret.length > 0 || JSON.stringify(config) !== JSON.stringify(settings.data?.config);
   const verified = !dirty && testedRevision !== null && testedRevision === settings.data?.configRevision;
@@ -127,23 +128,22 @@ function ProviderConnection() {
     } catch (error) { setMessage({ kind: "error", text: error instanceof Error ? error.message : t("ai.jobFailed") }); }
     finally { setBusy(null); }
   }
-  return <section className="provider-connection" data-testid="ai-settings">
-    <div className="connection-heading"><div><h3>{t("connection.heading")}</h3><p>{t("connection.compatibility")}</p></div>
-      <span className="connection-badge" data-verified={verified}>{t(verified ? "connection.verified" : keepSecret && !dirty ? "connection.configured" : "connection.notConnected")}</span>
-    </div>
-    <form noValidate onSubmit={event => { event.preventDefault(); if (!busy) void persist(false); }}>
+  return <section className="provider-connection" data-testid="ai-settings" aria-label={t("connection.title")}>
+    <form noValidate onSubmit={event => { event.preventDefault(); if (!busy && !settings.isPending) void persist(true); }}>
       <fieldset disabled={Boolean(busy) || settings.isPending} className="connection-fields">
-        <label className="field"><span>{t("connection.service")}</span><select aria-label={t("connection.service")} data-testid="ai-service" value={preset} onChange={event => choose(event.target.value as ProviderPreset)}>
-          <option value="custom">{t("connection.custom")}</option><option value="deepseek">DeepSeek</option><option value="openai">OpenAI</option>
-          <option value="openrouter">OpenRouter</option><option value="ollama">Ollama</option>
-        </select></label>
+        <div className="field connection-service">
+          <label htmlFor="connection-service">{t("connection.service")}</label>
+          <span className="connection-badge" data-verified={verified}>{t(verified ? "connection.verified" : keepSecret && !dirty ? "connection.configured" : "connection.notConnected")}</span>
+          <select id="connection-service" data-testid="ai-service" value={preset} onChange={event => choose(event.target.value as ProviderPreset)}>
+            <option value="custom">{t("connection.custom")}</option><option value="deepseek">DeepSeek</option><option value="openai">OpenAI</option>
+            <option value="openrouter">OpenRouter</option><option value="ollama">Ollama</option>
+          </select>
+        </div>
         <label className="field"><span>{t("connection.address")}</span>
           <input ref={address} aria-label={t("connection.address")} data-testid="ai-base-url" value={form.baseUrl} placeholder="https://api.example.com/v1" inputMode="url" autoCapitalize="none" autoCorrect="off" spellCheck={false}
-            aria-invalid={Boolean(urlError && (attempted || form.baseUrl.trim()))} aria-describedby="connection-address-hint"
+            aria-invalid={Boolean(addressError)} aria-describedby={addressHint ? "connection-address-hint" : undefined}
             onChange={event => { const baseUrl = event.target.value; edit({ ...form, baseUrl, capabilities: { ...form.capabilities, imageInput: knownVision(baseUrl, form.model) ?? false } }); }} />
-          <small id="connection-address-hint" className={urlError && (attempted || form.baseUrl.trim()) ? "field-error" : "field-hint"}>
-            {t(urlError && (attempted || form.baseUrl.trim()) ? urlError : "connection.addressHint")}
-          </small>
+          {addressHint && <small id="connection-address-hint" className={addressError ? "field-error" : "field-hint"}>{t(addressHint)}</small>}
         </label>
         <label className="field"><span>{t("settings.model")}</span>
           <input ref={modelInput} aria-label={t("settings.model")} data-testid="ai-model" value={form.model} autoCapitalize="none" spellCheck={false} placeholder={t("connection.modelPlaceholder")}
@@ -169,6 +169,9 @@ function ProviderConnection() {
             </select></label>
             <label className="check"><input data-testid="ai-local" type="checkbox" checked={form.allowLocalEndpoint} onChange={event => edit({ ...form, allowLocalEndpoint: event.target.checked })} />{t("connection.local")}</label>
             <p className="field-hint">{t("connection.localHint")}</p>
+            <Button action="save-connection" variant="quiet" disabled={!dirty && keepSecret} onClick={() => void persist(false)}>
+              {t("connection.saveOnly")}
+            </Button>
             {settings.data?.hasSecret && <Button action="delete-secret" variant="quiet" onClick={() => void removeSecret()}>{t("settings.deleteSecret")}</Button>}
           </div>
         </details>
@@ -178,8 +181,7 @@ function ProviderConnection() {
         {message && <p data-testid="ai-provider-status" className={"connection-feedback " + message.kind} role="status"><Icon name={message.kind === "success" ? "check" : "close"} />{message.text}</p>}
         {busy && <p role="status">{t(busy === "test" ? "connection.testing" : "connection.saving")}</p>}
         <div className="connection-actions">
-          <Button action="save-connection" type="submit" variant="quiet" disabled={Boolean(busy) || settings.isPending || (!dirty && keepSecret)}>{t("connection.save")}</Button>
-          <Button action="test-provider" variant="primary" disabled={Boolean(busy) || settings.isPending} onClick={() => void persist(true)}><Icon name="check" />{t(dirty || !keepSecret ? "connection.saveTest" : "ai.test")}</Button>
+          <Button action="test-provider" type="submit" variant="primary" disabled={Boolean(busy) || settings.isPending}><Icon name="check" />{t(dirty || !keepSecret ? "connection.saveTest" : "ai.test")}</Button>
         </div>
         <p className="connection-test-note">{t("connection.testHint")}</p>
       </div>

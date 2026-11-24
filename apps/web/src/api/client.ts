@@ -1,7 +1,8 @@
 import type {
   AIHistoryPage,
+  MessageBranchRequest, MessageBranchResponse,
   AILayoutRequest,
-  LayoutRequest,
+  LayoutCandidatesRequest, FigureBriefRequest, FigureBriefReply, FigureDiscussionRequest, FigureDiscussionReply, FigureReadingsRequest, FigureReading, ConfirmFigureIdentity,
   AIProviderConfig,
   AIConnectionWriteRequest,
   AIProviderSettings,
@@ -12,7 +13,7 @@ import type {
   DomainCommand,
   ExportRequest,
   FigureDocumentV1,
-  HealthResponse,
+  HealthResponse, SpeechTranscript,
   Job,
   PreviewRequest,
   Project,
@@ -47,7 +48,7 @@ export type AssetPage = { items: Asset[]; nextCursor: string | null };
 export type LayoutCandidatesResponse = { candidates: Candidate[] };
 export type DownloadedFile = { blob: Blob; filename: string; mediaType: string };
 
-async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+async function request<T>(path: string, init: RequestInit = {}, onText?: (text: string) => void): Promise<T> {
   let response: Response;
   try {
     response = await fetch(`${BASE}${path}`, init);
@@ -55,6 +56,8 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     const message = error instanceof Error ? error.message : "Network request failed.";
     throw new ApiClientError(message, 0, "NETWORK");
   }
+  if (response.ok && onText && response.headers.get("content-type")?.includes("application/x-ndjson"))
+    return readConversation<T>(response, onText);
   const text = await response.text();
   const body = text.length > 0 ? (JSON.parse(text) as unknown) : null;
   if (!response.ok) {
@@ -67,6 +70,37 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     );
   }
   return body as T;
+}
+
+async function readConversation<T>(response: Response, onText: (text: string) => void): Promise<T> {
+  const interrupted = () => new ApiClientError("The reply was interrupted.", 502, "MODEL_OUTPUT_INVALID");
+  if (!response.body) throw interrupted();
+  const reader = response.body.getReader(), decoder = new TextDecoder();
+  let buffer = "";
+  try {
+    while (true) {
+      const { value, done } = await reader.read();
+      buffer += done ? decoder.decode() : decoder.decode(value, { stream: true });
+      let end: number;
+      while ((end = buffer.indexOf("\n")) >= 0) {
+        const line = buffer.slice(0, end); buffer = buffer.slice(end + 1);
+        if (!line.trim()) continue;
+        const event = JSON.parse(line);
+        if (event.type === "text" && typeof event.text === "string") onText(event.text);
+        else if (event.type === "complete" && event.result) return event.result as T;
+        else if (event.type === "error" && isErrorBody(event))
+          throw new ApiClientError(event.error.message, ("status" in event && typeof event.status === "number" ? event.status : 502), event.error.code, event.error.details);
+        else throw interrupted();
+      }
+      if (done || buffer.length > 64_000) throw interrupted();
+    }
+  } catch (error) {
+    if (error instanceof ApiClientError) throw error;
+    throw interrupted();
+  } finally {
+    await reader.cancel().catch(() => {});
+    reader.releaseLock();
+  }
 }
 
 function isErrorBody(value: unknown): value is ApiError {
@@ -87,6 +121,9 @@ export const api = {
   },
   capabilities(): Promise<CapabilitiesResponse> {
     return request("/capabilities");
+  },
+  branchMessage(source: string, body: MessageBranchRequest, key: string): Promise<MessageBranchResponse> {
+    return request(`/projects/${source}/message-branches`, jsonInit("POST", body, key));
   },
   createProject(title: string, key: string): Promise<{ project: Project; revision: 0 }> {
     return request("/projects", jsonInit("POST", { title }, key));
@@ -125,7 +162,7 @@ export const api = {
     return request(`/projects/${projectId}/ai-history${query}`);
   },
   assets(projectId: string): Promise<AssetPage> {
-    return request(`/projects/${projectId}/assets`);
+    return request(`/projects/${projectId}/assets?limit=50`);
   },
   async uploadAsset(projectId: string, file: File, key: string): Promise<{ assetId: string; jobId: string }> {
     const body = new FormData();
@@ -144,6 +181,9 @@ export const api = {
   },
   cancelJob(jobId: string, key: string): Promise<Job> {
     return request(`/jobs/${jobId}/cancel`, jsonInit("POST", {}, key));
+  },
+  transcribeSpeech(wav: Blob, signal: AbortSignal): Promise<SpeechTranscript> {
+    return request("/speech/transcriptions", { method: "POST", headers: { "Content-Type": "audio/wav" }, body: wav, signal });
   },
   providerSettings(): Promise<AIProviderSettings> {
     return request("/settings/ai-provider");
@@ -179,9 +219,24 @@ export const api = {
   redo(projectId: string, baseRevision: number, key: string): Promise<TransactionResponse> {
     return request(`/projects/${projectId}/history/redo`, jsonInit("POST", { baseRevision }, key));
   },
+  readFigures(projectId: string, body: FigureReadingsRequest, signal?: AbortSignal): Promise<{ items: FigureReading[] }> {
+    return request(`/projects/${projectId}/figure-readings`, { ...jsonInit("POST", body), signal });
+  },
+  confirmFigureIdentity(
+    projectId: string, assetId: string, body: ConfirmFigureIdentity,
+  ): Promise<NonNullable<FigureReading["decision"]>> {
+    return request(`/projects/${projectId}/assets/${assetId}/figure-identity`, jsonInit("PUT", body));
+  },
+  discussBrief(body: FigureBriefRequest, signal?: AbortSignal, onText?: (text: string) => void): Promise<FigureBriefReply> {
+    return request("/figure-brief", { ...jsonInit("POST", body), signal,
+      headers: { "content-type": "application/json", accept: onText ? "application/x-ndjson, application/json" : "application/json" } }, onText);
+  },
+  discussFigure(projectId: string, body: FigureDiscussionRequest, signal?: AbortSignal): Promise<FigureDiscussionReply> {
+    return request(`/projects/${projectId}/figure-discussion`, { ...jsonInit("POST", body), signal });
+  },
   layoutCandidates(
     projectId: string,
-    body: { baseRevision: number; request: LayoutRequest; maxCandidates?: 1 | 2 | 3 },
+    body: LayoutCandidatesRequest,
     key: string,
   ): Promise<LayoutCandidatesResponse> {
     return request(`/projects/${projectId}/layout-candidates`, jsonInit("POST", body, key));
@@ -226,9 +281,14 @@ export const api = {
     }
     const header = response.headers.get("content-disposition") ?? "";
     const matched = /filename="([^"]*)"/.exec(header);
+    const encoded = /(?:^|;)\s*filename\*=UTF-8''([^;\s]+)/i.exec(header);
+    let filename = matched?.[1] || "download";
+    if (encoded?.[1]) {
+      try { filename = decodeURIComponent(encoded[1]); } catch { /* Keep the ASCII fallback. */ }
+    }
     return {
       blob: await response.blob(),
-      filename: matched?.[1] || "download",
+      filename,
       mediaType: response.headers.get("content-type") ?? "application/octet-stream",
     };
   },

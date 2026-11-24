@@ -1,4 +1,5 @@
 const MiB = 1024 * 1024;
+const MAX_PROJECT_IMAGES = 32;
 
 /** Document schema version. The only figure document model is version 1. */
 export const SCHEMA_VERSION = 1 as const;
@@ -26,8 +27,8 @@ export const NORMALIZATION_VERSION = "1";
 export const AI_ADAPTER_ID = "openai-compatible" as const;
 
 export const RESOURCE_LIMITS = {
-  maxPanelsPerProject: 8,
-  maxAssetsPerProject: 32,
+  maxPanelsPerProject: MAX_PROJECT_IMAGES,
+  maxAssetsPerProject: MAX_PROJECT_IMAGES,
   maxUploadBytes: 25 * MiB,
   maxOriginalAssetBytesPerProject: 200 * MiB,
   maxRasterDecodePixels: 50_000_000,
@@ -39,7 +40,7 @@ export const RESOURCE_LIMITS = {
   maxPngOutputEdgePx: 16_000,
   maxProjectPackageUncompressedBytes: 512 * MiB,
   minAutoLayoutPanels: 2,
-  maxAutoLayoutPanels: 8,
+  maxAutoLayoutPanels: MAX_PROJECT_IMAGES,
   maxLayoutCandidates: 3,
   aiModelCallBudget: 3,
 } as const;
@@ -88,6 +89,7 @@ export const JOB_EVENT_NAMES = [
 
 export const DOMAIN_COMMAND_NAMES = [
   "figure.setPublicationContext",
+  "figure.setCuration",
   "panel.add",
   "panel.remove",
   "panel.rename",

@@ -165,6 +165,8 @@ export type JobResult = Static<typeof JobResultSchema>;
 export type AILayoutJobResult = Static<typeof AILayoutJobResultSchema>;
 
 export const AIHistoryTurnSchema = object({
+  canEdit: Type.Optional(Type.Boolean()),
+  prefix: Type.Optional(Type.Array(object({prompt:Type.String(),response:Type.String(),projectId:UuidSchema,jobId:UuidSchema}))),
   jobId: UuidSchema,
   projectId: UuidSchema,
   baseRevision: RevisionSchema,

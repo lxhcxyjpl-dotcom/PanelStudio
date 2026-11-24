@@ -5,11 +5,13 @@ import {
   RESOURCE_LIMITS,
   SCHEMA_VERSION,
 } from "@panelstudio/contracts";
+import { maxSpeechBytes, transcribeSpeech } from "./speech.js";
 import multipart from "@fastify/multipart";
 import type { FastifyInstance } from "fastify";
 import { canonicalJson } from "@panelstudio/core";
 import {
   abortProjectJobs,
+  scheduleAiJobs,
   cancelAiJob,
   deleteProviderSecret,
   enqueueAiLayout,
@@ -25,8 +27,12 @@ import {
 import { listJobEvents } from "./db.js";
 import { listAiHistory } from "./ai-context.js";
 import { fontBundle, fontList } from "./fonts.js";
+import { readFigures, confirmFigureIdentity } from "./figure-readings.js";
+import { discussAssets } from "./figure-discussion.js";
+import { openingResponse } from "./opening-response.js";
 import { ApiException, requireIdempotencyKey, sendError } from "./http.js";
 import {
+  branchEditedMessage,
   commitHistory,
   commitTransaction,
   createLayoutCandidates,
@@ -107,6 +113,12 @@ export function registerRoutes(app: FastifyInstance, ctx: AppContext): void {
   app.post("/api/v1/projects", async (request, reply) => {
     const key = requireIdempotencyKey(request);
     const result = createProject(ctx, titleOf(request.body), key, hashJson(request.body));
+    return reply.status(result.status).send(result.body);
+  });
+
+  app.post("/api/v1/projects/:projectId/message-branches", async (request, reply) => {
+    const result = branchEditedMessage(ctx, projectIdOf(request.params), request.body, requireIdempotencyKey(request), hashJson(request.body));
+    if ((result.body as {jobId: string | null}).jobId) scheduleAiJobs(ctx);
     return reply.status(result.status).send(result.body);
   });
 
@@ -202,6 +214,36 @@ export function registerRoutes(app: FastifyInstance, ctx: AppContext): void {
     const key = requireIdempotencyKey(request);
     const result = commitHistory(ctx, projectIdOf(request.params), "redo", request.body, key, hashJson(request.body));
     return reply.status(result.status).send(result.body);
+  });
+
+  app.post("/api/v1/projects/:projectId/figure-readings", async (request, reply) => {
+    const controller = new AbortController(), cancel = () => controller.abort();
+    reply.raw.once("close", cancel);
+    try { return await readFigures(ctx, projectIdOf(request.params), request.body, controller.signal); }
+    finally { reply.raw.off("close", cancel); }
+  });
+  app.put("/api/v1/projects/:projectId/assets/:assetId/figure-identity", async request => {
+    const ids = assetParams(request.params);
+    return confirmFigureIdentity(ctx, ids.projectId, ids.assetId, request.body);
+  });
+  app.addContentTypeParser("audio/wav", { parseAs: "buffer", bodyLimit: maxSpeechBytes }, (_req, bytes, done) => done(null, bytes));
+  app.post("/api/v1/speech/transcriptions", { bodyLimit: maxSpeechBytes }, async (request, reply) => {
+    const controller = new AbortController();
+    const disconnect = () => controller.abort();
+    reply.raw.once("close", disconnect);
+    try {
+      return await transcribeSpeech(ctx, request.body, controller.signal);
+    } finally {
+      reply.raw.off("close", disconnect);
+    }
+  });
+
+  app.post("/api/v1/figure-brief", (request, reply) => openingResponse(ctx, request, reply));
+  app.post("/api/v1/projects/:projectId/figure-discussion", async (request, reply) => {
+    const controller = new AbortController(), cancel = () => controller.abort();
+    reply.raw.once("close", cancel);
+    try { return await discussAssets(ctx, projectIdOf(request.params), request.body, controller.signal); }
+    finally { reply.raw.off("close", cancel); }
   });
 
   app.post("/api/v1/projects/:projectId/layout-candidates", async (request, reply) => {
@@ -429,8 +471,11 @@ function sendBytes(
   reply: { header: (name: string, value: string) => unknown; send: (payload: Buffer) => unknown },
   file: { bytes: Buffer; mediaType: string; filename: string },
 ) {
-  const filename = file.filename.replace(/["\r\n]/gu, "");
+  const filename = file.filename.replace(/["\\/\r\n]/gu, "");
+  const fallback = filename.replace(/[^\x20-\x7e]+/gu, "_");
+  const disposition = 'attachment; filename="' + fallback + '"';
   reply.header("content-type", file.mediaType);
-  reply.header("content-disposition", `attachment; filename="${filename}"`);
+  const encoded = encodeURIComponent(filename).replace(/['()*]/gu, char => "%" + char.charCodeAt(0).toString(16).toUpperCase());
+  reply.header("content-disposition", filename === fallback ? disposition : disposition + "; filename*=UTF-8''" + encoded);
   return reply.send(file.bytes);
 }

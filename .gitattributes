@@ -9,3 +9,7 @@ docs/openapi.json text eol=lf
 fixtures/database/v0.1.sql text eol=lf
 examples/reference-preferences/guided.svg text eol=lf
 *.sh text eol=lf
+# Generated SVG contains intentional path whitespace; preserve export bytes and checksums.
+apps/web/public/showcase/* -text linguist-generated=true
+apps/web/public/showcase/*.svg -diff
+examples/showcase/assets/*.svg -text -diff linguist-generated=true

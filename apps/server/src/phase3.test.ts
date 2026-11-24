@@ -2,7 +2,7 @@ import { waitForTerminalJob } from "./test-jobs.js";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { isFigureDocument, type FigureDocumentV1 } from "@panelstudio/contracts";
+import { isFigureDocument, RESOURCE_LIMITS, type FigureDocumentV1 } from "@panelstudio/contracts";
 import { framesNearlyEqual } from "@panelstudio/core";
 import sharp from "sharp";
 import { afterEach, describe, expect, it } from "vitest";
@@ -189,6 +189,52 @@ describe("phase 3 automatic layout", () => {
     expect(still.documentHash).toBe(constrained.documentHash);
     await app.close();
   });
+
+  it("lays out and exports every imported image, including labels after Z", async () => {
+    const { app, projectId } = await openProject(directories);
+    try {
+      const bytes = await png(80, 40);
+      const assets = [];
+      for (let index = 1; index <= RESOURCE_LIMITS.maxAssetsPerProject; index++) {
+        assets.push(await upload(app, projectId, `panel-${index}.png`, bytes, `image-${index}`));
+      }
+      const panelIds = assets.map((_, index) => `11111111-1111-4111-8111-${String(index + 1).padStart(12, "0")}`);
+      const placed = await commit(app, projectId, "place-all", 0, assets.map(({ id }, index) =>
+        panel(panelIds[index]!, id, { x: 6 + (index % 8) * 21, y: 10 + Math.floor(index / 8) * 18, width: 20, height: 10 }),
+      ));
+      const compared = await layout(app, projectId, "compare-all", placed.revision, { family: "auto" });
+      expect(compared.statusCode, compared.body).toBe(200);
+      const chosen = (compared.json().candidates as CandidateBody[])[0]!;
+      expect(chosen.previewDocument.panelOrder).toEqual(panelIds);
+      expect(new Set(Object.values(chosen.previewDocument.panels).map(p => p.assetId)).size).toBe(assets.length);
+      const accepted = await app.inject({
+        method: "POST", url: `/api/v1/projects/${projectId}/transactions`,
+        headers: { "idempotency-key": "accept-all", "content-type": "application/json" },
+        payload: { baseRevision: placed.revision, candidateId: chosen.id },
+      });
+      expect(accepted.statusCode, accepted.body).toBe(200);
+      const edited = await commit(app, projectId, "edit-last", accepted.json().revision, [
+        { type: "panel.rename", panelId: panelIds.at(-1), name: "Last panel" },
+      ]);
+      expect((await documentOf(app, projectId)).document).toEqual(edited.document);
+      const exported = await app.inject({
+        method: "POST", url: `/api/v1/projects/${projectId}/exports`,
+        headers: { "idempotency-key": "export-all", "content-type": "application/json" },
+        payload: { revision: edited.revision, format: "svg", options: { includeMetadata: false } },
+      });
+      expect(exported.statusCode, exported.body).toBe(202);
+      const job = await waitForTerminalJob(app, exported.json().jobId);
+      if (job.kind !== "export" || job.status !== "succeeded") throw new Error(JSON.stringify(job.error));
+      const file = await app.inject({ method: "GET", url: `/api/v1/artifacts/${job.result.artifactId}/download` });
+      expect(file.statusCode).toBe(200);
+      expect(file.body.match(/<text id="panel-[\da-f-]+-label"/gu)).toHaveLength(assets.length);
+      expect(file.body).toContain(">I</text>");
+      expect(file.body).toContain(">AA</text>");
+      expect(file.body).toContain(">AF</text>");
+    } finally {
+      await app.close();
+    }
+  }, 15_000);
 });
 
 async function openProject(directories: string[]): Promise<{ app: App; projectId: string }> {

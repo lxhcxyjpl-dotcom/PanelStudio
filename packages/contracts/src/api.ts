@@ -3,8 +3,8 @@ import { AIProviderSettingsSchema, type AIProviderConfig } from "./ai.js";
 import { AssetSchema } from "./assets.js";
 import { CandidateSchema } from "./candidate.js";
 import { BUNDLED_FONTS, ENGINE_VERSIONS, RESOURCE_LIMITS, SCHEMA_VERSION } from "./constants.js";
-import { HistoryFlagsSchema, TransactionRequestSchema, TransactionResponseSchema } from "./commands.js";
-import { FigureDocumentSchema } from "./document.js";
+import { FigureSetCurationCommandSchema, HistoryFlagsSchema, PanelAddCommandSchema, PanelRemoveCommandSchema, PanelReplaceAssetCommandSchema, TransactionRequestSchema, TransactionResponseSchema } from "./commands.js";
+import { FigureDocumentSchema, PublicationContextSchema } from "./document.js";
 import { LayoutRequestSchema } from "./layout.js";
 import { AIHistoryTurnSchema } from "./jobs.js";
 import {
@@ -147,6 +147,9 @@ export const LayoutCandidatesRequestSchema = object({
   baseRevision: RevisionSchema,
   request: LayoutRequestSchema,
   maxCandidates: Type.Optional(MaxCandidatesSchema),
+  preparation: Type.Optional(Type.Array(Type.Union([PanelAddCommandSchema, PanelRemoveCommandSchema, PanelReplaceAssetCommandSchema, FigureSetCurationCommandSchema,
+    object({ type: Type.Literal("figure.setPublicationContext"), publicationContext: PublicationContextSchema }),
+  ]), { maxItems: 2 * RESOURCE_LIMITS.maxPanelsPerProject + 2 })),
 });
 
 export const LayoutCandidatesResponseSchema = object({

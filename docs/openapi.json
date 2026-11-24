@@ -189,6 +189,66 @@
         }
       }
     },
+    "/api/v1/projects/{projectId}/message-branches": {
+      "post": {
+        "operationId": "branchEditedMessage",
+        "tags": [
+          "Projects"
+        ],
+        "summary": "Create an independent figure at the original message input. Edited AI turns retain their preceding context.",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/IdempotencyKey"
+            },
+            "description": "Unique request id. The same key and the same request return the first response. The same key and a different request return IDEMPOTENCY_KEY_REUSED."
+          },
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MessageBranchRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "New project and optional edited AI job.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageBranchResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error envelope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/projects/{projectId}": {
       "get": {
         "operationId": "getProject",
@@ -1086,6 +1146,257 @@
                 "schema": {
                   "type": "string",
                   "format": "binary"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error envelope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{projectId}/figure-readings": {
+      "post": {
+        "operationId": "readFigureAssets",
+        "tags": [
+          "AI"
+        ],
+        "summary": "Read printed text and figure types from project assets; optionally use the connected visual model.",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FigureReadingsRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Content readings and outstanding identity questions.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FigureReadingsResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error envelope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{projectId}/assets/{assetId}/figure-identity": {
+      "put": {
+        "operationId": "confirmFigureIdentity",
+        "tags": [
+          "Assets"
+        ],
+        "summary": "Save the author’s interpretation of a conflicting file.",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Uuid"
+            }
+          },
+          {
+            "name": "assetId",
+            "in": "path",
+            "required": true,
+            "description": "Asset UUID within this project. Importing a project package preserves its asset UUIDs.",
+            "schema": {
+              "$ref": "#/components/schemas/Uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfirmFigureIdentity"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Confirmed interpretation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FigureIdentity"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error envelope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/speech/transcriptions": {
+      "post": {
+        "operationId": "transcribeSpeech",
+        "tags": [
+          "AI"
+        ],
+        "summary": "Transcribe up to 120 seconds of 16 kHz mono 16-bit PCM WAV with the connected DeepSeek account.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "audio/wav": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Editable transcript, empty if no speech was recognized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SpeechTranscript"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error envelope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/figure-brief": {
+      "post": {
+        "operationId": "discussFigureBrief",
+        "tags": [
+          "AI"
+        ],
+        "summary": "Discuss a figure before uploading artwork.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FigureBriefRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "A question or ready brief. Clients accepting NDJSON may receive text previews followed by a complete result or an error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FigureBriefReply"
+                }
+              },
+              "application/x-ndjson": {
+                "schema": {
+                  "type": "string",
+                  "description": "Newline-delimited JSON. Events carry type text with text, complete with result, or error with status and an API error."
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error envelope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{projectId}/figure-discussion": {
+      "post": {
+        "operationId": "discussFigureAssets",
+        "tags": [
+          "AI"
+        ],
+        "summary": "Discuss or curate main and supplementary library assets without modifying the figure.",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FigureDiscussionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "A material question or a proposal with ordered main panels and optional supplementary figures.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FigureDiscussionReply"
                 }
               }
             }
@@ -2067,6 +2378,1436 @@
   },
   "components": {
     "schemas": {
+      "FigureReadingsRequest": {
+        "type": "object",
+        "required": [
+          "assetIds",
+          "vision",
+          "locale"
+        ],
+        "properties": {
+          "assetIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid",
+              "description": "UUID. Letters such as A, B, and C are labels, not object ids."
+            },
+            "minItems": 1,
+            "maxItems": 32,
+            "uniqueItems": true
+          },
+          "vision": {
+            "type": "boolean"
+          },
+          "configRevision": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991,
+            "description": "Non-negative safe integer. Revisions start at 0 and only increase."
+          },
+          "preferSaved": {
+            "type": "boolean"
+          },
+          "locale": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "zh-CN"
+              },
+              {
+                "type": "string",
+                "const": "en-US"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "FigureReadingsResponse": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "id",
+                "fingerprint",
+                "source",
+                "local",
+                "category",
+                "confidence",
+                "text",
+                "observation",
+                "conflict",
+                "decision"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "UUID. Letters such as A, B, and C are labels, not object ids."
+                },
+                "fingerprint": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$",
+                  "description": "Lowercase hexadecimal SHA-256 digest."
+                },
+                "source": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "const": "local"
+                    },
+                    {
+                      "type": "string",
+                      "const": "vision"
+                    }
+                  ]
+                },
+                "local": {
+                  "type": "object",
+                  "required": [
+                    "category",
+                    "confidence",
+                    "svgText",
+                    "ocrText",
+                    "ocrStatus",
+                    "cues"
+                  ],
+                  "properties": {
+                    "category": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "const": "scatter"
+                        },
+                        {
+                          "type": "string",
+                          "const": "line"
+                        },
+                        {
+                          "type": "string",
+                          "const": "bar"
+                        },
+                        {
+                          "type": "string",
+                          "const": "box"
+                        },
+                        {
+                          "type": "string",
+                          "const": "violin"
+                        },
+                        {
+                          "type": "string",
+                          "const": "histogram"
+                        },
+                        {
+                          "type": "string",
+                          "const": "heatmap"
+                        },
+                        {
+                          "type": "string",
+                          "const": "embedding"
+                        },
+                        {
+                          "type": "string",
+                          "const": "volcano"
+                        },
+                        {
+                          "type": "string",
+                          "const": "survival"
+                        },
+                        {
+                          "type": "string",
+                          "const": "microscopy"
+                        },
+                        {
+                          "type": "string",
+                          "const": "blot"
+                        },
+                        {
+                          "type": "string",
+                          "const": "diagram"
+                        },
+                        {
+                          "type": "string",
+                          "const": "table"
+                        },
+                        {
+                          "type": "string",
+                          "const": "composite"
+                        },
+                        {
+                          "type": "string",
+                          "const": "unknown"
+                        }
+                      ]
+                    },
+                    "confidence": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "const": "high"
+                        },
+                        {
+                          "type": "string",
+                          "const": "medium"
+                        },
+                        {
+                          "type": "string",
+                          "const": "low"
+                        }
+                      ]
+                    },
+                    "svgText": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 180
+                      },
+                      "maxItems": 48
+                    },
+                    "ocrText": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 180
+                      },
+                      "maxItems": 48
+                    },
+                    "ocrStatus": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "const": "not-needed"
+                        },
+                        {
+                          "type": "string",
+                          "const": "read"
+                        },
+                        {
+                          "type": "string",
+                          "const": "empty"
+                        },
+                        {
+                          "type": "string",
+                          "const": "unavailable"
+                        }
+                      ]
+                    },
+                    "cues": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "maxLength": 180
+                      },
+                      "maxItems": 8
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                "category": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "const": "scatter"
+                    },
+                    {
+                      "type": "string",
+                      "const": "line"
+                    },
+                    {
+                      "type": "string",
+                      "const": "bar"
+                    },
+                    {
+                      "type": "string",
+                      "const": "box"
+                    },
+                    {
+                      "type": "string",
+                      "const": "violin"
+                    },
+                    {
+                      "type": "string",
+                      "const": "histogram"
+                    },
+                    {
+                      "type": "string",
+                      "const": "heatmap"
+                    },
+                    {
+                      "type": "string",
+                      "const": "embedding"
+                    },
+                    {
+                      "type": "string",
+                      "const": "volcano"
+                    },
+                    {
+                      "type": "string",
+                      "const": "survival"
+                    },
+                    {
+                      "type": "string",
+                      "const": "microscopy"
+                    },
+                    {
+                      "type": "string",
+                      "const": "blot"
+                    },
+                    {
+                      "type": "string",
+                      "const": "diagram"
+                    },
+                    {
+                      "type": "string",
+                      "const": "table"
+                    },
+                    {
+                      "type": "string",
+                      "const": "composite"
+                    },
+                    {
+                      "type": "string",
+                      "const": "unknown"
+                    }
+                  ]
+                },
+                "confidence": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "const": "high"
+                    },
+                    {
+                      "type": "string",
+                      "const": "medium"
+                    },
+                    {
+                      "type": "string",
+                      "const": "low"
+                    }
+                  ]
+                },
+                "text": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 180
+                  },
+                  "maxItems": 48
+                },
+                "observation": {
+                  "type": "string",
+                  "maxLength": 450
+                },
+                "conflict": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "required": [
+                        "nameQuote",
+                        "imageQuote"
+                      ],
+                      "properties": {
+                        "nameQuote": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 180
+                        },
+                        "imageQuote": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 180
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "decision": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "required": [
+                        "choice",
+                        "value"
+                      ],
+                      "properties": {
+                        "choice": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "const": "image"
+                            },
+                            {
+                              "type": "string",
+                              "const": "filename"
+                            },
+                            {
+                              "type": "string",
+                              "const": "custom"
+                            }
+                          ]
+                        },
+                        "value": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 300
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "additionalProperties": false
+            },
+            "maxItems": 32
+          }
+        },
+        "additionalProperties": false
+      },
+      "FigureIdentity": {
+        "type": "object",
+        "required": [
+          "choice",
+          "value"
+        ],
+        "properties": {
+          "choice": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "image"
+              },
+              {
+                "type": "string",
+                "const": "filename"
+              },
+              {
+                "type": "string",
+                "const": "custom"
+              }
+            ]
+          },
+          "value": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300
+          }
+        },
+        "additionalProperties": false
+      },
+      "ConfirmFigureIdentity": {
+        "type": "object",
+        "required": [
+          "fingerprint",
+          "choice",
+          "value"
+        ],
+        "properties": {
+          "fingerprint": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "description": "Lowercase hexadecimal SHA-256 digest."
+          },
+          "choice": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "image"
+              },
+              {
+                "type": "string",
+                "const": "filename"
+              },
+              {
+                "type": "string",
+                "const": "custom"
+              }
+            ]
+          },
+          "value": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300
+          }
+        },
+        "additionalProperties": false
+      },
+      "FigureBriefRequest": {
+        "type": "object",
+        "required": [
+          "turns",
+          "locale",
+          "configRevision"
+        ],
+        "properties": {
+          "turns": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "role",
+                "text"
+              ],
+              "properties": {
+                "role": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "const": "user"
+                    },
+                    {
+                      "type": "string",
+                      "const": "assistant"
+                    }
+                  ]
+                },
+                "text": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 1200
+                }
+              },
+              "additionalProperties": false
+            },
+            "minItems": 1,
+            "maxItems": 12
+          },
+          "locale": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "zh-CN"
+              },
+              {
+                "type": "string",
+                "const": "en-US"
+              }
+            ]
+          },
+          "brief": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "configRevision": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991,
+            "description": "Non-negative safe integer. Revisions start at 0 and only increase."
+          }
+        },
+        "additionalProperties": false
+      },
+      "FigureBriefReply": {
+        "type": "object",
+        "required": [
+          "kind",
+          "intent",
+          "reply",
+          "options",
+          "request"
+        ],
+        "properties": {
+          "kind": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "question"
+              },
+              {
+                "type": "string",
+                "const": "ready"
+              }
+            ]
+          },
+          "intent": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "select"
+              },
+              {
+                "type": "string",
+                "const": "arrange"
+              },
+              {
+                "type": "string",
+                "const": "undecided"
+              }
+            ]
+          },
+          "reply": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300
+          },
+          "options": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            },
+            "maxItems": 3,
+            "uniqueItems": true
+          },
+          "request": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          }
+        },
+        "additionalProperties": false
+      },
+      "FigureDiscussionRequest": {
+        "type": "object",
+        "required": [
+          "assets",
+          "turns",
+          "publication",
+          "locale",
+          "thumbnails"
+        ],
+        "properties": {
+          "assets": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "id",
+                "note",
+                "selected"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "UUID. Letters such as A, B, and C are labels, not object ids."
+                },
+                "note": {
+                  "type": "string",
+                  "maxLength": 500
+                },
+                "selected": {
+                  "type": "boolean"
+                }
+              },
+              "additionalProperties": false
+            },
+            "minItems": 1,
+            "maxItems": 32
+          },
+          "turns": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 1200
+            },
+            "minItems": 1,
+            "maxItems": 12
+          },
+          "publication": {
+            "type": "object",
+            "required": [
+              "journal",
+              "field",
+              "message",
+              "preference"
+            ],
+            "properties": {
+              "journal": {
+                "type": "string",
+                "maxLength": 160
+              },
+              "field": {
+                "type": "string",
+                "maxLength": 240
+              },
+              "message": {
+                "type": "string",
+                "maxLength": 1000
+              },
+              "preference": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "const": "auto"
+                  },
+                  {
+                    "type": "string",
+                    "const": "comparison"
+                  },
+                  {
+                    "type": "string",
+                    "const": "emphasis"
+                  },
+                  {
+                    "type": "string",
+                    "const": "compact"
+                  }
+                ]
+              }
+            },
+            "additionalProperties": false
+          },
+          "locale": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "zh-CN"
+              },
+              {
+                "type": "string",
+                "const": "en-US"
+              }
+            ]
+          },
+          "thumbnails": {
+            "type": "boolean"
+          },
+          "configRevision": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991,
+            "description": "Non-negative safe integer. Revisions start at 0 and only increase."
+          },
+          "curation": {
+            "type": "object",
+            "required": [
+              "allowQuestion"
+            ],
+            "properties": {
+              "allowQuestion": {
+                "type": "boolean"
+              },
+              "layoutAll": {
+                "type": "boolean"
+              },
+              "focusRevision": {
+                "type": "boolean",
+                "description": "Revise emphasis and reading order. Selected assets are existing main panels and the others are existing supplementary panels."
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      },
+      "FigureDiscussionReply": {
+        "type": "object",
+        "required": [
+          "kind",
+          "reply",
+          "rows",
+          "picks"
+        ],
+        "properties": {
+          "kind": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "question"
+              },
+              {
+                "type": "string",
+                "const": "proposal"
+              }
+            ]
+          },
+          "reply": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          },
+          "options": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            },
+            "maxItems": 3,
+            "uniqueItems": true
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "format": "uuid",
+                "description": "UUID. Letters such as A, B, and C are labels, not object ids."
+              },
+              "minItems": 1,
+              "maxItems": 3
+            },
+            "maxItems": 32
+          },
+          "picks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "id",
+                "reason"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "UUID. Letters such as A, B, and C are labels, not object ids."
+                },
+                "reason": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                }
+              },
+              "additionalProperties": false
+            },
+            "maxItems": 32
+          },
+          "supplementary": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "id",
+                "reason"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "UUID. Letters such as A, B, and C are labels, not object ids."
+                },
+                "reason": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                }
+              },
+              "additionalProperties": false
+            },
+            "maxItems": 32
+          },
+          "suggestedSupplementary": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "id",
+                "reason"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "UUID. Letters such as A, B, and C are labels, not object ids."
+                },
+                "reason": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                }
+              },
+              "additionalProperties": false
+            },
+            "maxItems": 32,
+            "description": "Optional suggestions concerning current main panels. These panels are still present in picks and rows."
+          },
+          "promotion": {
+            "type": "object",
+            "required": [
+              "id",
+              "question",
+              "accept",
+              "keep",
+              "reason"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid",
+                "description": "UUID. Letters such as A, B, and C are labels, not object ids."
+              },
+              "question": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 180
+              },
+              "accept": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 75
+              },
+              "keep": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 75
+              },
+              "reason": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              }
+            },
+            "description": "A question about bringing one existing supplementary panel into the main figure. The author must choose before any layout change.",
+            "additionalProperties": false
+          },
+          "primaryId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "UUID. Letters such as A, B, and C are labels, not object ids."
+          },
+          "identity": {
+            "type": "object",
+            "required": [
+              "id",
+              "fingerprint",
+              "source",
+              "local",
+              "category",
+              "confidence",
+              "text",
+              "observation",
+              "conflict",
+              "decision"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid",
+                "description": "UUID. Letters such as A, B, and C are labels, not object ids."
+              },
+              "fingerprint": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$",
+                "description": "Lowercase hexadecimal SHA-256 digest."
+              },
+              "source": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "const": "local"
+                  },
+                  {
+                    "type": "string",
+                    "const": "vision"
+                  }
+                ]
+              },
+              "local": {
+                "type": "object",
+                "required": [
+                  "category",
+                  "confidence",
+                  "svgText",
+                  "ocrText",
+                  "ocrStatus",
+                  "cues"
+                ],
+                "properties": {
+                  "category": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "const": "scatter"
+                      },
+                      {
+                        "type": "string",
+                        "const": "line"
+                      },
+                      {
+                        "type": "string",
+                        "const": "bar"
+                      },
+                      {
+                        "type": "string",
+                        "const": "box"
+                      },
+                      {
+                        "type": "string",
+                        "const": "violin"
+                      },
+                      {
+                        "type": "string",
+                        "const": "histogram"
+                      },
+                      {
+                        "type": "string",
+                        "const": "heatmap"
+                      },
+                      {
+                        "type": "string",
+                        "const": "embedding"
+                      },
+                      {
+                        "type": "string",
+                        "const": "volcano"
+                      },
+                      {
+                        "type": "string",
+                        "const": "survival"
+                      },
+                      {
+                        "type": "string",
+                        "const": "microscopy"
+                      },
+                      {
+                        "type": "string",
+                        "const": "blot"
+                      },
+                      {
+                        "type": "string",
+                        "const": "diagram"
+                      },
+                      {
+                        "type": "string",
+                        "const": "table"
+                      },
+                      {
+                        "type": "string",
+                        "const": "composite"
+                      },
+                      {
+                        "type": "string",
+                        "const": "unknown"
+                      }
+                    ]
+                  },
+                  "confidence": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "const": "high"
+                      },
+                      {
+                        "type": "string",
+                        "const": "medium"
+                      },
+                      {
+                        "type": "string",
+                        "const": "low"
+                      }
+                    ]
+                  },
+                  "svgText": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 180
+                    },
+                    "maxItems": 48
+                  },
+                  "ocrText": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 180
+                    },
+                    "maxItems": 48
+                  },
+                  "ocrStatus": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "const": "not-needed"
+                      },
+                      {
+                        "type": "string",
+                        "const": "read"
+                      },
+                      {
+                        "type": "string",
+                        "const": "empty"
+                      },
+                      {
+                        "type": "string",
+                        "const": "unavailable"
+                      }
+                    ]
+                  },
+                  "cues": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "maxLength": 180
+                    },
+                    "maxItems": 8
+                  }
+                },
+                "additionalProperties": false
+              },
+              "category": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "const": "scatter"
+                  },
+                  {
+                    "type": "string",
+                    "const": "line"
+                  },
+                  {
+                    "type": "string",
+                    "const": "bar"
+                  },
+                  {
+                    "type": "string",
+                    "const": "box"
+                  },
+                  {
+                    "type": "string",
+                    "const": "violin"
+                  },
+                  {
+                    "type": "string",
+                    "const": "histogram"
+                  },
+                  {
+                    "type": "string",
+                    "const": "heatmap"
+                  },
+                  {
+                    "type": "string",
+                    "const": "embedding"
+                  },
+                  {
+                    "type": "string",
+                    "const": "volcano"
+                  },
+                  {
+                    "type": "string",
+                    "const": "survival"
+                  },
+                  {
+                    "type": "string",
+                    "const": "microscopy"
+                  },
+                  {
+                    "type": "string",
+                    "const": "blot"
+                  },
+                  {
+                    "type": "string",
+                    "const": "diagram"
+                  },
+                  {
+                    "type": "string",
+                    "const": "table"
+                  },
+                  {
+                    "type": "string",
+                    "const": "composite"
+                  },
+                  {
+                    "type": "string",
+                    "const": "unknown"
+                  }
+                ]
+              },
+              "confidence": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "const": "high"
+                  },
+                  {
+                    "type": "string",
+                    "const": "medium"
+                  },
+                  {
+                    "type": "string",
+                    "const": "low"
+                  }
+                ]
+              },
+              "text": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 180
+                },
+                "maxItems": 48
+              },
+              "observation": {
+                "type": "string",
+                "maxLength": 450
+              },
+              "conflict": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "required": [
+                      "nameQuote",
+                      "imageQuote"
+                    ],
+                    "properties": {
+                      "nameQuote": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 180
+                      },
+                      "imageQuote": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 180
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "decision": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "required": [
+                      "choice",
+                      "value"
+                    ],
+                    "properties": {
+                      "choice": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "const": "image"
+                          },
+                          {
+                            "type": "string",
+                            "const": "filename"
+                          },
+                          {
+                            "type": "string",
+                            "const": "custom"
+                          }
+                        ]
+                      },
+                      "value": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 300
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      },
+      "SpeechTranscript": {
+        "type": "object",
+        "required": [
+          "text"
+        ],
+        "properties": {
+          "text": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "MessageBranchRequest": {
+        "anyOf": [
+          {
+            "type": "object",
+            "required": [
+              "kind",
+              "title",
+              "revision",
+              "assetIds"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "const": "figure"
+              },
+              "title": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 120,
+                "description": "Project title, 1 to 120 characters."
+              },
+              "revision": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991,
+                "description": "Non-negative safe integer. Revisions start at 0 and only increase."
+              },
+              "assetIds": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "UUID. Letters such as A, B, and C are labels, not object ids."
+                },
+                "uniqueItems": true,
+                "maxItems": 32
+              },
+              "identities": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "id",
+                    "fingerprint",
+                    "choice",
+                    "value"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "description": "UUID. Letters such as A, B, and C are labels, not object ids."
+                    },
+                    "fingerprint": {
+                      "type": "string",
+                      "pattern": "^[a-f0-9]{64}$",
+                      "description": "Lowercase hexadecimal SHA-256 digest."
+                    },
+                    "choice": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "const": "image"
+                        },
+                        {
+                          "type": "string",
+                          "const": "filename"
+                        },
+                        {
+                          "type": "string",
+                          "const": "custom"
+                        }
+                      ]
+                    },
+                    "value": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 300
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                "maxItems": 32
+              }
+            },
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "required": [
+              "kind",
+              "title",
+              "jobId",
+              "prompt",
+              "replyLocale",
+              "includePreviewImage",
+              "visualReview"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "const": "ai"
+              },
+              "title": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 120,
+                "description": "Project title, 1 to 120 characters."
+              },
+              "jobId": {
+                "type": "string",
+                "format": "uuid",
+                "description": "UUID. Letters such as A, B, and C are labels, not object ids."
+              },
+              "prompt": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 4000
+              },
+              "replyLocale": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "const": "zh-CN"
+                  },
+                  {
+                    "type": "string",
+                    "const": "en-US"
+                  }
+                ]
+              },
+              "includePreviewImage": {
+                "type": "boolean"
+              },
+              "visualReview": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false
+          }
+        ]
+      },
+      "MessageBranchResponse": {
+        "type": "object",
+        "required": [
+          "projectId",
+          "jobId"
+        ],
+        "properties": {
+          "projectId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "UUID. Letters such as A, B, and C are labels, not object ids."
+          },
+          "jobId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid",
+                "description": "UUID. Letters such as A, B, and C are labels, not object ids."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
       "ApiError": {
         "type": "object",
         "required": [
@@ -2182,6 +3923,10 @@
                   },
                   {
                     "type": "string",
+                    "const": "SPEECH_UNAVAILABLE"
+                  },
+                  {
+                    "type": "string",
                     "const": "SERVER_RESTARTED"
                   }
                 ]
@@ -2270,6 +4015,18 @@
                       {
                         "type": "string",
                         "const": "scope-conflict"
+                      },
+                      {
+                        "type": "string",
+                        "const": "reader-busy"
+                      },
+                      {
+                        "type": "string",
+                        "const": "vision-unavailable"
+                      },
+                      {
+                        "type": "string",
+                        "const": "reading-failed"
                       },
                       {
                         "type": "string",
@@ -3168,7 +4925,7 @@
                   "format": "uuid",
                   "description": "UUID. Letters such as A, B, and C are labels, not object ids."
                 },
-                "maxProperties": 8,
+                "maxProperties": 32,
                 "description": "Keyed by panelId. The id is not repeated on the value."
               },
               "panelOrder": {
@@ -3179,7 +4936,7 @@
                   "description": "UUID. Letters such as A, B, and C are labels, not object ids."
                 },
                 "uniqueItems": true,
-                "maxItems": 8,
+                "maxItems": 32,
                 "description": "Label order. Exact permutation of the panel ids."
               },
               "stackOrder": {
@@ -3190,7 +4947,7 @@
                   "description": "UUID. Letters such as A, B, and C are labels, not object ids."
                 },
                 "uniqueItems": true,
-                "maxItems": 8,
+                "maxItems": 32,
                 "description": "Paint order. Later ids paint above earlier ids. Not the label order."
               },
               "groups": {
@@ -3506,6 +5263,106 @@
                         "const": "compact"
                       }
                     ]
+                  }
+                },
+                "additionalProperties": false
+              },
+              "curation": {
+                "type": "object",
+                "required": [
+                  "summary",
+                  "main",
+                  "supplementary",
+                  "rowSizes"
+                ],
+                "properties": {
+                  "summary": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1000
+                  },
+                  "main": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "id",
+                        "reason"
+                      ],
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid",
+                          "description": "UUID. Letters such as A, B, and C are labels, not object ids."
+                        },
+                        "reason": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "minItems": 1,
+                    "maxItems": 32
+                  },
+                  "supplementary": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "id",
+                        "reason"
+                      ],
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid",
+                          "description": "UUID. Letters such as A, B, and C are labels, not object ids."
+                        },
+                        "reason": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "maxItems": 32
+                  },
+                  "suggestedSupplementary": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "id",
+                        "reason"
+                      ],
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid",
+                          "description": "UUID. Letters such as A, B, and C are labels, not object ids."
+                        },
+                        "reason": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "maxItems": 32
+                  },
+                  "rowSizes": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 3
+                    },
+                    "minItems": 1,
+                    "maxItems": 32
                   }
                 },
                 "additionalProperties": false
@@ -3979,7 +5836,7 @@
                   "format": "uuid",
                   "description": "UUID. Letters such as A, B, and C are labels, not object ids."
                 },
-                "maxProperties": 8,
+                "maxProperties": 32,
                 "description": "Keyed by panelId. The id is not repeated on the value."
               },
               "panelOrder": {
@@ -3990,7 +5847,7 @@
                   "description": "UUID. Letters such as A, B, and C are labels, not object ids."
                 },
                 "uniqueItems": true,
-                "maxItems": 8,
+                "maxItems": 32,
                 "description": "Label order. Exact permutation of the panel ids."
               },
               "stackOrder": {
@@ -4001,7 +5858,7 @@
                   "description": "UUID. Letters such as A, B, and C are labels, not object ids."
                 },
                 "uniqueItems": true,
-                "maxItems": 8,
+                "maxItems": 32,
                 "description": "Paint order. Later ids paint above earlier ids. Not the label order."
               },
               "groups": {
@@ -4320,6 +6177,106 @@
                   }
                 },
                 "additionalProperties": false
+              },
+              "curation": {
+                "type": "object",
+                "required": [
+                  "summary",
+                  "main",
+                  "supplementary",
+                  "rowSizes"
+                ],
+                "properties": {
+                  "summary": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1000
+                  },
+                  "main": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "id",
+                        "reason"
+                      ],
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid",
+                          "description": "UUID. Letters such as A, B, and C are labels, not object ids."
+                        },
+                        "reason": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "minItems": 1,
+                    "maxItems": 32
+                  },
+                  "supplementary": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "id",
+                        "reason"
+                      ],
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid",
+                          "description": "UUID. Letters such as A, B, and C are labels, not object ids."
+                        },
+                        "reason": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "maxItems": 32
+                  },
+                  "suggestedSupplementary": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "id",
+                        "reason"
+                      ],
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid",
+                          "description": "UUID. Letters such as A, B, and C are labels, not object ids."
+                        },
+                        "reason": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "maxItems": 32
+                  },
+                  "rowSizes": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 3
+                    },
+                    "minItems": 1,
+                    "maxItems": 32
+                  }
+                },
+                "additionalProperties": false
               }
             },
             "description": "The only figure document model. Client theme, language, zoom, selection, and API keys are not fields.",
@@ -4423,6 +6380,120 @@
                                   "const": "compact"
                                 }
                               ]
+                            }
+                          },
+                          "additionalProperties": false
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "type",
+                        "curation"
+                      ],
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "const": "figure.setCuration"
+                        },
+                        "curation": {
+                          "type": "object",
+                          "required": [
+                            "summary",
+                            "main",
+                            "supplementary",
+                            "rowSizes"
+                          ],
+                          "properties": {
+                            "summary": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 1000
+                            },
+                            "main": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "required": [
+                                  "id",
+                                  "reason"
+                                ],
+                                "properties": {
+                                  "id": {
+                                    "type": "string",
+                                    "format": "uuid",
+                                    "description": "UUID. Letters such as A, B, and C are labels, not object ids."
+                                  },
+                                  "reason": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 200
+                                  }
+                                },
+                                "additionalProperties": false
+                              },
+                              "minItems": 1,
+                              "maxItems": 32
+                            },
+                            "supplementary": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "required": [
+                                  "id",
+                                  "reason"
+                                ],
+                                "properties": {
+                                  "id": {
+                                    "type": "string",
+                                    "format": "uuid",
+                                    "description": "UUID. Letters such as A, B, and C are labels, not object ids."
+                                  },
+                                  "reason": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 200
+                                  }
+                                },
+                                "additionalProperties": false
+                              },
+                              "maxItems": 32
+                            },
+                            "suggestedSupplementary": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "required": [
+                                  "id",
+                                  "reason"
+                                ],
+                                "properties": {
+                                  "id": {
+                                    "type": "string",
+                                    "format": "uuid",
+                                    "description": "UUID. Letters such as A, B, and C are labels, not object ids."
+                                  },
+                                  "reason": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 200
+                                  }
+                                },
+                                "additionalProperties": false
+                              },
+                              "maxItems": 32
+                            },
+                            "rowSizes": {
+                              "type": "array",
+                              "items": {
+                                "type": "integer",
+                                "minimum": 1,
+                                "maximum": 3
+                              },
+                              "minItems": 1,
+                              "maxItems": 32
                             }
                           },
                           "additionalProperties": false
@@ -4762,7 +6833,7 @@
                             "description": "UUID. Letters such as A, B, and C are labels, not object ids."
                           },
                           "uniqueItems": true,
-                          "maxItems": 8
+                          "maxItems": 32
                         },
                         "resetTextOverrides": {
                           "type": "boolean",
@@ -4791,7 +6862,7 @@
                             "description": "UUID. Letters such as A, B, and C are labels, not object ids."
                           },
                           "uniqueItems": true,
-                          "maxItems": 8
+                          "maxItems": 32
                         }
                       },
                       "description": "Changes paint order only. Does not renumber labels.",
@@ -5797,7 +7868,7 @@
                   "format": "uuid",
                   "description": "UUID. Letters such as A, B, and C are labels, not object ids."
                 },
-                "maxProperties": 8,
+                "maxProperties": 32,
                 "description": "Keyed by panelId. The id is not repeated on the value."
               },
               "panelOrder": {
@@ -5808,7 +7879,7 @@
                   "description": "UUID. Letters such as A, B, and C are labels, not object ids."
                 },
                 "uniqueItems": true,
-                "maxItems": 8,
+                "maxItems": 32,
                 "description": "Label order. Exact permutation of the panel ids."
               },
               "stackOrder": {
@@ -5819,7 +7890,7 @@
                   "description": "UUID. Letters such as A, B, and C are labels, not object ids."
                 },
                 "uniqueItems": true,
-                "maxItems": 8,
+                "maxItems": 32,
                 "description": "Paint order. Later ids paint above earlier ids. Not the label order."
               },
               "groups": {
@@ -6135,6 +8206,106 @@
                         "const": "compact"
                       }
                     ]
+                  }
+                },
+                "additionalProperties": false
+              },
+              "curation": {
+                "type": "object",
+                "required": [
+                  "summary",
+                  "main",
+                  "supplementary",
+                  "rowSizes"
+                ],
+                "properties": {
+                  "summary": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1000
+                  },
+                  "main": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "id",
+                        "reason"
+                      ],
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid",
+                          "description": "UUID. Letters such as A, B, and C are labels, not object ids."
+                        },
+                        "reason": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "minItems": 1,
+                    "maxItems": 32
+                  },
+                  "supplementary": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "id",
+                        "reason"
+                      ],
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid",
+                          "description": "UUID. Letters such as A, B, and C are labels, not object ids."
+                        },
+                        "reason": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "maxItems": 32
+                  },
+                  "suggestedSupplementary": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "id",
+                        "reason"
+                      ],
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid",
+                          "description": "UUID. Letters such as A, B, and C are labels, not object ids."
+                        },
+                        "reason": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "maxItems": 32
+                  },
+                  "rowSizes": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 3
+                    },
+                    "minItems": 1,
+                    "maxItems": 32
                   }
                 },
                 "additionalProperties": false
@@ -7799,6 +9970,48 @@
                     },
                     "minItems": 1,
                     "description": "Hero rows describe only the secondary region. Each row has 1 to 3 units."
+                  },
+                  "emphasis": {
+                    "type": "object",
+                    "required": [
+                      "minimumWidthMm"
+                    ],
+                    "properties": {
+                      "minimumWidthMm": {
+                        "type": "number",
+                        "exclusiveMinimum": 0,
+                        "description": "Finite length in millimeters."
+                      },
+                      "maxAutoHeightMm": {
+                        "type": "number",
+                        "exclusiveMinimum": 0,
+                        "maximum": 480
+                      },
+                      "alignedRows": {
+                        "type": "array",
+                        "items": {
+                          "type": "array",
+                          "items": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "pattern": "^panel:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+                              },
+                              {
+                                "type": "string",
+                                "pattern": "^group:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+                              }
+                            ]
+                          },
+                          "minItems": 2,
+                          "maxItems": 32,
+                          "uniqueItems": true
+                        },
+                        "maxItems": 16
+                      }
+                    },
+                    "description": "With a primary panel in a complete rows layout, keep it at least this wide. Each alignment group names consecutive singleton rows that share a width and left edge. The height budget applies only to the default automatic canvas.",
+                    "additionalProperties": false
                   }
                 },
                 "description": "rows is set and orderedUnitIds is absent.",
@@ -8074,6 +10287,11 @@
                     },
                     "additionalProperties": false
                   },
+                  "widthMm": {
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "description": "Finite length in millimeters."
+                  },
                   "referenceAspect": {
                     "type": "number",
                     "exclusiveMinimum": 0,
@@ -8127,7 +10345,7 @@
                       "additionalProperties": false
                     },
                     "minItems": 2,
-                    "maxItems": 8
+                    "maxItems": 32
                   }
                 },
                 "description": "Reviewed reference regions in normalized image coordinates and explicit composition preferences.",
@@ -8153,6 +10371,328 @@
             ],
             "default": 3,
             "description": "1, 2, or 3. Omitted means 3."
+          },
+          "preparation": {
+            "type": "array",
+            "items": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "required": [
+                    "type",
+                    "panelId",
+                    "assetId",
+                    "frameMm"
+                  ],
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "const": "panel.add"
+                    },
+                    "panelId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "description": "UUID. Letters such as A, B, and C are labels, not object ids."
+                    },
+                    "assetId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "description": "UUID. Letters such as A, B, and C are labels, not object ids."
+                    },
+                    "frameMm": {
+                      "type": "object",
+                      "required": [
+                        "x",
+                        "y",
+                        "width",
+                        "height"
+                      ],
+                      "properties": {
+                        "x": {
+                          "type": "number",
+                          "description": "Millimeters."
+                        },
+                        "y": {
+                          "type": "number",
+                          "description": "Millimeters."
+                        },
+                        "width": {
+                          "type": "number",
+                          "exclusiveMinimum": 0,
+                          "description": "Finite length in millimeters."
+                        },
+                        "height": {
+                          "type": "number",
+                          "exclusiveMinimum": 0,
+                          "description": "Finite length in millimeters."
+                        }
+                      },
+                      "description": "Rectangle in document millimeters.",
+                      "additionalProperties": false
+                    },
+                    "cropNormalized": {
+                      "type": "object",
+                      "required": [
+                        "x",
+                        "y",
+                        "width",
+                        "height"
+                      ],
+                      "properties": {
+                        "x": {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 1
+                        },
+                        "y": {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 1
+                        },
+                        "width": {
+                          "type": "number",
+                          "exclusiveMinimum": 0,
+                          "maximum": 1
+                        },
+                        "height": {
+                          "type": "number",
+                          "exclusiveMinimum": 0,
+                          "maximum": 1
+                        }
+                      },
+                      "description": "Crop in 0–1 coordinates of the normalized asset. x + width and y + height must be <= 1. That cross-field bound is a document invariant and is not a JSON Schema keyword.",
+                      "additionalProperties": false
+                    }
+                  },
+                  "description": "When cropNormalized is omitted, the handler uses the full crop {x:0,y:0,width:1,height:1}. The field has no JSON Schema default.",
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "required": [
+                    "type",
+                    "panelIds"
+                  ],
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "const": "panel.remove"
+                    },
+                    "panelIds": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "UUID. Letters such as A, B, and C are labels, not object ids."
+                      },
+                      "minItems": 1,
+                      "uniqueItems": true
+                    }
+                  },
+                  "description": "Deletes panels and updates label order, stack order, and constraints. A locked panel cannot be deleted. A group with fewer than two remaining members dissolves.",
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "required": [
+                    "type",
+                    "panelId",
+                    "assetId"
+                  ],
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "const": "panel.replaceAsset"
+                    },
+                    "panelId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "description": "UUID. Letters such as A, B, and C are labels, not object ids."
+                    },
+                    "assetId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "description": "UUID. Letters such as A, B, and C are labels, not object ids."
+                    }
+                  },
+                  "description": "Show the new asset in full, uniformly fitted into the old frame, with the center held.",
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "required": [
+                    "type",
+                    "curation"
+                  ],
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "const": "figure.setCuration"
+                    },
+                    "curation": {
+                      "type": "object",
+                      "required": [
+                        "summary",
+                        "main",
+                        "supplementary",
+                        "rowSizes"
+                      ],
+                      "properties": {
+                        "summary": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 1000
+                        },
+                        "main": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "id",
+                              "reason"
+                            ],
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "format": "uuid",
+                                "description": "UUID. Letters such as A, B, and C are labels, not object ids."
+                              },
+                              "reason": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 200
+                              }
+                            },
+                            "additionalProperties": false
+                          },
+                          "minItems": 1,
+                          "maxItems": 32
+                        },
+                        "supplementary": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "id",
+                              "reason"
+                            ],
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "format": "uuid",
+                                "description": "UUID. Letters such as A, B, and C are labels, not object ids."
+                              },
+                              "reason": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 200
+                              }
+                            },
+                            "additionalProperties": false
+                          },
+                          "maxItems": 32
+                        },
+                        "suggestedSupplementary": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "id",
+                              "reason"
+                            ],
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "format": "uuid",
+                                "description": "UUID. Letters such as A, B, and C are labels, not object ids."
+                              },
+                              "reason": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 200
+                              }
+                            },
+                            "additionalProperties": false
+                          },
+                          "maxItems": 32
+                        },
+                        "rowSizes": {
+                          "type": "array",
+                          "items": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 3
+                          },
+                          "minItems": 1,
+                          "maxItems": 32
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "required": [
+                    "type",
+                    "publicationContext"
+                  ],
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "const": "figure.setPublicationContext"
+                    },
+                    "publicationContext": {
+                      "type": "object",
+                      "required": [
+                        "journal",
+                        "field",
+                        "message",
+                        "preference"
+                      ],
+                      "properties": {
+                        "journal": {
+                          "type": "string",
+                          "maxLength": 160
+                        },
+                        "field": {
+                          "type": "string",
+                          "maxLength": 240
+                        },
+                        "message": {
+                          "type": "string",
+                          "maxLength": 1000
+                        },
+                        "preference": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "const": "auto"
+                            },
+                            {
+                              "type": "string",
+                              "const": "comparison"
+                            },
+                            {
+                              "type": "string",
+                              "const": "emphasis"
+                            },
+                            {
+                              "type": "string",
+                              "const": "compact"
+                            }
+                          ]
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "maxItems": 66
           }
         },
         "additionalProperties": false
@@ -8308,6 +10848,120 @@
                                     "const": "compact"
                                   }
                                 ]
+                              }
+                            },
+                            "additionalProperties": false
+                          }
+                        },
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "required": [
+                          "type",
+                          "curation"
+                        ],
+                        "properties": {
+                          "type": {
+                            "type": "string",
+                            "const": "figure.setCuration"
+                          },
+                          "curation": {
+                            "type": "object",
+                            "required": [
+                              "summary",
+                              "main",
+                              "supplementary",
+                              "rowSizes"
+                            ],
+                            "properties": {
+                              "summary": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 1000
+                              },
+                              "main": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "required": [
+                                    "id",
+                                    "reason"
+                                  ],
+                                  "properties": {
+                                    "id": {
+                                      "type": "string",
+                                      "format": "uuid",
+                                      "description": "UUID. Letters such as A, B, and C are labels, not object ids."
+                                    },
+                                    "reason": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 200
+                                    }
+                                  },
+                                  "additionalProperties": false
+                                },
+                                "minItems": 1,
+                                "maxItems": 32
+                              },
+                              "supplementary": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "required": [
+                                    "id",
+                                    "reason"
+                                  ],
+                                  "properties": {
+                                    "id": {
+                                      "type": "string",
+                                      "format": "uuid",
+                                      "description": "UUID. Letters such as A, B, and C are labels, not object ids."
+                                    },
+                                    "reason": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 200
+                                    }
+                                  },
+                                  "additionalProperties": false
+                                },
+                                "maxItems": 32
+                              },
+                              "suggestedSupplementary": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "required": [
+                                    "id",
+                                    "reason"
+                                  ],
+                                  "properties": {
+                                    "id": {
+                                      "type": "string",
+                                      "format": "uuid",
+                                      "description": "UUID. Letters such as A, B, and C are labels, not object ids."
+                                    },
+                                    "reason": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 200
+                                    }
+                                  },
+                                  "additionalProperties": false
+                                },
+                                "maxItems": 32
+                              },
+                              "rowSizes": {
+                                "type": "array",
+                                "items": {
+                                  "type": "integer",
+                                  "minimum": 1,
+                                  "maximum": 3
+                                },
+                                "minItems": 1,
+                                "maxItems": 32
                               }
                             },
                             "additionalProperties": false
@@ -8647,7 +11301,7 @@
                               "description": "UUID. Letters such as A, B, and C are labels, not object ids."
                             },
                             "uniqueItems": true,
-                            "maxItems": 8
+                            "maxItems": 32
                           },
                           "resetTextOverrides": {
                             "type": "boolean",
@@ -8676,7 +11330,7 @@
                               "description": "UUID. Letters such as A, B, and C are labels, not object ids."
                             },
                             "uniqueItems": true,
-                            "maxItems": 8
+                            "maxItems": 32
                           }
                         },
                         "description": "Changes paint order only. Does not renumber labels.",
@@ -9628,7 +12282,7 @@
                         "format": "uuid",
                         "description": "UUID. Letters such as A, B, and C are labels, not object ids."
                       },
-                      "maxProperties": 8,
+                      "maxProperties": 32,
                       "description": "Keyed by panelId. The id is not repeated on the value."
                     },
                     "panelOrder": {
@@ -9639,7 +12293,7 @@
                         "description": "UUID. Letters such as A, B, and C are labels, not object ids."
                       },
                       "uniqueItems": true,
-                      "maxItems": 8,
+                      "maxItems": 32,
                       "description": "Label order. Exact permutation of the panel ids."
                     },
                     "stackOrder": {
@@ -9650,7 +12304,7 @@
                         "description": "UUID. Letters such as A, B, and C are labels, not object ids."
                       },
                       "uniqueItems": true,
-                      "maxItems": 8,
+                      "maxItems": 32,
                       "description": "Paint order. Later ids paint above earlier ids. Not the label order."
                     },
                     "groups": {
@@ -9969,6 +12623,106 @@
                         }
                       },
                       "additionalProperties": false
+                    },
+                    "curation": {
+                      "type": "object",
+                      "required": [
+                        "summary",
+                        "main",
+                        "supplementary",
+                        "rowSizes"
+                      ],
+                      "properties": {
+                        "summary": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 1000
+                        },
+                        "main": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "id",
+                              "reason"
+                            ],
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "format": "uuid",
+                                "description": "UUID. Letters such as A, B, and C are labels, not object ids."
+                              },
+                              "reason": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 200
+                              }
+                            },
+                            "additionalProperties": false
+                          },
+                          "minItems": 1,
+                          "maxItems": 32
+                        },
+                        "supplementary": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "id",
+                              "reason"
+                            ],
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "format": "uuid",
+                                "description": "UUID. Letters such as A, B, and C are labels, not object ids."
+                              },
+                              "reason": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 200
+                              }
+                            },
+                            "additionalProperties": false
+                          },
+                          "maxItems": 32
+                        },
+                        "suggestedSupplementary": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "id",
+                              "reason"
+                            ],
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "format": "uuid",
+                                "description": "UUID. Letters such as A, B, and C are labels, not object ids."
+                              },
+                              "reason": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 200
+                              }
+                            },
+                            "additionalProperties": false
+                          },
+                          "maxItems": 32
+                        },
+                        "rowSizes": {
+                          "type": "array",
+                          "items": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 3
+                          },
+                          "minItems": 1,
+                          "maxItems": 32
+                        }
+                      },
+                      "additionalProperties": false
                     }
                   },
                   "description": "The only figure document model. Client theme, language, zoom, selection, and API keys are not fields.",
@@ -10222,6 +12976,120 @@
                               "const": "compact"
                             }
                           ]
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "required": [
+                    "type",
+                    "curation"
+                  ],
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "const": "figure.setCuration"
+                    },
+                    "curation": {
+                      "type": "object",
+                      "required": [
+                        "summary",
+                        "main",
+                        "supplementary",
+                        "rowSizes"
+                      ],
+                      "properties": {
+                        "summary": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 1000
+                        },
+                        "main": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "id",
+                              "reason"
+                            ],
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "format": "uuid",
+                                "description": "UUID. Letters such as A, B, and C are labels, not object ids."
+                              },
+                              "reason": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 200
+                              }
+                            },
+                            "additionalProperties": false
+                          },
+                          "minItems": 1,
+                          "maxItems": 32
+                        },
+                        "supplementary": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "id",
+                              "reason"
+                            ],
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "format": "uuid",
+                                "description": "UUID. Letters such as A, B, and C are labels, not object ids."
+                              },
+                              "reason": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 200
+                              }
+                            },
+                            "additionalProperties": false
+                          },
+                          "maxItems": 32
+                        },
+                        "suggestedSupplementary": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "id",
+                              "reason"
+                            ],
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "format": "uuid",
+                                "description": "UUID. Letters such as A, B, and C are labels, not object ids."
+                              },
+                              "reason": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 200
+                              }
+                            },
+                            "additionalProperties": false
+                          },
+                          "maxItems": 32
+                        },
+                        "rowSizes": {
+                          "type": "array",
+                          "items": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 3
+                          },
+                          "minItems": 1,
+                          "maxItems": 32
                         }
                       },
                       "additionalProperties": false
@@ -10561,7 +13429,7 @@
                         "description": "UUID. Letters such as A, B, and C are labels, not object ids."
                       },
                       "uniqueItems": true,
-                      "maxItems": 8
+                      "maxItems": 32
                     },
                     "resetTextOverrides": {
                       "type": "boolean",
@@ -10590,7 +13458,7 @@
                         "description": "UUID. Letters such as A, B, and C are labels, not object ids."
                       },
                       "uniqueItems": true,
-                      "maxItems": 8
+                      "maxItems": 32
                     }
                   },
                   "description": "Changes paint order only. Does not renumber labels.",
@@ -11542,7 +14410,7 @@
                   "format": "uuid",
                   "description": "UUID. Letters such as A, B, and C are labels, not object ids."
                 },
-                "maxProperties": 8,
+                "maxProperties": 32,
                 "description": "Keyed by panelId. The id is not repeated on the value."
               },
               "panelOrder": {
@@ -11553,7 +14421,7 @@
                   "description": "UUID. Letters such as A, B, and C are labels, not object ids."
                 },
                 "uniqueItems": true,
-                "maxItems": 8,
+                "maxItems": 32,
                 "description": "Label order. Exact permutation of the panel ids."
               },
               "stackOrder": {
@@ -11564,7 +14432,7 @@
                   "description": "UUID. Letters such as A, B, and C are labels, not object ids."
                 },
                 "uniqueItems": true,
-                "maxItems": 8,
+                "maxItems": 32,
                 "description": "Paint order. Later ids paint above earlier ids. Not the label order."
               },
               "groups": {
@@ -11883,6 +14751,106 @@
                   }
                 },
                 "additionalProperties": false
+              },
+              "curation": {
+                "type": "object",
+                "required": [
+                  "summary",
+                  "main",
+                  "supplementary",
+                  "rowSizes"
+                ],
+                "properties": {
+                  "summary": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1000
+                  },
+                  "main": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "id",
+                        "reason"
+                      ],
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid",
+                          "description": "UUID. Letters such as A, B, and C are labels, not object ids."
+                        },
+                        "reason": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "minItems": 1,
+                    "maxItems": 32
+                  },
+                  "supplementary": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "id",
+                        "reason"
+                      ],
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid",
+                          "description": "UUID. Letters such as A, B, and C are labels, not object ids."
+                        },
+                        "reason": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "maxItems": 32
+                  },
+                  "suggestedSupplementary": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "id",
+                        "reason"
+                      ],
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid",
+                          "description": "UUID. Letters such as A, B, and C are labels, not object ids."
+                        },
+                        "reason": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "maxItems": 32
+                  },
+                  "rowSizes": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 3
+                    },
+                    "minItems": 1,
+                    "maxItems": 32
+                  }
+                },
+                "additionalProperties": false
               }
             },
             "description": "The only figure document model. Client theme, language, zoom, selection, and API keys are not fields.",
@@ -12087,7 +15055,7 @@
               "description": "UUID. Letters such as A, B, and C are labels, not object ids."
             },
             "uniqueItems": true,
-            "maxItems": 8
+            "maxItems": 32
           },
           "replyLocale": {
             "type": "string",
@@ -12131,6 +15099,40 @@
                 "isStale"
               ],
               "properties": {
+                "canEdit": {
+                  "type": "boolean"
+                },
+                "prefix": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "prompt",
+                      "response",
+                      "projectId",
+                      "jobId"
+                    ],
+                    "properties": {
+                      "prompt": {
+                        "type": "string"
+                      },
+                      "response": {
+                        "type": "string"
+                      },
+                      "projectId": {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "UUID. Letters such as A, B, and C are labels, not object ids."
+                      },
+                      "jobId": {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "UUID. Letters such as A, B, and C are labels, not object ids."
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                },
                 "jobId": {
                   "type": "string",
                   "format": "uuid",
@@ -12467,6 +15469,10 @@
                             },
                             {
                               "type": "string",
+                              "const": "SPEECH_UNAVAILABLE"
+                            },
+                            {
+                              "type": "string",
                               "const": "SERVER_RESTARTED"
                             }
                           ]
@@ -12551,6 +15557,18 @@
                                 {
                                   "type": "string",
                                   "const": "scope-conflict"
+                                },
+                                {
+                                  "type": "string",
+                                  "const": "reader-busy"
+                                },
+                                {
+                                  "type": "string",
+                                  "const": "vision-unavailable"
+                                },
+                                {
+                                  "type": "string",
+                                  "const": "reading-failed"
                                 },
                                 {
                                   "type": "string",
@@ -13653,6 +16671,10 @@
                           },
                           {
                             "type": "string",
+                            "const": "SPEECH_UNAVAILABLE"
+                          },
+                          {
+                            "type": "string",
                             "const": "SERVER_RESTARTED"
                           }
                         ]
@@ -13737,6 +16759,18 @@
                               {
                                 "type": "string",
                                 "const": "scope-conflict"
+                              },
+                              {
+                                "type": "string",
+                                "const": "reader-busy"
+                              },
+                              {
+                                "type": "string",
+                                "const": "vision-unavailable"
+                              },
+                              {
+                                "type": "string",
+                                "const": "reading-failed"
                               },
                               {
                                 "type": "string",
@@ -14365,6 +17399,120 @@
                                         "type": "object",
                                         "required": [
                                           "type",
+                                          "curation"
+                                        ],
+                                        "properties": {
+                                          "type": {
+                                            "type": "string",
+                                            "const": "figure.setCuration"
+                                          },
+                                          "curation": {
+                                            "type": "object",
+                                            "required": [
+                                              "summary",
+                                              "main",
+                                              "supplementary",
+                                              "rowSizes"
+                                            ],
+                                            "properties": {
+                                              "summary": {
+                                                "type": "string",
+                                                "minLength": 1,
+                                                "maxLength": 1000
+                                              },
+                                              "main": {
+                                                "type": "array",
+                                                "items": {
+                                                  "type": "object",
+                                                  "required": [
+                                                    "id",
+                                                    "reason"
+                                                  ],
+                                                  "properties": {
+                                                    "id": {
+                                                      "type": "string",
+                                                      "format": "uuid",
+                                                      "description": "UUID. Letters such as A, B, and C are labels, not object ids."
+                                                    },
+                                                    "reason": {
+                                                      "type": "string",
+                                                      "minLength": 1,
+                                                      "maxLength": 200
+                                                    }
+                                                  },
+                                                  "additionalProperties": false
+                                                },
+                                                "minItems": 1,
+                                                "maxItems": 32
+                                              },
+                                              "supplementary": {
+                                                "type": "array",
+                                                "items": {
+                                                  "type": "object",
+                                                  "required": [
+                                                    "id",
+                                                    "reason"
+                                                  ],
+                                                  "properties": {
+                                                    "id": {
+                                                      "type": "string",
+                                                      "format": "uuid",
+                                                      "description": "UUID. Letters such as A, B, and C are labels, not object ids."
+                                                    },
+                                                    "reason": {
+                                                      "type": "string",
+                                                      "minLength": 1,
+                                                      "maxLength": 200
+                                                    }
+                                                  },
+                                                  "additionalProperties": false
+                                                },
+                                                "maxItems": 32
+                                              },
+                                              "suggestedSupplementary": {
+                                                "type": "array",
+                                                "items": {
+                                                  "type": "object",
+                                                  "required": [
+                                                    "id",
+                                                    "reason"
+                                                  ],
+                                                  "properties": {
+                                                    "id": {
+                                                      "type": "string",
+                                                      "format": "uuid",
+                                                      "description": "UUID. Letters such as A, B, and C are labels, not object ids."
+                                                    },
+                                                    "reason": {
+                                                      "type": "string",
+                                                      "minLength": 1,
+                                                      "maxLength": 200
+                                                    }
+                                                  },
+                                                  "additionalProperties": false
+                                                },
+                                                "maxItems": 32
+                                              },
+                                              "rowSizes": {
+                                                "type": "array",
+                                                "items": {
+                                                  "type": "integer",
+                                                  "minimum": 1,
+                                                  "maximum": 3
+                                                },
+                                                "minItems": 1,
+                                                "maxItems": 32
+                                              }
+                                            },
+                                            "additionalProperties": false
+                                          }
+                                        },
+                                        "additionalProperties": false
+                                      },
+                                      {
+                                        "type": "object",
+                                        "required": [
+                                          "type",
                                           "panelId",
                                           "assetId",
                                           "frameMm"
@@ -14693,7 +17841,7 @@
                                               "description": "UUID. Letters such as A, B, and C are labels, not object ids."
                                             },
                                             "uniqueItems": true,
-                                            "maxItems": 8
+                                            "maxItems": 32
                                           },
                                           "resetTextOverrides": {
                                             "type": "boolean",
@@ -14722,7 +17870,7 @@
                                               "description": "UUID. Letters such as A, B, and C are labels, not object ids."
                                             },
                                             "uniqueItems": true,
-                                            "maxItems": 8
+                                            "maxItems": 32
                                           }
                                         },
                                         "description": "Changes paint order only. Does not renumber labels.",
@@ -15674,7 +18822,7 @@
                                         "format": "uuid",
                                         "description": "UUID. Letters such as A, B, and C are labels, not object ids."
                                       },
-                                      "maxProperties": 8,
+                                      "maxProperties": 32,
                                       "description": "Keyed by panelId. The id is not repeated on the value."
                                     },
                                     "panelOrder": {
@@ -15685,7 +18833,7 @@
                                         "description": "UUID. Letters such as A, B, and C are labels, not object ids."
                                       },
                                       "uniqueItems": true,
-                                      "maxItems": 8,
+                                      "maxItems": 32,
                                       "description": "Label order. Exact permutation of the panel ids."
                                     },
                                     "stackOrder": {
@@ -15696,7 +18844,7 @@
                                         "description": "UUID. Letters such as A, B, and C are labels, not object ids."
                                       },
                                       "uniqueItems": true,
-                                      "maxItems": 8,
+                                      "maxItems": 32,
                                       "description": "Paint order. Later ids paint above earlier ids. Not the label order."
                                     },
                                     "groups": {
@@ -16012,6 +19160,106 @@
                                               "const": "compact"
                                             }
                                           ]
+                                        }
+                                      },
+                                      "additionalProperties": false
+                                    },
+                                    "curation": {
+                                      "type": "object",
+                                      "required": [
+                                        "summary",
+                                        "main",
+                                        "supplementary",
+                                        "rowSizes"
+                                      ],
+                                      "properties": {
+                                        "summary": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 1000
+                                        },
+                                        "main": {
+                                          "type": "array",
+                                          "items": {
+                                            "type": "object",
+                                            "required": [
+                                              "id",
+                                              "reason"
+                                            ],
+                                            "properties": {
+                                              "id": {
+                                                "type": "string",
+                                                "format": "uuid",
+                                                "description": "UUID. Letters such as A, B, and C are labels, not object ids."
+                                              },
+                                              "reason": {
+                                                "type": "string",
+                                                "minLength": 1,
+                                                "maxLength": 200
+                                              }
+                                            },
+                                            "additionalProperties": false
+                                          },
+                                          "minItems": 1,
+                                          "maxItems": 32
+                                        },
+                                        "supplementary": {
+                                          "type": "array",
+                                          "items": {
+                                            "type": "object",
+                                            "required": [
+                                              "id",
+                                              "reason"
+                                            ],
+                                            "properties": {
+                                              "id": {
+                                                "type": "string",
+                                                "format": "uuid",
+                                                "description": "UUID. Letters such as A, B, and C are labels, not object ids."
+                                              },
+                                              "reason": {
+                                                "type": "string",
+                                                "minLength": 1,
+                                                "maxLength": 200
+                                              }
+                                            },
+                                            "additionalProperties": false
+                                          },
+                                          "maxItems": 32
+                                        },
+                                        "suggestedSupplementary": {
+                                          "type": "array",
+                                          "items": {
+                                            "type": "object",
+                                            "required": [
+                                              "id",
+                                              "reason"
+                                            ],
+                                            "properties": {
+                                              "id": {
+                                                "type": "string",
+                                                "format": "uuid",
+                                                "description": "UUID. Letters such as A, B, and C are labels, not object ids."
+                                              },
+                                              "reason": {
+                                                "type": "string",
+                                                "minLength": 1,
+                                                "maxLength": 200
+                                              }
+                                            },
+                                            "additionalProperties": false
+                                          },
+                                          "maxItems": 32
+                                        },
+                                        "rowSizes": {
+                                          "type": "array",
+                                          "items": {
+                                            "type": "integer",
+                                            "minimum": 1,
+                                            "maximum": 3
+                                          },
+                                          "minItems": 1,
+                                          "maxItems": 32
                                         }
                                       },
                                       "additionalProperties": false
@@ -16379,6 +19627,10 @@
                           },
                           {
                             "type": "string",
+                            "const": "SPEECH_UNAVAILABLE"
+                          },
+                          {
+                            "type": "string",
                             "const": "SERVER_RESTARTED"
                           }
                         ]
@@ -16463,6 +19715,18 @@
                               {
                                 "type": "string",
                                 "const": "scope-conflict"
+                              },
+                              {
+                                "type": "string",
+                                "const": "reader-busy"
+                              },
+                              {
+                                "type": "string",
+                                "const": "vision-unavailable"
+                              },
+                              {
+                                "type": "string",
+                                "const": "reading-failed"
                               },
                               {
                                 "type": "string",
@@ -17144,6 +20408,10 @@
                           },
                           {
                             "type": "string",
+                            "const": "SPEECH_UNAVAILABLE"
+                          },
+                          {
+                            "type": "string",
                             "const": "SERVER_RESTARTED"
                           }
                         ]
@@ -17228,6 +20496,18 @@
                               {
                                 "type": "string",
                                 "const": "scope-conflict"
+                              },
+                              {
+                                "type": "string",
+                                "const": "reader-busy"
+                              },
+                              {
+                                "type": "string",
+                                "const": "vision-unavailable"
+                              },
+                              {
+                                "type": "string",
+                                "const": "reading-failed"
                               },
                               {
                                 "type": "string",
@@ -18017,6 +21297,10 @@
                           },
                           {
                             "type": "string",
+                            "const": "SPEECH_UNAVAILABLE"
+                          },
+                          {
+                            "type": "string",
                             "const": "SERVER_RESTARTED"
                           }
                         ]
@@ -18101,6 +21385,18 @@
                               {
                                 "type": "string",
                                 "const": "scope-conflict"
+                              },
+                              {
+                                "type": "string",
+                                "const": "reader-busy"
+                              },
+                              {
+                                "type": "string",
+                                "const": "vision-unavailable"
+                              },
+                              {
+                                "type": "string",
+                                "const": "reading-failed"
                               },
                               {
                                 "type": "string",
@@ -18787,6 +22083,10 @@
                           },
                           {
                             "type": "string",
+                            "const": "SPEECH_UNAVAILABLE"
+                          },
+                          {
+                            "type": "string",
                             "const": "SERVER_RESTARTED"
                           }
                         ]
@@ -18871,6 +22171,18 @@
                               {
                                 "type": "string",
                                 "const": "scope-conflict"
+                              },
+                              {
+                                "type": "string",
+                                "const": "reader-busy"
+                              },
+                              {
+                                "type": "string",
+                                "const": "vision-unavailable"
+                              },
+                              {
+                                "type": "string",
+                                "const": "reading-failed"
                               },
                               {
                                 "type": "string",
@@ -19581,6 +22893,10 @@
                           },
                           {
                             "type": "string",
+                            "const": "SPEECH_UNAVAILABLE"
+                          },
+                          {
+                            "type": "string",
                             "const": "SERVER_RESTARTED"
                           }
                         ]
@@ -19665,6 +22981,18 @@
                               {
                                 "type": "string",
                                 "const": "scope-conflict"
+                              },
+                              {
+                                "type": "string",
+                                "const": "reader-busy"
+                              },
+                              {
+                                "type": "string",
+                                "const": "vision-unavailable"
+                              },
+                              {
+                                "type": "string",
+                                "const": "reading-failed"
                               },
                               {
                                 "type": "string",
@@ -20172,7 +23500,7 @@
               "format": "uuid",
               "description": "UUID. Letters such as A, B, and C are labels, not object ids."
             },
-            "maxProperties": 8,
+            "maxProperties": 32,
             "description": "Keyed by panelId. The id is not repeated on the value."
           },
           "panelOrder": {
@@ -20183,7 +23511,7 @@
               "description": "UUID. Letters such as A, B, and C are labels, not object ids."
             },
             "uniqueItems": true,
-            "maxItems": 8,
+            "maxItems": 32,
             "description": "Label order. Exact permutation of the panel ids."
           },
           "stackOrder": {
@@ -20194,7 +23522,7 @@
               "description": "UUID. Letters such as A, B, and C are labels, not object ids."
             },
             "uniqueItems": true,
-            "maxItems": 8,
+            "maxItems": 32,
             "description": "Paint order. Later ids paint above earlier ids. Not the label order."
           },
           "groups": {
@@ -20513,6 +23841,106 @@
               }
             },
             "additionalProperties": false
+          },
+          "curation": {
+            "type": "object",
+            "required": [
+              "summary",
+              "main",
+              "supplementary",
+              "rowSizes"
+            ],
+            "properties": {
+              "summary": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 1000
+              },
+              "main": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "id",
+                    "reason"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "description": "UUID. Letters such as A, B, and C are labels, not object ids."
+                    },
+                    "reason": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                "minItems": 1,
+                "maxItems": 32
+              },
+              "supplementary": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "id",
+                    "reason"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "description": "UUID. Letters such as A, B, and C are labels, not object ids."
+                    },
+                    "reason": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                "maxItems": 32
+              },
+              "suggestedSupplementary": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "id",
+                    "reason"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "description": "UUID. Letters such as A, B, and C are labels, not object ids."
+                    },
+                    "reason": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                "maxItems": 32
+              },
+              "rowSizes": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 3
+                },
+                "minItems": 1,
+                "maxItems": 32
+              }
+            },
+            "additionalProperties": false
           }
         },
         "description": "The only figure document model. Client theme, language, zoom, selection, and API keys are not fields.",
@@ -20571,6 +23999,120 @@
                         "const": "compact"
                       }
                     ]
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "required": [
+              "type",
+              "curation"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "figure.setCuration"
+              },
+              "curation": {
+                "type": "object",
+                "required": [
+                  "summary",
+                  "main",
+                  "supplementary",
+                  "rowSizes"
+                ],
+                "properties": {
+                  "summary": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1000
+                  },
+                  "main": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "id",
+                        "reason"
+                      ],
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid",
+                          "description": "UUID. Letters such as A, B, and C are labels, not object ids."
+                        },
+                        "reason": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "minItems": 1,
+                    "maxItems": 32
+                  },
+                  "supplementary": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "id",
+                        "reason"
+                      ],
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid",
+                          "description": "UUID. Letters such as A, B, and C are labels, not object ids."
+                        },
+                        "reason": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "maxItems": 32
+                  },
+                  "suggestedSupplementary": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "id",
+                        "reason"
+                      ],
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid",
+                          "description": "UUID. Letters such as A, B, and C are labels, not object ids."
+                        },
+                        "reason": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "maxItems": 32
+                  },
+                  "rowSizes": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 3
+                    },
+                    "minItems": 1,
+                    "maxItems": 32
                   }
                 },
                 "additionalProperties": false
@@ -20910,7 +24452,7 @@
                   "description": "UUID. Letters such as A, B, and C are labels, not object ids."
                 },
                 "uniqueItems": true,
-                "maxItems": 8
+                "maxItems": 32
               },
               "resetTextOverrides": {
                 "type": "boolean",
@@ -20939,7 +24481,7 @@
                   "description": "UUID. Letters such as A, B, and C are labels, not object ids."
                 },
                 "uniqueItems": true,
-                "maxItems": 8
+                "maxItems": 32
               }
             },
             "description": "Changes paint order only. Does not renumber labels.",
@@ -21850,6 +25392,48 @@
                 },
                 "minItems": 1,
                 "description": "Hero rows describe only the secondary region. Each row has 1 to 3 units."
+              },
+              "emphasis": {
+                "type": "object",
+                "required": [
+                  "minimumWidthMm"
+                ],
+                "properties": {
+                  "minimumWidthMm": {
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "description": "Finite length in millimeters."
+                  },
+                  "maxAutoHeightMm": {
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "maximum": 480
+                  },
+                  "alignedRows": {
+                    "type": "array",
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "pattern": "^panel:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+                          },
+                          {
+                            "type": "string",
+                            "pattern": "^group:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+                          }
+                        ]
+                      },
+                      "minItems": 2,
+                      "maxItems": 32,
+                      "uniqueItems": true
+                    },
+                    "maxItems": 16
+                  }
+                },
+                "description": "With a primary panel in a complete rows layout, keep it at least this wide. Each alignment group names consecutive singleton rows that share a width and left edge. The height budget applies only to the default automatic canvas.",
+                "additionalProperties": false
               }
             },
             "description": "rows is set and orderedUnitIds is absent.",
@@ -22125,6 +25709,11 @@
                 },
                 "additionalProperties": false
               },
+              "widthMm": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "description": "Finite length in millimeters."
+              },
               "referenceAspect": {
                 "type": "number",
                 "exclusiveMinimum": 0,
@@ -22178,7 +25767,7 @@
                   "additionalProperties": false
                 },
                 "minItems": 2,
-                "maxItems": 8
+                "maxItems": 32
               }
             },
             "description": "Reviewed reference regions in normalized image coordinates and explicit composition preferences.",
@@ -22247,7 +25836,7 @@
                             ]
                           },
                           "minItems": 2,
-                          "maxItems": 8,
+                          "maxItems": 32,
                           "uniqueItems": true
                         },
                         "preferences": {
@@ -22561,6 +26150,48 @@
                                       },
                                       "minItems": 1,
                                       "description": "Hero rows describe only the secondary region. Each row has 1 to 3 units."
+                                    },
+                                    "emphasis": {
+                                      "type": "object",
+                                      "required": [
+                                        "minimumWidthMm"
+                                      ],
+                                      "properties": {
+                                        "minimumWidthMm": {
+                                          "type": "number",
+                                          "exclusiveMinimum": 0,
+                                          "description": "Finite length in millimeters."
+                                        },
+                                        "maxAutoHeightMm": {
+                                          "type": "number",
+                                          "exclusiveMinimum": 0,
+                                          "maximum": 480
+                                        },
+                                        "alignedRows": {
+                                          "type": "array",
+                                          "items": {
+                                            "type": "array",
+                                            "items": {
+                                              "anyOf": [
+                                                {
+                                                  "type": "string",
+                                                  "pattern": "^panel:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+                                                },
+                                                {
+                                                  "type": "string",
+                                                  "pattern": "^group:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+                                                }
+                                              ]
+                                            },
+                                            "minItems": 2,
+                                            "maxItems": 32,
+                                            "uniqueItems": true
+                                          },
+                                          "maxItems": 16
+                                        }
+                                      },
+                                      "description": "With a primary panel in a complete rows layout, keep it at least this wide. Each alignment group names consecutive singleton rows that share a width and left edge. The height budget applies only to the default automatic canvas.",
+                                      "additionalProperties": false
                                     }
                                   },
                                   "description": "rows is set and orderedUnitIds is absent.",
@@ -23494,7 +27125,7 @@
                             "description": "UUID. Letters such as A, B, and C are labels, not object ids."
                           },
                           "uniqueItems": true,
-                          "maxItems": 8
+                          "maxItems": 32
                         },
                         "resetTextOverrides": {
                           "type": "boolean"

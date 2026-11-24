@@ -1,0 +1,57 @@
+
+Running 50 tests using 1 worker
+
+
+(node:35228) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[1/50] [chromium] › apps\web\e2e\ai.spec.ts:72:3 › phase 5 AI › keeps import, layout, edit, and export working when AI is not configured
+[2/50] [chromium] › apps\web\e2e\ai.spec.ts:101:3 › phase 5 AI › compiles a fixture proposal, and the preview matches the accepted document
+[3/50] [chromium] › apps\web\e2e\ai.spec.ts:125:3 › phase 5 AI › refines the same draft three times, compares against the root, applies once and reconnects its history
+[4/50] [chromium] › apps\web\e2e\ai.spec.ts:174:3 › phase 5 AI › a deliberately held ten-second AI call leaves manual transactions responsive and returns a read-only result
+[5/50] [chromium] › apps\web\e2e\ai.spec.ts:205:3 › phase 5 AI › leaves the figure unchanged when the model output is invalid
+[6/50] [chromium] › apps\web\e2e\ai.spec.ts:218:3 › phase 5 AI › reports a provider test and a missing secret
+[7/50] [chromium] › apps\web\e2e\ai.spec.ts:237:3 › phase 5 AI › cancels a running request
+[8/50] [chromium] › apps\web\e2e\ai.spec.ts:252:3 › phase 5 AI › shows a stale proposal after the figure changes and stops a job when settings change
+[9/50] [chromium] › apps\web\e2e\ai.spec.ts:282:3 › phase 5 AI › chat composer handles Enter, multiline and IME input, and stays visible beside a draft
+[10/50] [chromium] › apps\web\e2e\connection.spec.ts:46:1 › explains a key in the URL field and supports provider presets without calling them
+[11/50] [chromium] › apps\web\e2e\connection.spec.ts:72:1 › saves a complete connection once, tests it, preserves its key and requires a new one for another service
+[12/50] [chromium] › apps\web\e2e\connection.spec.ts:101:1 › connection works on a narrow English screen and the editor has a calmer hierarchy
+[13/50] [chromium] › apps\web\e2e\editorial.spec.ts:32:3 › editorial home and editor at 1440, zh-CN, light
+[14/50] [chromium] › apps\web\e2e\editorial.spec.ts:32:3 › editorial home and editor at 1280, en-US, light
+[15/50] [chromium] › apps\web\e2e\editorial.spec.ts:32:3 › editorial home and editor at 1024, zh-CN, dark
+[16/50] [chromium] › apps\web\e2e\editorial.spec.ts:32:3 › editorial home and editor at 390, en-US, dark
+[17/50] [chromium] › apps\web\e2e\editorial.spec.ts:32:3 › editorial home and editor at 320, zh-CN, light
+[18/50] [chromium] › apps\web\e2e\editorial.spec.ts:59:1 › real recorded geometry plays once, pauses, compares and exports the demonstrated SVG
+[19/50] [chromium] › apps\web\e2e\editorial.spec.ts:80:1 › home, browser history and deep links preserve the editing session; examples are separate projects
+[20/50] [chromium] › apps\web\e2e\editorial.spec.ts:102:1 › crop and unsaved edits prevent navigation until resolved, including browser Back
+[21/50] [chromium] › apps\web\e2e\editorial.spec.ts:122:1 › inspector candidates preserve the viewport, readonly previews and saved export revision
+[22/50] [chromium] › apps\web\e2e\editorial.spec.ts:145:1 › multi-panel typography writes one undoable transaction and tab arrows do not nudge artwork
+[23/50] [chromium] › apps\web\e2e\editorial.spec.ts:160:1 › leaving waits for an in-flight import and retains the newly imported panel
+[24/50] [chromium] › apps\web\e2e\editorial.spec.ts:180:1 › project library reopens the current session and searches beyond its first fifty rows
+[25/50] [chromium] › apps\web\e2e\font-geometry.spec.ts:14:1 › registered ink and advance agree with Chromium rendering the same SVG text
+[26/50] [chromium] › apps\web\e2e\guided.spec.ts:26:1 › reference only and combined input preview, commit, undo and export via the normal editor
+[27/50] [chromium] › apps\web\e2e\guided.spec.ts:66:1 › preference-only input exposes unknown phrases and accepts the recognized preferences explicitly
+[28/50] [chromium] › apps\web\e2e\guided.spec.ts:80:1 › blank references can be redrawn, reassigned and removed
+[29/50] [chromium] › apps\web\e2e\onboarding.spec.ts:27:1 › welcome can be skipped and reopened; the tour leads to an editable sample and export
+[30/50] [chromium] › apps\web\e2e\onboarding.spec.ts:65:1 › home brief survives import; preferences save and remain editable after reload
+[31/50] [chromium] › apps\web\e2e\onboarding.spec.ts:93:1 › small dark English screens keep the guide, brief, and conversation usable with four sizes
+[32/50] [chromium] › apps\web\e2e\projects.spec.ts:27:1 › opens, soft-deletes, and restores a project from the project menu
+[33/50] [chromium] › apps\web\e2e\publication.spec.ts:44:1 › new-project brief, configured vision images, editable proposal and adopted references
+[34/50] [chromium] › apps\web\e2e\refinement.spec.ts:43:1 › drags complete selections and rigid groups once, cancels a gesture, and rejects a lock
+[35/50] [chromium] › apps\web\e2e\refinement.spec.ts:71:1 › edits only the label baseline, batches nudge keys and keeps lettering automatic after list sorting
+[36/50] [chromium] › apps\web\e2e\refinement.spec.ts:101:1 › keeps an empty numeric field and IME Enter from issuing transactions, and commits a color once
+[37/50] [chromium] › apps\web\e2e\refinement.spec.ts:118:1 › previews the maximum equal width in a custom 100 mm row and keeps both panels editable
+[38/50] [chromium] › apps\web\e2e\refinement.spec.ts:144:1 › Shift-marquee includes complete groups, adds to the selection and cancels without a revision
+[39/50] [chromium] › apps\web\e2e\typography.spec.ts:36:3 › uses the four studio sizes at 1440 px in zh-CN
+[40/50] [chromium] › apps\web\e2e\typography.spec.ts:36:3 › uses the four studio sizes at 320 px in en-US
+[41/50] [chromium] › apps\web\e2e\walkthrough.spec.ts:38:1 › imports six drawings, lays them out, applies one sentence, and exports SVG
+[42/50] [chromium] › apps\web\e2e\walkthrough.spec.ts:85:1 › v0.2 six-panel continuous refinement, local row and editable export
+[43/50] [chromium] › apps\web\e2e\workspace.spec.ts:29:1 › imports, lays out, accepts, and exports through the real API
+[44/50] [chromium] › apps\web\e2e\workspace.spec.ts:68:1 › completes undo, layout, and export from the keyboard
+[45/50] [chromium] › apps\web\e2e\workspace.spec.ts:92:1 › shows empty history, import failure, save failure, conflict, stale candidate, and font warning
+[46/50] [chromium] › apps\web\e2e\workspace.spec.ts:135:1 › reports a real layout conflict and restores the project after reload
+[47/50] [chromium] › apps\web\e2e\workspace.spec.ts:156:1 › switches theme tokens and English copy
+[48/50] [chromium] › apps\web\e2e\workspace.spec.ts:178:1 › keeps three columns at 1440, 1280, and 1024
+[49/50] [chromium] › apps\web\e2e\workspace.spec.ts:196:1 › zeroes spatial motion when reduced motion is on
+[50/50] [chromium] › apps\web\e2e\workspace.spec.ts:213:1 › opens a recent figure and uses both sidebars and the reference form on a phone
+  50 passed (2.3m)

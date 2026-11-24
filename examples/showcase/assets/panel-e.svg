@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN"
+  "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg xmlns:xlink="http://www.w3.org/1999/xlink" width="266.4pt" height="190.8pt" viewBox="0 0 266.4 190.8" xmlns="http://www.w3.org/2000/svg" version="1.1">
+ <metadata>
+  <rdf:RDF xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:cc="http://creativecommons.org/ns#" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+   <cc:Work>
+    <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage"/>
+    <dc:date>2026-11-14T11:15:58.975758</dc:date>
+    <dc:format>image/svg+xml</dc:format>
+    <dc:creator>
+     <cc:Agent>
+      <dc:title>Matplotlib v3.10.8, https://matplotlib.org/</dc:title>
+     </cc:Agent>
+    </dc:creator>
+   </cc:Work>
+  </rdf:RDF>
+ </metadata>
+ <defs>
+  <style type="text/css">*{stroke-linejoin: round; stroke-linecap: butt}</style>
+ </defs>
+ <g id="figure_1">
+  <g id="patch_1">
+   <path d="M 0 190.8 
+L 266.4 190.8 
+L 266.4 0 
+L 0 0 
+z
+" style="fill: #ffffff"/>
+  </g>
+  <g id="axes_1">
+   <g id="patch_2">
+    <path d="M 28.2 169.08 
+L 257.6 169.08 
+L 257.6 22.72 
+L 28.2 22.72 
+z
+" style="fill: #ffffff"/>
+   </g>
+   <g clip-path="url(#p52a1ceb117)">
+    <image xlink:href="data:image/png;base64,
+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" id="image4cfaf8a43c" transform="scale(1 -1) translate(0 -146.4)" x="28.2" y="-22.68" width="229.44" height="146.4"/>
+   </g>
+   <g id="matplotlib.axis_1">
+    <g id="xtick_1">
+     <g id="line2d_1">
+      <defs>
+       <path id="m03627163b1" d="M 0 0 
+L 0 2 
+" style="stroke: #666666; stroke-width: 0.8"/>
+      </defs>
+      <g>
+       <use xlink:href="#m03627163b1" x="42.5375" y="169.08" style="fill: #666666; stroke: #666666; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_1">
+      <text style="font-size: 7px; font-family: 'Noto Sans'; text-anchor: middle; fill: #666666" x="42.5375" y="179.398906" transform="rotate(-0 42.5375 179.398906)">S1</text>
+     </g>
+    </g>
+    <g id="xtick_2">
+     <g id="line2d_2">
+      <g>
+       <use xlink:href="#m03627163b1" x="128.5625" y="169.08" style="fill: #666666; stroke: #666666; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_2">
+      <text style="font-size: 7px; font-family: 'Noto Sans'; text-anchor: middle; fill: #666666" x="128.5625" y="179.398906" transform="rotate(-0 128.5625 179.398906)">S4</text>
+     </g>
+    </g>
+    <g id="xtick_3">
+     <g id="line2d_3">
+      <g>
+       <use xlink:href="#m03627163b1" x="243.2625" y="169.08" style="fill: #666666; stroke: #666666; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_3">
+      <text style="font-size: 7px; font-family: 'Noto Sans'; text-anchor: middle; fill: #666666" x="243.2625" y="179.398906" transform="rotate(-0 243.2625 179.398906)">S8</text>
+     </g>
+    </g>
+   </g>
+   <g id="matplotlib.axis_2">
+    <g id="ytick_1">
+     <g id="line2d_4">
+      <defs>
+       <path id="m514f353e97" d="M 0 0 
+L -2 0 
+" style="stroke: #666666; stroke-width: 0.8"/>
+      </defs>
+      <g>
+       <use xlink:href="#m514f353e97" x="28.2" y="30.038" style="fill: #666666; stroke: #666666; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_4">
+      <text style="font-size: 7px; font-family: 'Noto Sans'; text-anchor: end; fill: #666666" x="23.2" y="32.697453" transform="rotate(-0 23.2 32.697453)">M1</text>
+     </g>
+    </g>
+    <g id="ytick_2">
+     <g id="line2d_5">
+      <g>
+       <use xlink:href="#m514f353e97" x="28.2" y="88.582" style="fill: #666666; stroke: #666666; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_5">
+      <text style="font-size: 7px; font-family: 'Noto Sans'; text-anchor: end; fill: #666666" x="23.2" y="91.241453" transform="rotate(-0 23.2 91.241453)">M5</text>
+     </g>
+    </g>
+    <g id="ytick_3">
+     <g id="line2d_6">
+      <g>
+       <use xlink:href="#m514f353e97" x="28.2" y="161.762" style="fill: #666666; stroke: #666666; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_6">
+      <text style="font-size: 7px; font-family: 'Noto Sans'; text-anchor: end; fill: #666666" x="23.2" y="164.421453" transform="rotate(-0 23.2 164.421453)">M10</text>
+     </g>
+    </g>
+   </g>
+   <g id="text_7">
+    <text style="font-size: 10px; font-family: 'Noto Sans'; text-anchor: middle; fill: #252525" x="142.9" y="16.72" transform="rotate(-0 142.9 16.72)">Marker expression</text>
+   </g>
+  </g>
+ </g>
+ <defs>
+  <clipPath id="p52a1ceb117">
+   <rect x="28.2" y="22.72" width="229.4" height="146.36"/>
+  </clipPath>
+ </defs>
+</svg>

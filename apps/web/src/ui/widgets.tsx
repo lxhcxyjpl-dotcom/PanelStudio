@@ -16,6 +16,7 @@ export function Button({ action, disabledReason, variant = "default", className,
       data-action={action}
       className={["button", variant === "primary" ? "primary" : "", variant === "quiet" ? "quiet" : "", className ?? ""].filter(Boolean).join(" ")}
       disabled={isDisabled}
+      aria-description={isDisabled ? disabledReason : props["aria-description"]}
       title={isDisabled ? disabledReason : title}
     />
   );
@@ -155,9 +156,35 @@ export function Icon({ name }: { name: string }) {
   );
 }
 
+export function TabBar<T extends string>({ id, value, items, onChange, label }: {
+  id: string; value: T; items: Array<{ value: T; label: string; action: string; disabled?: boolean }>; onChange: (value: T) => void; label: string;
+}) {
+  return <div className="tabs" role="tablist" aria-label={label} onKeyDown={event => {
+    if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+    const enabled = items.filter(item => !item.disabled);
+    const at = enabled.findIndex(item => item.value === value);
+    const next = event.key === "Home" ? 0 : event.key === "End" ? enabled.length - 1 : (at + (event.key === "ArrowLeft" ? -1 : 1) + enabled.length) % enabled.length;
+    const item = enabled[next];
+    if (!item) return;
+    event.preventDefault(); event.stopPropagation();
+    onChange(item.value);
+    document.getElementById(`${id}-${item.value}`)?.focus();
+  }}>{items.map(item => <button key={item.value} type="button" id={`${id}-${item.value}`} role="tab" data-action={item.action} disabled={item.disabled}
+    aria-selected={value === item.value} aria-controls={`${id}-panel`} tabIndex={value === item.value ? 0 : -1} onClick={() => onChange(item.value)}>{item.label}</button>)}</div>;
+}
+
 const stroke = { fill: "none", stroke: "currentColor", strokeWidth: 1.5, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
 
 const paths: Record<string, ReactNode> = {
+  inspect: <g {...stroke}><circle cx="6.7" cy="6.7" r="4.6"/><path d="m10.2 10.2 3.4 3.4"/></g>,
+  play: <path {...stroke} d="m5 3 8 5-8 5Z" />,
+  pause: <path {...stroke} d="M5 3v10M11 3v10" />,
+  arrowLeft: <path {...stroke} d="M13.5 8h-10m4-4-4 4 4 4" />,
+  trash: <path {...stroke} d="M2.5 4h11M6 2h4M4 4l.5 10h7L12 4M6.5 7v4M9.5 7v4" />,
+  mic: <g {...stroke}><rect x="5.4" y="1.5" width="5.2" height="8" rx="2.6"/><path d="M3.1 7.2a4.9 4.9 0 0 0 9.8 0M8 12.2v2.3M5.7 14.5h4.6"/></g>,
+  voicePending: <path {...stroke} d="M13.5 8A5.5 5.5 0 1 1 8 2.5"/>,
+  conversationHistory: <g {...stroke}><path d="M2.2 7.7a5.8 5.8 0 1 1 1.4 4.2M2 4.8v3.3h3.3M8 4.7v3.6l2.1 1.4"/></g>,
+  arrowDown: <path {...stroke} d="M8 3v10M3.5 8.5 8 13l4.5-4.5" />,
   arrowUp: <path {...stroke} d="M8 13V3M3.5 7.5 8 3l4.5 4.5" />,
   spark: <path {...stroke} d="m9 1.5 1.7 4.8 4.8 1.7-4.8 1.7L9 14.5 7.3 9.7 2.5 8l4.8-1.7L9 1.5ZM2 1v3M.5 2.5h3" />,
   book: <path {...stroke} d="M8 4C6 2.5 4 2.5 1.5 3v9c2.5-.5 4.5-.5 6.5 1 2-1.5 4-1.5 6.5-1V3C12 2.5 10 2.5 8 4Zm0 0v9" />,

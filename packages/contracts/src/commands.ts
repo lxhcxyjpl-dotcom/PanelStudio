@@ -2,6 +2,7 @@ import Type, { type Static } from "typebox";
 import { RESOURCE_LIMITS } from "./constants.js";
 import {
   CanvasSchema,
+  FigureCurationSchema,
   FigureDocumentSchema,
   LabelOverridesSchema,
   LabelStyleSchema,
@@ -188,8 +189,13 @@ export const GroupSetLockedCommandSchema = object({
   locked: Type.Boolean(),
 });
 
+export const FigureSetCurationCommandSchema = object({
+  type: Type.Literal("figure.setCuration"),
+  curation: FigureCurationSchema,
+});
 export const DomainCommandSchema = Type.Union([
   object({ type: Type.Literal("figure.setPublicationContext"), publicationContext: PublicationContextSchema }),
+  FigureSetCurationCommandSchema,
   PanelAddCommandSchema,
   PanelRemoveCommandSchema,
   PanelRenameCommandSchema,

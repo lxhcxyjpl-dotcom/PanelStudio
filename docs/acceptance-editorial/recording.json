@@ -1,0 +1,16 @@
+{
+  "errors": [],
+  "synthetic": true,
+  "liveExternalAI": false,
+  "steps": [
+    "Home carousel",
+    "Recorded domain-command replay",
+    "Import editable example",
+    "Layout candidate comparison",
+    "Apply",
+    "Edit X position",
+    "Undo",
+    "Export SVG",
+    "Return home"
+  ]
+}

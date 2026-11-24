@@ -1,0 +1,26 @@
+[
+  {
+    "family": "Newsreader",
+    "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/newsreader/Newsreader%5Bopsz,wght%5D.ttf",
+    "license": "https://raw.githubusercontent.com/google/fonts/main/ofl/newsreader/OFL.txt",
+    "ttf_bytes": 451664,
+    "woff2_bytes": 215008,
+    "sha256": "8a08d13f8a6c0d51be379a60af84f945f65369a67e509ee3c3bdcc421254d7c1"
+  },
+  {
+    "family": "Inter",
+    "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/inter/Inter%5Bopsz,wght%5D.ttf",
+    "license": "https://raw.githubusercontent.com/google/fonts/main/ofl/inter/OFL.txt",
+    "ttf_bytes": 876576,
+    "woff2_bytes": 350528,
+    "sha256": "29160a80ff49ddcab2c97711247e08b1fab27a484a329ce8b813d820dc559031"
+  },
+  {
+    "family": "GeistMono",
+    "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/geistmono/GeistMono%5Bwght%5D.ttf",
+    "license": "https://raw.githubusercontent.com/google/fonts/main/ofl/geistmono/OFL.txt",
+    "ttf_bytes": 171948,
+    "woff2_bytes": 70948,
+    "sha256": "d00e590b8eb3a59acc329b2d044fd143ae935090b7da33199ebee27cc7de8196"
+  }
+]

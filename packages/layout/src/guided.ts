@@ -1,6 +1,6 @@
 import { layoutUnitIds, RESOURCE_LIMITS, type DomainCommand, type GuidedLayoutRequest, type GuidedPreferences } from "@panelstudio/contracts";
 import { DocumentCommandError, framesNearlyEqual } from "@panelstudio/core";
-import { assetFacts, croppedAspect, occupiedRects, unionRect, unitGeometry, type Rect } from "./measure.js";
+import { assetFacts, autoHeightLimit, croppedAspect, occupiedRects, unionRect, unitGeometry, type Rect } from "./measure.js";
 import { preferenceTrees, referenceTree, type Axis, type Tree } from "./guided-tree.js";
 import { scoreLayout } from "./score.js";
 import type { SolveLayoutFailure, SolveLayoutInput, SolveLayoutResult, SolvedCandidate } from "./solve.js";
@@ -115,7 +115,7 @@ export function solveGuided(input: Input): SolveLayoutResult {
   const { referenceSlots: slots, preferences: p } = request;
   const ids = layoutUnitIds(document), panels = document.panelOrder;
   if (panels.length > RESOURCE_LIMITS.maxAutoLayoutPanels || ids.length < 2)
-    return fail("invalid-units", "Guided layout needs two to eight independent units.", "REQUEST_INVALID");
+    return fail("invalid-units", `Guided layout requires 2 to ${RESOURCE_LIMITS.maxAutoLayoutPanels} panels and at least two independent units.`, "REQUEST_INVALID");
   if (panels.some((id) => !croppedAspect(document, assets, id))) return fail("invalid-units", "A panel is missing its asset.", "DOCUMENT_INVALID");
   if ((!slots && (!Object.keys(p).length || request.referenceAspect !== undefined)) || (p.focus && !ids.includes(p.focus)) ||
     (p.pair && (!ids.includes(p.pair.first) || !ids.includes(p.pair.second) || p.pair.first === p.pair.second)))
@@ -125,12 +125,14 @@ export function solveGuided(input: Input): SolveLayoutResult {
     return fail("reference-slots", "Map one in-bounds reference region to each layout unit.", "REQUEST_INVALID");
   const trees = slots ? [referenceTree(slots)] : preferenceTrees(ids, p);
   if (!trees[0]) return fail("reference-structure", "Reference regions cannot be separated into rows and columns.");
-  const settings = document.layoutSettings, canvas = document.canvas, m = canvas.marginsMm;
+  const settings = document.layoutSettings;
+  const canvas = { ...document.canvas, widthMm: request.widthMm ?? document.canvas.widthMm };
+  const m = canvas.marginsMm;
   const gaps = p.gapMm === undefined ? settings.gutterMm : { horizontal: p.gapMm, vertical: p.gapMm };
   const leaves = leavesFor(input, ids);
   const availableW = canvas.widthMm - m.left - m.right;
   const fixed = canvas.heightMode === "fixed";
-  const maxH = (fixed ? canvas.heightMm : settings.maxAutoHeightMm) - m.top - m.bottom;
+  const maxH = (fixed ? canvas.heightMm : autoHeightLimit(document)) - m.top - m.bottom;
   const source = slots ? unionRect(slots) : null;
   const candidates = new Map<string, SolvedCandidate>();
   let failure: SolveLayoutFailure | undefined;
@@ -167,7 +169,7 @@ export function solveGuided(input: Input): SolveLayoutResult {
       const primary = p.focus ? (p.focus.startsWith("panel:") ? p.focus.slice(6) : null) : settings.primaryPanelId;
       if (primary !== settings.primaryPanelId || gaps.horizontal !== settings.gutterMm.horizontal || gaps.vertical !== settings.gutterMm.vertical)
         commands.push({ type: "layout.setSettings", layoutSettings: { ...settings, primaryPanelId: primary, gutterMm: gaps } });
-      if (Math.abs(canvas.heightMm - heightMm) > 1e-7) commands.push({ type: "canvas.set", canvas: { ...canvas, heightMm } });
+      if (canvas.widthMm !== document.canvas.widthMm || Math.abs(canvas.heightMm - heightMm) > 1e-7) commands.push({ type: "canvas.set", canvas: { ...canvas, heightMm } });
       if (items.some((i) => !framesNearlyEqual(document.panels[i.panelId]!.frameMm, i.frameMm))) commands.push({ type: "panel.setFrames", items });
       try {
         const previewDocument = validateCandidateResult(document, commands, (id) => assetFacts(assets, id), "layout");

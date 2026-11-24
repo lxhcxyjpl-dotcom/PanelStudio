@@ -16,14 +16,16 @@ import {
   reorderLabels,
   transact,
 } from "../state/session";
-import { patch, useWorkspace } from "../state/store";
+import { patch, useWorkspace, useWorkspaceFields } from "../state/store";
 import { baseDocument } from "../state/types";
-import { Button, Icon } from "./widgets";
+import { Button, Icon, TabBar } from "./widgets";
 
 export function LeftSidebar() {
   const { t } = useTranslation();
-  const state = useWorkspace();
-  const [tab, setTab] = useState<"assets" | "panels">("assets");
+  const state = useWorkspaceFields("assetTab", "mode", "leftWidth", "leftOpen", "projectId", "imports");
+  const tab = state.assetTab;
+  const phoneHeading = state.mode === "phone";
+  const setTab = (assetTab: "assets" | "panels") => patch({ assetTab });
   const [openPanels, setOpenPanels] = useState<Record<string, boolean>>({});
   const width = sidebarWidth("left", state.mode, state.leftWidth);
   const assets = useQuery({
@@ -31,10 +33,12 @@ export function LeftSidebar() {
     enabled: Boolean(state.projectId),
     queryFn: () => api.assets(state.projectId ?? ""),
   });
-  const document = baseDocument(state);
-  const visible = (assets.data?.items ?? []).filter((asset) => !asset.removedFromLibraryAt);
+  const document = useWorkspace(baseDocument);
+  const visible = (assets.data?.items ?? []).filter((asset) => !asset.removedFromLibraryAt &&
+    !(asset.status === "failed" && state.imports.some(row => row.status === "failed" && row.filename === asset.originalFilename)));
   const completed = state.imports.filter((row) => row.status === "ready").length;
   const pending = state.imports.filter((row) => row.status !== "ready");
+  const assetsLabel = assets.data ? t("assets.tabCount", { count: visible.length }) : t("assets.tab");
   return (
     <aside
       className="sidebar left-sidebar" id="studio-assets"
@@ -43,33 +47,35 @@ export function LeftSidebar() {
       style={{ width }}
       aria-label={t("a11y.left")}
     >
-      <div className="tabs" role="tablist">
-        <button type="button" data-action="tab-assets" role="tab" aria-selected={tab === "assets"} onClick={() => setTab("assets")}>
-          <Icon name="image" />{t("assets.tab")}
-        </button>
-        <button type="button" data-action="tab-panels" role="tab" aria-selected={tab === "panels"} onClick={() => setTab("panels")}>
-          <Icon name="layers" />{t("panels.tab")}
-        </button>
-      </div>
+      {phoneHeading ? <h2 className="drawer-heading" id="assets-drawer-heading" tabIndex={-1} data-drawer-heading>
+        {tab === "assets" ? assetsLabel : t("panels.tab")}
+      </h2> : <TabBar id="asset-tabs" value={tab} onChange={setTab} label={t("a11y.left")} items={[
+        { value: "assets", label: assetsLabel, action: "tab-assets" },
+        { value: "panels", label: t("panels.tab"), action: "tab-panels" },
+      ]} />}
       <Button action="close-assets" className="drawer-close" variant="quiet" aria-label={t("a11y.close")}
         onClick={() => patch({leftOpen:false})}><Icon name="close" /></Button>
-      <div className="side-scroll">
+      <div className="side-scroll" role={phoneHeading ? "region" : "tabpanel"} id="asset-tabs-panel"
+        aria-labelledby={phoneHeading ? "assets-drawer-heading" : "asset-tabs-" + tab}>
         {tab === "assets" ? (
           <section className="section asset-library">
-            <div className="library-title"><h2>{t("assets.available")}</h2><span>{visible.length}</span></div>
-            {completed > 0 && <p className="import-summary" role="status"><Icon name="check" />{t("assets.importedCount",{count:completed})}</p>}
+            {completed > 0 && pending.length > 0 && <p className="import-summary" role="status"><Icon name="check" />{t("assets.importedCount",{count:completed})}</p>}
             {pending.length > 0 ? (
               <ul className="import-log">
                 {pending.map((row) => (
                   <li key={row.id} data-status={row.status}>
                     <strong>{row.filename}</strong>
                     <span>
-                      {row.status === "importing" ? t("assets.importing", { name: row.filename }) : row.message}
+                      {row.status === "importing" ? t("assets.importing", { name: row.filename }) :
+                        row.code === "SVG_UNSUPPORTED_FEATURE" ? t("assets.unsupportedDetail", { detail: row.message }) : row.message}
                     </span>
                     {row.code === "SVG_UNSUPPORTED_FEATURE" ? (
-                      <Button action="svg-help" onClick={() => patch({ dialog: "svg" })}>
-                        {t("assets.formatHelp")}
-                      </Button>
+                      <>
+                        <span>{t("assets.svgRecovery")}</span>
+                        <Button action="svg-help" onClick={() => patch({ dialog: "svg" })}>
+                          {t("assets.formatHelp")}
+                        </Button>
+                      </>
                     ) : null}
                   </li>
                 ))}
@@ -95,8 +101,9 @@ function AssetCard({ asset, count }: { asset: Asset; count: number }) {
   const size = asset.status === "ready" && asset.normalized
     ? asset.normalized.rasterPixelSize
       ? `${asset.normalized.rasterPixelSize.width}×${asset.normalized.rasterPixelSize.height} px`
-      : `${Math.round(asset.normalized.viewport.width)}×${Math.round(asset.normalized.viewport.height)}`
+      : t("assets.viewportShort", { size: `${Math.round(asset.normalized.viewport.width)}×${Math.round(asset.normalized.viewport.height)}` })
     : "—";
+  const openInfo = () => patch({ dialog: "asset", assetInfoId: asset.id });
   return (
     <article className="asset-card" data-used={count > 0}>
       <div className="thumb">
@@ -111,15 +118,23 @@ function AssetCard({ asset, count }: { asset: Asset; count: number }) {
         <strong title={asset.originalFilename}>{asset.originalFilename}</strong>
         <span title={format + " · " + size}>{size}</span>
         {asset.status !== "ready" && <span className="asset-status">{t(asset.status === "failed" ? "assets.failed" : "assets.processing")}</span>}
+        {asset.status === "ready" && asset.diagnostics.length > 0 && <button
+          type="button" className="asset-notice" data-action="asset-notice"
+          aria-label={t("assets.viewNotices", { name: asset.originalFilename })}
+          onClick={openInfo}>
+          {t(asset.diagnostics.every(item => item.code === "FONT_MISSING") ? "assets.fontNotice" : "assets.noticeCount",
+            { count: asset.diagnostics.length })}
+        </button>}
       </div>
       <div className="asset-tools">
-        <Button action="add-asset" variant="quiet" aria-label={t("assets.add")} title={t("assets.add")}
-          disabledReason={asset.status === "ready" ? undefined : t("assets.processing")} onClick={() => void offerAssets([asset.id])}><Icon name="plus" /></Button>
+        {count === 0 && <Button action="add-asset" variant="quiet" aria-label={t("assets.add")} title={t("assets.add")}
+          disabledReason={asset.status === "ready" ? undefined : t("assets.processing")} onClick={() => void offerAssets([asset.id])}><Icon name="plus" /></Button>}
         <DropdownMenu.Root>
           <DropdownMenu.Trigger asChild><Button action="asset-menu" variant="quiet" aria-label={t("assets.actions",{name:asset.originalFilename})} title={t("toolbar.more")}><Icon name="more" /></Button></DropdownMenu.Trigger>
           <DropdownMenu.Portal>
             <DropdownMenu.Content className="menu" align="end" sideOffset={4}>
-              <DropdownMenu.Item className="menu-item" data-action="asset-info" onSelect={() => patch({dialog:"asset",assetInfoId:asset.id})}>{t("assets.info")}</DropdownMenu.Item>
+              {count > 0 && <DropdownMenu.Item className="menu-item" data-action="add-asset-copy" onSelect={() => void offerAssets([asset.id])}>{t("assets.addCopy")}</DropdownMenu.Item>}
+              <DropdownMenu.Item className="menu-item" data-action="asset-info" onSelect={openInfo}>{t("assets.info")}</DropdownMenu.Item>
               <DropdownMenu.Item className="menu-item" data-action="download-original" onSelect={() => void downloadOriginal(asset.id)}>{t("assets.download")}</DropdownMenu.Item>
               <DropdownMenu.Item className="menu-item" data-action="remove-asset" disabled={count > 0} title={count > 0 ? t("assets.removeReasonUsed") : undefined}
                 onSelect={() => void removeAsset(asset.id)}>{t("assets.remove")}</DropdownMenu.Item>
@@ -127,15 +142,16 @@ function AssetCard({ asset, count }: { asset: Asset; count: number }) {
           </DropdownMenu.Portal>
         </DropdownMenu.Root>
       </div>
-      {asset.diagnostics.length > 0 && <span className="asset-diagnostic">{asset.diagnostics.map((item) => formatDiagnostic(t, item)).join(" ")}</span>}
+      {asset.status !== "ready" && asset.diagnostics.length > 0 &&
+        <span className="asset-diagnostic">{asset.diagnostics.map((item) => formatDiagnostic(t, item)).join(" ")}</span>}
     </article>
   );
 }
 
 function PanelList({ openPanels, onToggle }: { openPanels: Record<string, boolean>; onToggle: (panelId: string) => void }) {
   const { t } = useTranslation();
-  const state = useWorkspace();
-  const document = baseDocument(state);
+  const state = useWorkspaceFields("selection", "projectId");
+  const document = useWorkspace(baseDocument);
   const [dragId, setDragId] = useState<string | null>(null);
   const [slot, setSlot] = useState<number | null>(null);
   const list = useRef<HTMLDivElement>(null);
@@ -232,7 +248,7 @@ function PanelList({ openPanels, onToggle }: { openPanels: Record<string, boolea
               </button>
               {state.projectId ? <img className="row-thumb" alt="" draggable={false} src={thumbnailUrl(state.projectId, panel.assetId)} /> : null}
               <span className="row-label">{label?.text ?? "–"}</span>
-              <span className="row-name">{panel.name}</span>
+              <span className="row-name" title={panel.name}>{panel.name}</span>
               <Button
                 action="expand-panel"
                 aria-label={expanded ? t("panels.collapse") : t("panels.expand")}

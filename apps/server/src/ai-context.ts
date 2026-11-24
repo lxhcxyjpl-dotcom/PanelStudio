@@ -6,6 +6,7 @@ import {
 import { DocumentCommandError, canonicalJson, hashFigureDocument, type AssetLookup } from "@panelstudio/core";
 import { validateCandidateResult } from "@panelstudio/layout";
 import { getCandidate, getJobDetail, getProject, getRevision, queryAiHistory, type CandidateRecord, type JobDetail, type KeyCursor } from "./db.js";
+import { panelReadingClues } from "./figure-readings.js";
 import { ApiException } from "./http.js";
 import type { AppContext } from "./pipeline.js";
 import { selectLayoutExamples } from "./layout-references.js";
@@ -109,9 +110,31 @@ export function prepareTurn(
     configRevision, parentCandidateId: parentId, rootHash, sourceHash, previousTurns,
     engineVersion: ENGINE_VERSIONS.layout, fontRegistryVersion: ENGINE_VERSIONS.fontRegistry,
     layoutExamples: selectLayoutExamples(ctx, work.document),
+    ...(body.includePreviewImage ? {
+      imageReadings: panelReadingClues(
+        ctx, projectId, work.document, scope === "selection" ? selectedPanelIds : work.document.panelOrder,
+        body.replyLocale, configRevision,
+      ),
+    } : {}),
   };
 }
 
+/** Recover the ids of the conversational prefix, including parents inherited from another version. */
+export function messageParents(ctx: AppContext, job: JobDetail): { projectId: string; jobId: string }[] {
+  const result: { projectId: string; jobId: string }[] = [], visited = new Set<string>();
+  let cursor: JobDetail | null = job;
+  while (cursor && !visited.has(cursor.id) && result.length < MAX_AI_TURNS) {
+    visited.add(cursor.id);
+    const input = frozenInput(cursor), parent = input?.request.context;
+    if (!parent || parent.kind === "revision") return [...(input?.branchParents ?? []),...result];
+    const jobId: string | null = parent.kind === "clarification" ? parent.jobId : getCandidate(ctx.db,parent.candidateId)?.sourceJobId ?? null;
+    if (!jobId) break;
+    const prior = getJobDetail(ctx.db,jobId);
+    if (!prior?.projectId || prior.projectId !== cursor.projectId) break;
+    result.unshift({projectId:prior.projectId,jobId}); cursor = prior;
+  }
+  return result;
+}
 export function currentEngines(input: { engineVersion: string; fontRegistryVersion: string }): boolean {
   return input.engineVersion === ENGINE_VERSIONS.layout && input.fontRegistryVersion === ENGINE_VERSIONS.fontRegistry;
 }
@@ -155,7 +178,10 @@ export function listAiHistory(ctx: AppContext, projectId: string, baseRevision: 
     const summary = candidates[0]?.summary;
     const isStale = Boolean(damagedSelection || project.deletedAt || request.baseRevision !== project.currentRevision || saved && !currentEngines(saved) || candidates.some((candidate) => !currentEngines(candidate)));
     return {
-      jobId: job.id, projectId, baseRevision: request.baseRevision, context: request.context ?? { kind: "revision" },
+      ...(saved?.branchParents?.length && saved.branchParents.length === saved.previousTurns.length ? {
+        prefix:saved.previousTurns.map((turn,i) => ({prompt:turn.prompt,response:turn.response,...saved.branchParents![i]!})),
+      } : {}),
+      canEdit: Boolean(saved && currentEngines(saved)), jobId: job.id, projectId, baseRevision: request.baseRevision, context: request.context ?? { kind: "revision" },
       scope: request.scope ?? "document",
       resolvedSelectedPanelIds: request.selectedPanelIds,
       prompt: request.prompt, replyLocale: request.replyLocale, status: job.status, phase: job.phase,

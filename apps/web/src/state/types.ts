@@ -1,4 +1,4 @@
-import { ENGINE_VERSIONS, type AIHistoryTurn, type AIEditScope, type Candidate, type Diagnostic, type DomainCommand, type FigureDocumentV1, type LayoutRequest } from "@panelstudio/contracts";
+import { ENGINE_VERSIONS, type AIHistoryTurn, type AIEditScope, type Candidate, type Diagnostic, type DomainCommand, type ExportRequest, type FigureDocumentV1, type LayoutRequest } from "@panelstudio/contracts";
 import type { Guide } from "../model/snap";
 import type { Camera } from "../model/view";
 import type { LocaleName, MotionPreference, ThemeName } from "../prefs";
@@ -40,7 +40,7 @@ export type LayoutCard = {
 
 export type ExportState =
   | null
-  | { status: "running"; revision: number; phase: string }
+  | { status: "running"; request: ExportRequest; source: Confirmed; phase: string }
   | {
       status: "ready";
       revision: number;
@@ -51,7 +51,7 @@ export type ExportState =
     }
   | { status: "failed"; message: string };
 
-export type DialogName = null | "settings" | "ai-settings" | "shortcuts" | "export" | "svg" | "asset" | "recovery" | "quota" | "guided" | "publication" | "onboarding";
+export type DialogName = null | "settings" | "ai-settings" | "shortcuts" | "export" | "svg" | "asset" | "recovery" | "quota" | "guided" | "publication" | "onboarding" | "projects";
 
 export type QuotaChoice = { assetIds: string[]; remaining: number };
 
@@ -73,6 +73,8 @@ export type FrozenScope = { scope: AIEditScope; selectedPanelIds: string[] };
 export type AwaitingAnswer = FrozenScope & { jobId: string; baseRevision: number; question: string; options: string[] };
 
 export type WorkspaceState = {
+  assetTab: "assets" | "panels";
+  inspectorMode: "properties" | "ai" | "layout";
   compareMode: "editing" | "original" | "draft";
   candidateRoot: { revision: number; document: FigureDocumentV1 } | null;
   aiHistory: AIHistoryTurn[];
@@ -132,7 +134,7 @@ export function baseDocument(state: WorkspaceState): FigureDocumentV1 | null {
   return state.draft?.document ?? state.optimistic ?? state.confirmed?.document ?? null;
 }
 
-export function candidatesStale(state: WorkspaceState): boolean {
+export function candidatesStale(state: Pick<WorkspaceState, "cards" | "confirmed" | "draft">): boolean {
   const base = state.cards[0]?.candidate.baseRevision;
   if (base === undefined || !state.confirmed) return false;
   return base !== state.confirmed.revision || state.draft !== null || state.cards.some(({ candidate }) =>

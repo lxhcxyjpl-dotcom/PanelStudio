@@ -1,4 +1,5 @@
 import {
+  DEFAULT_MAX_AUTO_HEIGHT_MM,
   RESOURCE_LIMITS,
   TOLERANCES,
   type Diagnostic,
@@ -16,10 +17,15 @@ import {
   hasExplicitOrder,
   hasExplicitRows,
   assetFacts,
+  autoHeightLimit,
+  balancedRowCounts,
+  croppedAspect,
   occupiedRects,
   nearly,
   patternKey,
   compositions,
+  MAX_AUTO_ROW_UNITS,
+  MIN_WIDE_PANEL_ASPECT,
   splitUnits,
   type LayoutAssetFacts,
   type Rect,
@@ -29,7 +35,7 @@ import { parseUnitList } from "./units.js";
 import { assertLayoutConstraints, validateCandidateResult } from "./validate.js";
 import { solveLocalRow } from "./local-row.js";
 import { solveGuided } from "./guided.js";
-import { placeHeroLeft, placeStack, type Placement } from "./place.js";
+import { placeCompactStack, placeHeroLeft, placeStack, type Placement, type RowEmphasis } from "./place.js";
 import { scoreLayout, type ConcreteFamily } from "./score.js";
 
 export type { LayoutAssetFacts } from "./measure.js";
@@ -84,7 +90,10 @@ type Attempt = {
   family: ConcreteFamily;
   rows: Unit[][];
   primaryId: string | null;
+  compositionCost: number;
 };
+
+type RankedCandidate = { result: SolvedCandidate; compositionCost: number };
 
 /**
  * Deterministic candidate search for handbook section 7.
@@ -104,17 +113,20 @@ export function solveLayout(input: SolveLayoutInput): SolveLayoutResult {
   const prepared = prepare({ ...input, request: input.request });
   if (!prepared.ok) return prepared;
   const failures = new Map<FailureKind, Failure>();
-  const found: SolvedCandidate[] = [];
+  const found: RankedCandidate[] = [];
   for (const attempt of prepared.attempts) {
-    const outcome = evaluate(input.document, input.assets, prepared, attempt);
-    if (outcome.ok) found.push(outcome.candidate);
+    let outcome = evaluate(input.document, input.assets, prepared, attempt);
+    if (!outcome.ok && outcome.failure.kind === "height" && prepared.expandedAutoHeightLimitMm > prepared.autoHeightLimitMm) {
+      outcome = evaluate(input.document, input.assets, { ...prepared, autoHeightLimitMm: prepared.expandedAutoHeightLimitMm }, attempt);
+    }
+    if (outcome.ok) found.push({ result: outcome.candidate, compositionCost: attempt.compositionCost });
     else remember(failures, outcome.failure);
   }
   const limit =
     input.maxCandidates === 1 || input.maxCandidates === 2 || input.maxCandidates === 3
       ? input.maxCandidates
       : RESOURCE_LIMITS.maxLayoutCandidates;
-  const candidates = dedupe(found).slice(0, limit);
+  const candidates = dedupe(found).slice(0, limit).map(({ result }) => result);
   if (candidates.length > 0) return { ok: true, candidates };
   const failure = bestFailure(failures);
   return {
@@ -133,8 +145,12 @@ type Prepared = {
   widthMm: number;
   heightMode: "auto" | "fixed";
   fixedHeightMm: number;
+  autoHeightLimitMm: number;
+  expandedAutoHeightLimitMm: number;
   gutterH: number;
   gutterV: number;
+  compactExplicitRows: boolean;
+  emphasis?: RowEmphasis;
 };
 
 function prepare(input: Omit<SolveLayoutInput, "request"> & { request: GlobalRequest }): Prepared | SolveLayoutFailure {
@@ -145,7 +161,7 @@ function prepare(input: Omit<SolveLayoutInput, "request"> & { request: GlobalReq
     panelIds.length > RESOURCE_LIMITS.maxAutoLayoutPanels ||
     Object.keys(document.panels).length !== panelIds.length
   ) {
-    return invalid("REQUEST_INVALID", "Automatic layout supports 2 to 8 panels.");
+    return invalid("REQUEST_INVALID", `Automatic layout supports ${RESOURCE_LIMITS.minAutoLayoutPanels} to ${RESOURCE_LIMITS.maxAutoLayoutPanels} panels.`);
   }
   const missingAssets: string[] = [];
   const missingPanels: string[] = [];
@@ -192,47 +208,154 @@ function prepare(input: Omit<SolveLayoutInput, "request"> & { request: GlobalReq
   const heightMode = request.canvasOverride?.heightMode ?? document.canvas.heightMode;
   const fixedHeightMm =
     heightMode === "fixed" ? (request.canvasOverride?.heightMm ?? document.canvas.heightMm) : document.canvas.heightMm;
+  const autoHeightLimitMm = autoHeightLimit(document);
+  const intent = "emphasis" in request ? request.emphasis : undefined;
+  let emphasis: RowEmphasis | undefined;
+  let expandedAutoHeightLimitMm = autoHeightLimitMm;
+  if (intent) {
+    if (request.family !== "rows" || !hasExplicitRows(request) || !request.primaryPanelId) {
+      return invalid("REQUEST_INVALID", "Emphasis requires complete explicit rows and a primary panel.");
+    }
+    const alignedRows = alignedRowIndices(request.rows, intent.alignedRows ?? []);
+    if (!alignedRows) return invalid("REQUEST_INVALID", "Aligned rows must name distinct, consecutive singleton panel rows in order.");
+    emphasis = { minimumWidthMm: intent.minimumWidthMm, alignedRows };
+    if (heightMode === "auto" && document.canvas.heightMode === "auto" &&
+        document.layoutSettings.maxAutoHeightMm === DEFAULT_MAX_AUTO_HEIGHT_MM) {
+      expandedAutoHeightLimitMm = Math.max(autoHeightLimitMm,
+        Math.min(intent.maxAutoHeightMm ?? autoHeightLimitMm, DEFAULT_MAX_AUTO_HEIGHT_MM * 2));
+    }
+  }
   const gutterH = request.gutterOverrideMm?.horizontal ?? document.layoutSettings.gutterMm.horizontal;
   const gutterV = request.gutterOverrideMm?.vertical ?? document.layoutSettings.gutterMm.vertical;
   return {
     ok: true,
     units: parsed.units,
-    attempts: buildAttempts(request.family, parsed.units, parsed.explicitRows, parsed.rowMode, primaryId),
+    attempts: buildAttempts(request.family, parsed, primaryId, input),
     primaryId,
     widthMm,
     heightMode,
     fixedHeightMm,
+    autoHeightLimitMm,
+    expandedAutoHeightLimitMm,
     gutterH,
     gutterV,
+    compactExplicitRows: hasExplicitRows(request),
+    ...(emphasis ? { emphasis } : {}),
   };
+}
+
+function alignedRowIndices(rows: string[][], groups: string[][]): number[][] | null {
+  const used = new Set<number>();
+  const indexBySingleton = new Map(rows.flatMap((row, index) => row.length === 1 && row[0]?.startsWith("panel:") ? [[row[0], index] as const] : []));
+  const aligned: number[][] = [];
+  for (const group of groups) {
+    if (group.length < 2) return null;
+    const indices: number[] = [];
+    for (const unit of group) {
+      const index = indexBySingleton.get(unit);
+      if (index === undefined || used.has(index) || (indices.length && index !== indices.at(-1)! + 1)) return null;
+      used.add(index);
+      indices.push(index);
+    }
+    aligned.push(indices);
+  }
+  return aligned;
 }
 
 function buildAttempts(
   family: GlobalRequest["family"],
-  units: Unit[],
-  explicitRows: Unit[][] | null,
-  rowMode: "full" | "secondary" | "search",
+  { units, explicitRows, rowMode }: ParsedUnits,
   primaryId: string | null,
+  { document, assets }: Pick<SolveLayoutInput, "document" | "assets">,
 ): Attempt[] {
   const families: ConcreteFamily[] =
     family === "auto" ? ["rows", "hero-top", "hero-left"] : [family];
   const secondary = primaryId ? units.filter((unit) => !unitContains(unit, primaryId)) : units;
+  const aspects = new Map<Unit, number>();
+  if (!explicitRows) for (const unit of units) {
+    const aspect = unit.kind === "panel" && croppedAspect(document, assets, unit.panelId);
+    if (aspect) aspects.set(unit, aspect);
+  }
+  const wide = widePanels(aspects);
   const attempts: Attempt[] = [];
   for (const item of families) {
     if (item !== "rows" && !primaryId) continue;
     if (item === "rows" && rowMode === "secondary") continue;
     if (item !== "rows" && rowMode === "full") continue;
     const source = item === "rows" ? units : secondary;
+    const pairs = wide.size && units.length > 8 ? pairedFollowers(source, aspects, wide) : new Set<Unit>();
     const rowSets =
       explicitRows && rowMode !== "search"
         ? [explicitRows]
-        : compositions(source.length).map((pattern) => splitUnits(source, pattern));
+        : candidateRows(source, wide, pairs);
     for (const rows of rowSets) {
       if (item !== "rows" && rows.length === 0) continue;
-      attempts.push({ family: item, rows, primaryId });
+      const reducedWide = rows.reduce((total, row) =>
+        total + (item === "hero-left" || row.length > 1 ? row.filter((unit) => wide.has(unit)).length : 0), 0);
+      const splitPairs = rows.filter((row) => pairs.has(row[0]!)).length;
+      const dense = rows.some((row) => row.length > 3);
+      attempts.push({ family: item, rows, primaryId,
+        compositionCost: reducedWide * (RESOURCE_LIMITS.maxAutoLayoutPanels + 1) + splitPairs * 2 + Number(dense) });
     }
   }
   return attempts;
+}
+
+function widePanels(aspects: Map<Unit, number>): Set<Unit> {
+  const measured = [...aspects.values()].sort((a, b) => a - b);
+  if (measured.length < 4) return new Set();
+  const center = (measured[Math.floor((measured.length - 1) / 2)]! + measured[Math.floor(measured.length / 2)]!) / 2;
+  return new Set([...aspects].filter(([, aspect]) => aspect >= Math.max(MIN_WIDE_PANEL_ASPECT, center * 1.45)).map(([unit]) => unit));
+}
+
+function pairedFollowers(units: Unit[], aspects: Map<Unit, number>, wide: Set<Unit>): Set<Unit> {
+  const followers = new Set<Unit>();
+  for (let index = 1; index < units.length; index++) {
+    const first = units[index - 1]!, second = units[index]!;
+    const a = aspects.get(first), b = aspects.get(second);
+    if (!a || !b || wide.has(first) || wide.has(second) || followers.has(first)) continue;
+    if (Math.abs(a - b) <= Math.max(a, b) * 0.02) followers.add(second);
+  }
+  return followers;
+}
+
+function candidateRows(units: Unit[], wide: Set<Unit>, pairs: Set<Unit>): Unit[][][] {
+  const patterns = compositions(units.length);
+  if (units.some((unit) => wide.has(unit))) {
+    const maxColumns = units.length > 8 ? MAX_AUTO_ROW_UNITS : 3;
+    // A wide multi-part plot keeps its own row. Fill the contiguous runs between
+    // wide plots without changing the source order or choosing a scientific story.
+    for (let columns = 2; columns <= maxColumns; columns++) {
+      const pattern: number[] = [];
+      let run = 0;
+      for (const unit of units) {
+        if (wide.has(unit)) {
+          if (run) pattern.push(...balancedRowCounts(run, columns));
+          pattern.push(1);
+          run = 0;
+        } else run++;
+      }
+      if (run) pattern.push(...balancedRowCounts(run, columns));
+      patterns.push(pattern);
+      if (pairs.size) {
+        const pairedRows: number[] = [];
+        let count = 0;
+        for (const [index, unit] of units.entries()) {
+          if (pairs.has(unit)) continue;
+          const size = pairs.has(units[index + 1]!) ? 2 : 1;
+          if (count && (wide.has(unit) || count + size > columns)) {
+            pairedRows.push(count);
+            count = 0;
+          }
+          if (wide.has(unit)) pairedRows.push(1);
+          else count += size;
+        }
+        if (count) pairedRows.push(count);
+        patterns.push(pairedRows);
+      }
+    }
+  }
+  return [...new Map(patterns.map((p) => [p.join("-"), p])).values()].map((p) => splitUnits(units, p));
 }
 
 type ParsedUnits = {
@@ -341,6 +464,11 @@ function evaluate(
       failure: { kind: "fit", message: "This row arrangement does not fit the canvas width.", panelIds: everyone, constraintIds: [] },
     };
   }
+  if (prepared.emphasis && attempt.primaryId &&
+      placed.frames.get(attempt.primaryId)!.width + TOLERANCES.geometryComparisonMm < prepared.emphasis.minimumWidthMm) {
+    return { ok: false, failure: { kind: "fit", message: "The emphasized panel cannot reach the requested width in these rows.",
+      panelIds: [attempt.primaryId], constraintIds: [] } };
+  }
   for (const panelId of everyone) {
     if (!placed.frames.has(panelId)) {
       return {
@@ -386,7 +514,7 @@ function evaluate(
   for (const box of boxes) bottom = Math.max(bottom, box.y + box.height);
   const needed = bottom + margins.bottom;
   if (prepared.heightMode === "auto") {
-    if (needed > document.layoutSettings.maxAutoHeightMm + TOLERANCES.geometryComparisonMm) {
+    if (needed > prepared.autoHeightLimitMm + TOLERANCES.geometryComparisonMm) {
       return {
         ok: false,
         failure: {
@@ -428,6 +556,15 @@ function evaluate(
   const commands: DomainCommand[] = [];
   if (frames.some((item) => !framesNearlyEqual(document.panels[item.panelId]?.frameMm ?? item.frameMm, item.frameMm))) {
     commands.push({ type: "panel.setFrames", items: frames });
+  }
+  if (prepared.emphasis) {
+    const settings = document.layoutSettings;
+    const extended = nextCanvas.heightMode === "auto" && needed > autoHeightLimit(document) + TOLERANCES.geometryComparisonMm;
+    if (extended || settings.primaryPanelId !== attempt.primaryId) {
+      commands.push({ type: "layout.setSettings", layoutSettings: {
+        ...settings, primaryPanelId: attempt.primaryId, maxAutoHeightMm: extended ? needed : settings.maxAutoHeightMm,
+      } });
+    }
   }
   const canvasUnchanged =
     nextCanvas.heightMode === document.canvas.heightMode &&
@@ -500,6 +637,11 @@ function placeAttempt(
     attempt.family === "hero-top" && attempt.primaryId
       ? [[{ kind: "panel" as const, panelId: attempt.primaryId }], ...attempt.rows]
       : attempt.rows;
+  if (prepared.compactExplicitRows) {
+    const height = prepared.heightMode === "fixed" ? prepared.fixedHeightMm : prepared.autoHeightLimitMm;
+    return placeCompactStack(document, assets, rows, originX, originY, innerWidth, prepared.gutterH,
+      prepared.gutterV, height - document.canvas.marginsMm.bottom, attempt.primaryId, prepared.emphasis);
+  }
   return placeStack(document, assets, rows, originX, originY, innerWidth, prepared.gutterH, prepared.gutterV);
 }
 
@@ -540,10 +682,10 @@ function unitContains(unit: Unit, panelId: string): boolean {
   return unit.kind === "panel" ? unit.panelId === panelId : unit.panelIds.includes(panelId);
 }
 
-function dedupe(candidates: SolvedCandidate[]): SolvedCandidate[] {
-  const kept = new Map<string, SolvedCandidate>();
+function dedupe(candidates: RankedCandidate[]): RankedCandidate[] {
+  const kept = new Map<string, RankedCandidate>();
   for (const candidate of candidates) {
-    const key = geometryKey(candidate.previewDocument);
+    const key = geometryKey(candidate.result.previewDocument);
     const current = kept.get(key);
     if (!current || prefer(candidate, current)) kept.set(key, candidate);
   }
@@ -578,7 +720,9 @@ function quantizeNumber(value: number): number {
   return Math.round(value / step) * step;
 }
 
-function prefer(left: SolvedCandidate, right: SolvedCandidate): boolean {
+function prefer(a: RankedCandidate, b: RankedCandidate): boolean {
+  if (a.compositionCost !== b.compositionCost) return a.compositionCost < b.compositionCost;
+  const left = a.result, right = b.result;
   const leftScore = left.score.total ?? 2;
   const rightScore = right.score.total ?? 2;
   if (leftScore !== rightScore) return leftScore < rightScore;

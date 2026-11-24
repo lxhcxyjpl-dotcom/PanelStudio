@@ -1,5 +1,11 @@
 # Recorded workflows
 
+## Editorial Studio · 14 November 2026
+
+The [53.4-second actual browser recording](demo/editorial-studio.webm) shows homepage image playback, recorded editing stages, importing an editable synthetic example, comparing real layout candidates, accepting a layout, editing a panel position, undoing it, exporting SVG and returning home. It does not call an external model or show native Illustrator. [Screenshots and regression boundaries](editorial-implementation.md) accompany it.
+
+Reproduce with a dedicated `scripts/local-preview.mjs` server and `node scripts/record-editorial.mjs <output-directory>`. Playwright recording requires its FFmpeg component.
+
 ## v0.2 continuous refinement
 
 The [20.2-second recording](demo/v0.2-refinement.webm) shows the real web workspace at 1440 × 900. The local fixture provider responds to two prompts through the normal HTTP adapter. The first turn changes the initial multi-row layout into two rows of three. The second turn keeps that arrangement and moves label A by 1 mm. After comparing root and draft, the editor applies both turns in a single revision. The final steps move label B with the mouse, make B and C equally wide, and export editable SVG.

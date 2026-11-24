@@ -1,0 +1,63 @@
+{
+  "unicode_ranges": [
+    "0020-024F",
+    "2000-206F",
+    "2190-21FF",
+    "2212"
+  ],
+  "outputs": [
+    {
+      "file": "Newsreader-latin.woff2",
+      "family": "Newsreader",
+      "axes": {
+        "opsz": 56,
+        "wght": [
+          400,
+          500
+        ]
+      },
+      "bytes": 48788,
+      "sha256": "574b146d5da601344d7af2b59f54b754a34e7ef88645454f968ef426a73ac343"
+    },
+    {
+      "file": "Inter-latin.woff2",
+      "family": "Inter",
+      "axes": {
+        "opsz": 14,
+        "wght": 400
+      },
+      "bytes": 30248,
+      "sha256": "dda94a57313d089ee82efa16eafafd02fd6091fe9121fbcee62da6d6bbfb13be"
+    },
+    {
+      "file": "Inter-medium.woff2",
+      "family": "Inter",
+      "axes": {
+        "opsz": 14,
+        "wght": 500
+      },
+      "bytes": 31116,
+      "sha256": "12b805261a6f126f48811b2473c61457d3f7f0cdd15fb782884fa5837e62a194"
+    },
+    {
+      "file": "Inter-semibold.woff2",
+      "family": "Inter",
+      "axes": {
+        "opsz": 14,
+        "wght": 600
+      },
+      "bytes": 31456,
+      "sha256": "566e13c1929a22e139b25f8922a32b4dc75a23ce3cc09515e2120ff01a141a48"
+    },
+    {
+      "file": "GeistMono-latin.woff2",
+      "family": "GeistMono",
+      "axes": {
+        "wght": 400
+      },
+      "bytes": 11128,
+      "sha256": "8f89492365fe8ff1ce97de57718643882552c0eede1cef20026ab1565fa498bb"
+    }
+  ],
+  "total_bytes": 152736
+}

@@ -4,13 +4,19 @@ import {
   ARTWORK_COLOR_PRESETS,
   BUNDLED_FONTS,
   CANVAS_WIDTH_PRESETS_MM,
+  RESOURCE_LIMITS,
+  resolveLabelText,
   type FigureDocumentV1,
   type LabelOverrides,
 } from "@panelstudio/contracts";
 import { scalePanel, translateSelection } from "@panelstudio/core/arrange";
+import { DocumentCommandError } from "@panelstudio/core/apply";
 import { resolvePanelLabel } from "@panelstudio/core/labels";
+import { ApiClientError } from "../api/client";
+import { labelName } from "../model/changes";
+import { errorText } from "../model/feedback";
 import { sidebarWidth } from "../model/chrome";
-import { geometryLocked, mergedOverrides } from "../model/document-ui";
+import { cropInvalid, geometryLocked, mergedOverrides } from "../model/document-ui";
 import {
   align,
   continueEditing,
@@ -19,28 +25,41 @@ import {
   distribute,
   enterCrop,
   equalSize,
+  requestLayout,
+  resizeCanvas,
   restoreFullCrop,
+  selectCandidate,
   transact,
   updateCrop,
 } from "../state/session";
-import { patch, useWorkspace } from "../state/store";
-import { baseDocument } from "../state/types";
+import { patch, useWorkspace, useWorkspaceFields } from "../state/store";
+import { baseDocument, candidatesStale } from "../state/types";
 import { AiPanel } from "./AiPanel";
+import { ArrangeInspector } from "./ArrangeInspector";
+import { CropActions } from "./CropActions";
 import { LocalRow } from "./LocalRow";
-import { Button, Icon, NumberField, SelectField, TextField } from "./widgets";
+import { Button, Icon, NumberField, SelectField, TabBar, TextField } from "./widgets";
 
 export function Inspector() {
   const { t } = useTranslation();
-  const state = useWorkspace();
-  const [tab, setTab] = useState<"properties" | "ai">("properties");
-  useEffect(() => {
-    if (state.aiStatus.phase === "running") {
-      setTab("ai");
-      patch({ rightOpen: true });
+  const state = useWorkspaceFields(
+    "inspectorMode", "mode", "rightWidth", "rightOpen", "compareMode", "candidateRoot", "activeCandidateId", "cards",
+  );
+  const tab = state.inspectorMode;
+  const setTab = (inspectorMode: typeof tab) => {
+    if (inspectorMode === "layout" && state.compareMode === "editing" && state.activeCandidateId && !candidatesStale(useWorkspace.getState())) {
+      selectCandidate(state.activeCandidateId);
     }
-  }, [state.aiStatus.phase]);
+    patch({ inspectorMode });
+  };
   const width = sidebarWidth("right", state.mode, state.rightWidth);
-  const document = baseDocument(state);
+  const previewing = state.compareMode !== "editing";
+  const hasLayouts = tab === "layout" || state.cards.some(card => card.candidate.origin !== "ai");
+  const phoneHeading = state.mode === "phone" && !hasLayouts;
+  const base = useWorkspace(baseDocument);
+  const document = state.compareMode === "original" ? state.candidateRoot?.document ?? base
+    : state.compareMode === "draft" ? state.cards.find(card => card.candidate.id === state.activeCandidateId)?.candidate.previewDocument ?? base
+    : base;
   return (
     <aside
       className="sidebar right-sidebar" id="studio-inspector"
@@ -49,26 +68,29 @@ export function Inspector() {
       style={{ width }}
       aria-label={t("a11y.right")}
     >
-      <div className="tabs" role="tablist">
-        <button type="button" data-action="tab-properties" role="tab" aria-selected={tab === "properties"} onClick={() => { setTab("properties"); continueEditing(); }}>
-          <Icon name="sliders" />{t("inspector.tab")}
-        </button>
-        <button type="button" data-action="tab-ai" role="tab" aria-selected={tab === "ai"} onClick={() => setTab("ai")}>
-          <Icon name="chat" />{t("ai.tab")}
-        </button>
-      </div>
+      {phoneHeading ? <h2 className="drawer-heading" id="inspector-drawer-heading" tabIndex={-1} data-drawer-heading>
+        {t(tab === "ai" ? "ai.tab" : "inspector.tab")}
+      </h2> : <TabBar id="inspector-tabs" value={tab} onChange={setTab} label={t("a11y.right")} items={[
+        { value: "properties", label: t("inspector.tab"), action: "tab-properties" }, { value: "ai", label: t("ai.tab"), action: "tab-ai" },
+        ...(hasLayouts ? [{ value: "layout" as const, label: t("layout.candidatesTab"), action: "tab-layout" }] : []),
+      ]} />}
       <Button action="close-inspector" className="drawer-close" variant="quiet" aria-label={t("a11y.close")}
         onClick={() => patch({rightOpen:false})}><Icon name="close" /></Button>
-      <div className={"side-scroll" + (tab === "ai" ? " conversation-scroll" : "")}>
-        {tab === "ai" ? <AiPanel /> : document ? <Properties document={document} /> : <p className="muted section">{t("app.noProject")}</p>}
+      <div className={"side-scroll" + (tab === "ai" ? " conversation-scroll" : tab === "layout" ? " layout-scroll" : "")}
+        role={phoneHeading ? "region" : "tabpanel"} id="inspector-tabs-panel"
+        aria-labelledby={phoneHeading ? "inspector-drawer-heading" : "inspector-tabs-" + tab}>
+        {tab === "ai" ? <AiPanel /> : tab === "layout" ? <ArrangeInspector /> : document ? <>
+          {previewing && <div className="preview-readonly"><p>{t("inspector.previewReadOnly")}</p><Button action="properties-edit" onClick={continueEditing}>{t("inspector.returnEditing")}</Button></div>}
+          <fieldset className="property-content" disabled={previewing}><Properties document={document} /></fieldset>
+        </> : <p className="muted section">{t("app.noProject")}</p>}
       </div>
     </aside>
   );
 }
 
 function Properties({ document }: { document: FigureDocumentV1 }) {
-  const state = useWorkspace();
-  if (state.crop) return <CropFields document={document} />;
+  const state = useWorkspaceFields("crop", "selection");
+  if (state.crop) return <CropFields />;
   if (state.selection.kind === "none") return <CanvasFields document={document} />;
   if (state.selection.kind === "label") return <LabelFields document={document} panelId={state.selection.panelId} />;
   if (state.selection.kind === "group") return <GroupFields document={document} groupId={state.selection.groupId} />;
@@ -78,27 +100,63 @@ function Properties({ document }: { document: FigureDocumentV1 }) {
   return <PanelFields document={document} panelId={panelId} />;
 }
 
+function CanvasDimensions({ document }: { document: FigureDocumentV1 }) {
+  const { t } = useTranslation();
+  type Dimension = "widthMm" | "heightMm";
+  const [rejection, setRejection] = useState<{
+    dimension: Dimension; value: number; error: unknown; source: FigureDocumentV1; attempt: number;
+  } | null>(null);
+  const issue = rejection?.source === document ? rejection : null;
+  const error = issue?.error instanceof DocumentCommandError || issue?.error instanceof ApiClientError ? issue.error : null;
+  const outside = error?.code === "OUTSIDE_CANVAS";
+  const lockedPanels = (error?.details.panelIds ?? []).filter(id => geometryLocked(document, id) === "lock");
+  const canReflow = issue?.dimension === "widthMm" && outside &&
+    document.panelOrder.length >= RESOURCE_LIMITS.minAutoLayoutPanels;
+  const canvas = document.canvas;
+  function change(dimension: Dimension, value: number) {
+    if (canvas[dimension] === value) { setRejection(null); return; }
+    void resizeCanvas(dimension, value, (error, source) => {
+      setRejection(previous => ({ dimension, value, error, source, attempt: (previous?.attempt ?? 0) + 1 }));
+    });
+  }
+  return <>
+    <div className="preset-row width-presets">
+      {CANVAS_WIDTH_PRESETS_MM.map(width => <Button key={width} action={`width-${width}`}
+        aria-pressed={canvas.widthMm === width} onClick={() => change("widthMm", width)}>{width} mm</Button>)}
+    </div>
+    <div className="field-pair">
+      <NumberField key={issue?.dimension === "widthMm" ? `width-${issue.attempt}` : "width"} label={t("inspector.width") + " (mm)"}
+        value={canvas.widthMm} min={0.1} onCommit={value => change("widthMm", value)} />
+      <NumberField key={issue?.dimension === "heightMm" ? `height-${issue.attempt}` : "height"} label={t("inspector.height") + " (mm)"}
+        value={canvas.heightMm} min={0.1} onCommit={value => change("heightMm", value)} />
+    </div>
+    {issue && <div className="field-group canvas-resize-feedback">
+      <p role="alert" className="task-warning">{t(issue.dimension === "widthMm" ? "inspector.widthRejected" : "inspector.heightRejected",
+        { value: issue.value, reason: errorText(issue.error) })}</p>
+      {outside && lockedPanels.length ? <p>{t("inspector.resizeLocked", {
+        panels: lockedPanels.map(id => labelName(document, id)).join(", "),
+      })}</p> : canReflow ? <Button action="preview-canvas-width" onClick={() =>
+        void requestLayout({ family: "auto", canvasOverride: { widthMm: issue.value } })}>
+        {t("inspector.previewWidth", { width: issue.value })}</Button>
+        : outside && <p>{t("inspector.resizeManually")}</p>}
+    </div>}
+  </>;
+}
+
 function CanvasFields({ document }: { document: FigureDocumentV1 }) {
   const { t } = useTranslation();
   const canvas = document.canvas;
   const settings = document.layoutSettings;
   const style = document.labelStyle;
+  const labelExamples = [0, 1, 2].map(index => resolveLabelText({
+    index, sequence: style.sequence, format: style.format, textOverride: null,
+  })).join(" ");
   const ungrouped = document.panelOrder.filter((id) => !Object.values(document.groups).some((group) => group.panelIds.includes(id)));
   return (
     <>
       <section className="section canvas-fields">
         <h2 className="inspector-section-title"><Icon name="reference" />{t("inspector.canvas")}</h2>
-        <div className="preset-row width-presets">
-          {CANVAS_WIDTH_PRESETS_MM.map((width) => (
-            <Button key={width} action={`width-${width}`} aria-pressed={canvas.widthMm === width} onClick={() => void transact([{ type: "canvas.set", canvas: { ...canvas, widthMm: width } }])}>
-              {width} mm
-            </Button>
-          ))}
-        </div>
-        <div className="field-pair">
-          <NumberField label={t("inspector.width") + " (mm)"} value={canvas.widthMm} min={0.1} onCommit={(widthMm) => void transact([{ type: "canvas.set", canvas: { ...canvas, widthMm } }])} />
-          <NumberField label={t("inspector.height") + " (mm)"} value={canvas.heightMm} min={0.1} onCommit={(heightMm) => void transact([{ type: "canvas.set", canvas: { ...canvas, heightMm } }])} />
-        </div>
+        <CanvasDimensions document={document} />
         <details className="inspector-disclosure"><summary>{t("inspector.canvasDetails")}<Icon name="chevron" /></summary><div>
         <SelectField
           label={t("inspector.heightMode")}
@@ -112,17 +170,17 @@ function CanvasFields({ document }: { document: FigureDocumentV1 }) {
           <NumberField label={t("inspector.bottom")} value={canvas.marginsMm.bottom} onCommit={(bottom) => void transact([{ type: "canvas.set", canvas: { ...canvas, marginsMm: { ...canvas.marginsMm, bottom } } }])} />
           <NumberField label={t("inspector.left")} value={canvas.marginsMm.left} onCommit={(left) => void transact([{ type: "canvas.set", canvas: { ...canvas, marginsMm: { ...canvas.marginsMm, left } } }])} />
         </fieldset>
-        <label className="field canvas-background">
+        <div className="field canvas-background">
           <span>{t("inspector.background")}</span>
-          <input value={canvas.background} disabled title={t("inspector.backgroundLocked")} readOnly />
-        </label>
+          <span>{t("inspector.backgroundWhite")}</span>
+        </div>
         </div></details>
       </section>
       <section className="section canvas-fields">
-        <h2 className="inspector-section-title"><Icon name="layout" />{t("inspector.gutter")}</h2>
-        <div className="field-pair">
-          <NumberField label={t("inspector.gutterX") + " (mm)"} value={settings.gutterMm.horizontal} onCommit={(horizontal) => void transact([{ type: "layout.setSettings", layoutSettings: { ...settings, gutterMm: { ...settings.gutterMm, horizontal } } }])} />
-          <NumberField label={t("inspector.gutterY") + " (mm)"} value={settings.gutterMm.vertical} onCommit={(vertical) => void transact([{ type: "layout.setSettings", layoutSettings: { ...settings, gutterMm: { ...settings.gutterMm, vertical } } }])} />
+        <h2 className="inspector-section-title" id="canvas-gutters"><Icon name="layout" />{t("inspector.gutter")} (mm)</h2>
+        <div className="field-pair" role="group" aria-labelledby="canvas-gutters">
+          <NumberField label={t("inspector.gutterX")} value={settings.gutterMm.horizontal} onCommit={(horizontal) => void transact([{ type: "layout.setSettings", layoutSettings: { ...settings, gutterMm: { ...settings.gutterMm, horizontal } } }])} />
+          <NumberField label={t("inspector.gutterY")} value={settings.gutterMm.vertical} onCommit={(vertical) => void transact([{ type: "layout.setSettings", layoutSettings: { ...settings, gutterMm: { ...settings.gutterMm, vertical } } }])} />
         </div>
         <SelectField
           label={t("inspector.primary")}
@@ -141,8 +199,10 @@ function CanvasFields({ document }: { document: FigureDocumentV1 }) {
         </details>
       </section>
       <section className="section canvas-fields">
-        <h2 className="inspector-section-title"><Icon name="edit" />{t("inspector.labels")}</h2>
-        <LabelStyleFields style={style} />
+        <details className="inspector-disclosure" data-testid="default-label-settings">
+          <summary><span>{t("panels.label")}　{labelExamples} · {style.fontSizePt} pt</span><Icon name="chevron" /></summary>
+          <LabelStyleFields style={style} />
+        </details>
       </section>
     </>
   );
@@ -171,19 +231,22 @@ function PanelFields({ document, panelId }: { document: FigureDocumentV1; panelI
   const blocked = geometryLocked(document, panelId);
   const reason = blocked === "group" ? t("inspector.disabledGroup") : blocked === "lock" ? t("inspector.disabledLock") : undefined;
   return (
-    <section className="section">
+    <><section className="section panel-properties">
       <h2>{panel.name}</h2>
       <TextField label={t("panels.name")} value={panel.name} onCommit={(name) => void transact([{ type: "panel.rename", panelId, name }])} />
+      <div className="field-pair">
       <NumberField label="X (mm)" value={panel.frameMm.x} disabledReason={reason} onCommit={(x) => void transact([translateSelection(document, [panelId], x - panel.frameMm.x, 0)])} />
       <NumberField label="Y (mm)" value={panel.frameMm.y} disabledReason={reason} onCommit={(y) => void transact([translateSelection(document, [panelId], 0, y - panel.frameMm.y)])} />
+      </div><div className="field-pair">
       <NumberField label={t("inspector.width") + " (mm)"} value={panel.frameMm.width} min={0.1} disabledReason={reason} onCommit={(width) => void transact([scalePanel(document, panelId, { width }, "top-left")])} />
       <NumberField label={t("inspector.height") + " (mm)"} value={panel.frameMm.height} min={0.1} disabledReason={reason} onCommit={(height) => void transact([scalePanel(document, panelId, { height }, "top-left")])} />
+      </div><p className="panel-proportion"><Icon name="lock" />{t("inspector.proportion")} · {(panel.frameMm.width / panel.frameMm.height).toFixed(2)} : 1</p><div className="panel-actions">
       <Button action="enter-crop" disabledReason={reason} onClick={() => enterCrop(panelId)}>{t("inspector.crop")}</Button>
       <Button action="panel-lock" onClick={() => void transact([{ type: "panel.setLocked", panelIds: [panelId], locked: !panel.locked }])}>
         {panel.locked ? t("panels.unlock") : t("panels.lock")}
       </Button>
-      <Button action="select-its-label" onClick={() => patch({ selection: { kind: "label", panelId } })}>{t("panels.label")}</Button>
-    </section>
+      <Button action="select-its-label" onClick={() => patch({ selection: { kind: "label", panelId } })}>{t("labels.edit")}</Button>
+      </div></section></>
   );
 }
 
@@ -211,12 +274,15 @@ function LabelFields({ document, panelId }: { document: FigureDocumentV1; panelI
       <NumberField label={t("labels.size") + " (pt)"} value={overrides.typography?.fontSizePt ?? document.labelStyle.fontSizePt} min={0.1} onCommit={(fontSizePt) => commitOverride(document, panelId, { typography: { ...(overrides.typography ?? {}), fontSizePt } })} />
       <ColorField label={t("labels.color")} value={overrides.typography?.color ?? document.labelStyle.color} onCommit={(color) => commitOverride(document, panelId, { typography: { ...(overrides.typography ?? {}), color } })} />
       <SelectField label={t("labels.placement")} value={overrides.placement ?? document.labelStyle.placement} options={[{ value: "outside-top-left", label: t("labels.outside") }, { value: "inside-top-left", label: t("labels.inside") }]} onChange={(placement) => commitOverride(document, panelId, { placement: placement as "outside-top-left" | "inside-top-left" })} />
-      <NumberField label={t("labels.baselineX")} value={offset.x} onCommit={(x) => commitOverride(document, panelId, { offsetMm: { ...offset, x } })} />
-      <NumberField label={t("labels.baselineY")} value={offset.y} onCommit={(y) => commitOverride(document, panelId, { offsetMm: { ...offset, y } })} />
+      <div className="field-pair" role="group" aria-labelledby="label-offset-reference">
+        <NumberField label={t("labels.baselineX")} value={offset.x} onCommit={(x) => commitOverride(document, panelId, { offsetMm: { ...offset, x } })} />
+        <NumberField label={t("labels.baselineY")} value={offset.y} onCommit={(y) => commitOverride(document, panelId, { offsetMm: { ...offset, y } })} />
+      </div>
+      <small className="muted" id="label-offset-reference">{t("labels.offsetReference")}</small>
       <Button action="hide-label" onClick={() => commitOverride(document, panelId, { visible: overrides.visible === false ? null : false })}>{t(overrides.visible === false ? "labels.show" : "labels.hide")}</Button>
-      <Button action="reset-label-text" disabled={!overrides.text} onClick={() => commitOverride(document, panelId, { text: null })}>{t("labels.resetText")}</Button>
-      <Button action="reset-label-position" disabled={!overrides.offsetMm && !overrides.placement} onClick={() => commitOverride(document, panelId, { offsetMm: null, placement: null })}>{t("labels.resetPosition")}</Button>
-      <Button action="reset-label-style" disabled={!overrides.typography} onClick={() => commitOverride(document, panelId, { typography: null })}>{t("labels.resetStyle")}</Button>
+      {overrides.text !== null && <Button action="reset-label-text" onClick={() => commitOverride(document, panelId, { text: null })}>{t("labels.resetText")}</Button>}
+      {(overrides.offsetMm || overrides.placement) && <Button action="reset-label-position" onClick={() => commitOverride(document, panelId, { offsetMm: null, placement: null })}>{t("labels.resetPosition")}</Button>}
+      {overrides.typography && Object.keys(overrides.typography).length > 0 && <Button action="reset-label-style" onClick={() => commitOverride(document, panelId, { typography: null })}>{t("labels.resetStyle")}</Button>}
       <details className="field-group"><summary>{t("labels.all")}</summary><LabelStyleFields style={document.labelStyle} /></details>
     </section>
   );
@@ -224,6 +290,16 @@ function LabelFields({ document, panelId }: { document: FigureDocumentV1; panelI
 
 function MultiFields({ document, ids }: { document: FigureDocumentV1; ids: string[] }) {
   const { t } = useTranslation();
+  const styles = ids.map(id => ({ ...document.labelStyle, ...document.panels[id]?.labelOverrides.typography }));
+  function common<K extends "fontId" | "fontSizePt" | "fontWeight">(key: K): FigureDocumentV1["labelStyle"][K] | "mixed" {
+    return styles.every(style => style[key] === styles[0]?.[key]) ? styles[0]?.[key] ?? document.labelStyle[key] : "mixed";
+  }
+  function setTypography(typography: NonNullable<LabelOverrides["typography"]>) {
+    void transact([{ type: "label.setOverrides", items: ids.flatMap(panelId => {
+      const panel = document.panels[panelId];
+      return panel ? [{ panelId, value: mergedOverrides(panel.labelOverrides, { typography: { ...panel.labelOverrides.typography, ...typography } }) }] : [];
+    }) }]);
+  }
   const colors = ids.map((id) => document.panels[id]?.labelOverrides.typography?.color ?? document.labelStyle.color);
   const color = colors.every((item) => item === colors[0]) ? colors[0] ?? document.labelStyle.color : "mixed";
   const tooFew = ids.length < 2 ? t("inspector.needTwo") : undefined;
@@ -244,6 +320,11 @@ function MultiFields({ document, ids }: { document: FigureDocumentV1; ids: strin
       <Button action="equal-width" disabledReason={tooFew} onClick={() => void equalSize("width")}>{t("inspector.equalWidth")}</Button>
       <Button action="equal-height" disabledReason={tooFew} onClick={() => void equalSize("height")}>{t("inspector.equalHeight")}</Button>
       <h2>{t("inspector.common")}</h2>
+      <SelectField label={t("labels.font")} value={common("fontId")} options={[{ value: "mixed", label: t("inspector.mixed") }, ...BUNDLED_FONTS.map(font => ({ value: font.fontId, label: font.family }))]}
+        onChange={fontId => { if (fontId === "noto-sans" || fontId === "noto-sans-sc") setTypography({ fontId }); }} />
+      <div className="field-pair"><NumberField label={t("labels.size") + " (pt)"} value={common("fontSizePt")} mixedLabel={t("inspector.mixed")} min={0.1} onCommit={fontSizePt => setTypography({ fontSizePt })} />
+      <SelectField label={t("labels.weight")} value={String(common("fontWeight"))} options={[{ value: "mixed", label: t("inspector.mixed") }, { value: "400", label: t("labels.regular") }, { value: "700", label: t("labels.bold") }]}
+        onChange={weight => { if (weight === "400" || weight === "700") setTypography({ fontWeight: weight === "700" ? 700 : 400 }); }} /></div>
       {color === "mixed" ? <p>{t("inspector.mixed")}</p> : null}
       <ColorField
         label={t("labels.color")}
@@ -284,21 +365,29 @@ function GroupFields({ document, groupId }: { document: FigureDocumentV1; groupI
   );
 }
 
-function CropFields({ document }: { document: FigureDocumentV1 }) {
+function CropFields() {
   const { t } = useTranslation();
   const crop = useWorkspace((state) => state.crop);
   if (!crop) return null;
-  const invalid = crop.crop.x < -1e-6 || crop.crop.y < -1e-6 || crop.crop.x + crop.crop.width > 1 + 1e-6 || crop.crop.y + crop.crop.height > 1 + 1e-6;
+  const invalid = cropInvalid(crop.crop);
+  const print = (value: number) => value * 100;
   return (
-    <section className="section">
+    <section className="section crop-fields">
       <h2>{t("crop.title")}</h2>
-      {invalid ? <p>{t("crop.invalid")}</p> : null}
-      <NumberField label="X" value={crop.crop.x} onCommit={(x) => updateCrop({ ...crop.crop, x })} />
-      <NumberField label="Y" value={crop.crop.y} onCommit={(y) => updateCrop({ ...crop.crop, y })} />
-      <NumberField label={t("inspector.width")} value={crop.crop.width} min={0.01} onCommit={(width) => updateCrop({ ...crop.crop, width })} />
-      <NumberField label={t("inspector.height")} value={crop.crop.height} min={0.01} onCommit={(height) => updateCrop({ ...crop.crop, height })} />
+      <fieldset>
+        <legend>{t("crop.relative")}</legend>
+        <div className="field-pair">
+          <NumberField label={t("crop.horizontal")} value={print(crop.crop.x)} onCommit={(x) => updateCrop({ ...crop.crop, x: x / 100 })} />
+          <NumberField label={t("crop.vertical")} value={print(crop.crop.y)} onCommit={(y) => updateCrop({ ...crop.crop, y: y / 100 })} />
+        </div>
+        <div className="field-pair">
+          <NumberField label={t("inspector.width") + " (%)"} value={print(crop.crop.width)} onCommit={(width) => updateCrop({ ...crop.crop, width: width / 100 })} />
+          <NumberField label={t("inspector.height") + " (%)"} value={print(crop.crop.height)} onCommit={(height) => updateCrop({ ...crop.crop, height: height / 100 })} />
+        </div>
+      </fieldset>
+      {invalid && <p role="status">{t("crop.invalid")}</p>}
       <Button action="restore-crop" onClick={restoreFullCrop}>{t("crop.restore")}</Button>
-      <p className="muted">{document.panels[crop.panelId]?.name}</p>
+      <CropActions />
     </section>
   );
 }
