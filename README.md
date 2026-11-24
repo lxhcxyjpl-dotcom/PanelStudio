@@ -2,46 +2,32 @@
 
 [中文](README.zh-CN.md)
 
-PanelStudio is a local or self-hosted editor for multi-panel scientific figures. You import drawings you already made, the app proposes a layout and adds panel labels, and you export an SVG you can keep editing in Adobe Illustrator.
+PanelStudio is a local editor for assembling existing plots into multi-panel scientific figures. Import your panels, compare layouts, adjust sizes and labels on the canvas, and export an SVG you can keep editing in Adobe Illustrator.
 
-The normative handbook is [`docs/PanelStudio-spec-v0.1.md`](docs/PanelStudio-spec-v0.1.md). This repository is v0.1.0. AI is optional: import, layout, editing, and export work with no model configured.
+**Latest development preview** · [PanelStudio 0.2.0](https://github.com/lxhcxyjpl-dotcom/PanelStudio/tree/design/editorial-studio) adds image-aware selection of main and supplementary panels, layout changes by conversation, and one-step undo. The quick start below runs the v0.1.0 default branch.
 
-## Flow
+Run PanelStudio locally in a browser with no PanelStudio account. Import, layout, editing and export work without an API key. To give layout instructions in plain language, connect a compatible model in the AI settings.
 
-Import images → auto layout → adjust with one sentence, or with the mouse → export SVG → keep editing in Illustrator.
+![Layout candidates for six imported scientific panels](docs/screenshots/03-layout.png)
 
-![Empty editor](docs/screenshots/01-empty.png)
+## Quick start
 
-![Six imported drawings](docs/screenshots/02-imported.png)
-
-![Layout candidates](docs/screenshots/03-layout.png)
-
-![One sentence makes C the primary panel](docs/screenshots/05-ai-primary.png)
-
-![Export dialog, with bundled font names](docs/screenshots/06-export.png)
-
-Those stills are from the running app. A Playwright capture of the same in-app states is [`docs/demo/in-app-walkthrough.webm`](docs/demo/in-app-walkthrough.webm). It does not include Illustrator. The sentence in that capture is answered by a local stand-in, not a hosted model. The script is [`docs/demo.md`](docs/demo.md).
-
-## Run
-
-Node.js 22.12 or newer, pnpm 10.33.4.
+Use Node.js 22.12 or newer and pnpm 10.33.4. In the first terminal, download the source, install dependencies and start the backend.
 
 ```bash
+git clone https://github.com/lxhcxyjpl-dotcom/PanelStudio.git
+cd PanelStudio
 pnpm install --frozen-lockfile
 pnpm --filter @panelstudio/server exec node start.mjs
 ```
 
-In a second terminal:
+Open a second terminal in the `PanelStudio` directory and start the web app.
 
 ```bash
 pnpm --filter @panelstudio/web dev
 ```
 
-Open `http://127.0.0.1:5173`. Full notes, including the data directory and `master.key`, are in [`docs/install.md`](docs/install.md).
-
-The default data directory is `$HOME/.panelstudio`. `master.key` is created there when you save a model secret. It must never be committed.
-
-The project menu opens another project on this server, soft-deletes the current one, or restores a deleted one. A deleted project keeps its files and history, rejects new edits, and cancels work that had not finished. The route audit is [`docs/v0.1-gap-close.md`](docs/v0.1-gap-close.md).
+Keep both terminals running and open [the local workspace](http://127.0.0.1:5173). Projects and images are stored in `$HOME/.panelstudio` on the machine running the backend. Installation, data and self-hosting details are in the [setup guide](docs/install.md).
 
 ## Formats and limits
 
@@ -51,12 +37,13 @@ Details: [`docs/format-support.md`](docs/format-support.md).
 
 ## Example
 
-[`examples/synthetic-six/`](examples/synthetic-six/) is an original six-panel figure (MIT), with source drawings and a `.figurezip`.
+Try the original [six-panel example](examples/synthetic-six/) (MIT). It includes source drawings and a `.figurezip` project. The [recorded walkthrough](docs/demo/in-app-walkthrough.webm) shows import, layout and SVG export. It uses a local test model for the example layout request.
 
 ## More
 
 - [Test record](docs/test-record.md)
-- [Illustrator checklist](docs/illustrator-compatibility.md) — every row needs a manual check
+- [Illustrator compatibility checklist](docs/illustrator-compatibility.md)
 - [Licenses, including the Noto OFL](docs/licenses.md)
+- [v0.1 handbook](docs/PanelStudio-spec-v0.1.md)
 - [Phase 6 notes](docs/phase-6-decisions.md)
 - [v0.1 route audit](docs/v0.1-gap-close.md)

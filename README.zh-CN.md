@@ -2,46 +2,32 @@
 
 [English](README.md)
 
-PanelStudio 是一个本地或自部署的科研多面板排版编辑器。导入已经画好的子图，应用给出版式并加上面板编号，再导出可以在 Adobe Illustrator 里继续编辑的 SVG。
+PanelStudio 是一个本地科研组图工具。导入已经画好的子图，在画布上比较版式、微调尺寸和面板编号，再导出可在 Adobe Illustrator 里继续编辑的 SVG。
 
-规范正文是 [`docs/PanelStudio-spec-v0.1.md`](docs/PanelStudio-spec-v0.1.md)。当前版本是 v0.1.0。AI 是可选的：不配置模型，导入、排版、编辑和导出仍然可用。
+**最新开发预览** · [PanelStudio 0.2.0](https://github.com/lxhcxyjpl-dotcom/PanelStudio/tree/design/editorial-studio) 支持模型读图、挑选正文和补图、对话改稿与一键撤销。下方启动步骤适用于默认分支 v0.1.0。
 
-## 核心流程
+在本机启动后，用浏览器打开即可使用，无需注册账号。基础导入、排版、编辑和导出无需 API Key。想用自然语言描述排版要求，可以在 AI 设置里接入兼容模型。
 
-导入图片 → 一键排版 → 用一句话或鼠标调整 → 导出 SVG → 在 Illustrator 里继续改。
+![六张科研子图的排版候选](docs/screenshots/03-layout.png)
 
-![空编辑器](docs/screenshots/01-empty.png)
+## 本地运行
 
-![导入六张图](docs/screenshots/02-imported.png)
-
-![布局候选](docs/screenshots/03-layout.png)
-
-![一句话把 C 设成主图](docs/screenshots/05-ai-primary.png)
-
-![导出对话框，显示内置字体名](docs/screenshots/06-export.png)
-
-这些截图来自正在运行的应用。同一段应用内流程的 Playwright 录像是 [`docs/demo/in-app-walkthrough.webm`](docs/demo/in-app-walkthrough.webm)。录像里没有 Illustrator。那一句调整由本地语料替身回答，不是托管模型。讲解稿在 [`docs/demo.md`](docs/demo.md)。Illustrator 里改编号和曲线需要人来录。
-
-## 运行
-
-需要 Node.js 22.12 或更新，以及 pnpm 10.33.4。
+需要 Node.js 22.12 或更新版本，以及 pnpm 10.33.4。在第一个终端下载源码、安装依赖并启动后端。
 
 ```bash
+git clone https://github.com/lxhcxyjpl-dotcom/PanelStudio.git
+cd PanelStudio
 pnpm install --frozen-lockfile
 pnpm --filter @panelstudio/server exec node start.mjs
 ```
 
-另一个终端：
+在 `PanelStudio` 目录打开第二个终端，启动网页。
 
 ```bash
 pnpm --filter @panelstudio/web dev
 ```
 
-打开 `http://127.0.0.1:5173`。数据目录、`master.key` 和自部署说明在 [`docs/install.md`](docs/install.md)。
-
-数据目录默认是 `$HOME/.panelstudio`。保存模型密钥时会在那里生成 `master.key`，权限 `0600`。不要把这个文件提交到仓库。
-
-项目菜单可以打开这台服务上的其他项目，软删除当前项目，或恢复已删除的项目。删除后素材和历史还在，新的修改会被拒绝，未完成的任务会被取消。路由对照见 [`docs/v0.1-gap-close.md`](docs/v0.1-gap-close.md)。
+保持两个终端运行，打开[本机工作台](http://127.0.0.1:5173)。项目和图片默认保存在后端所在电脑的 `$HOME/.panelstudio`。更多安装、数据目录和自部署细节见[安装说明](docs/install.md)。
 
 ## 格式与限制
 
@@ -51,12 +37,13 @@ pnpm --filter @panelstudio/web dev
 
 ## 示例
 
-[`examples/synthetic-six/`](examples/synthetic-six/) 是原创的六面板图（MIT），带源文件和 `.figurezip`。
+可以先用[原创六面板示例](examples/synthetic-six/)（MIT），其中有源图和 `.figurezip` 工程包。[演示录像](docs/demo/in-app-walkthrough.webm)展示导入、排版和 SVG 导出，示例排版指令使用本地测试模型。
 
 ## 其他
 
 - [测试记录](docs/test-record.md)
-- [Illustrator 对照表](docs/illustrator-compatibility.md)：每一行都是 needs manual check
+- [Illustrator 兼容性检查表](docs/illustrator-compatibility.md)
 - [依赖与字体许可](docs/licenses.md)
+- [v0.1 手册](docs/PanelStudio-spec-v0.1.md)
 - [阶段 6 记录](docs/phase-6-decisions.md)
 - [v0.1 路由对照](docs/v0.1-gap-close.md)
